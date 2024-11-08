@@ -1,0 +1,42 @@
+{
+  "name": "nostr-zap-view",
+  "version": "0.1.0",
+  "description": "A module to manage and display Zaps.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lokuyow/nostr-zap-view.git"
+  },
+  "keywords": [
+    "nostr",
+    "zap",
+    "bitcoin",
+    "lightning"
+  ],
+  "author": "Lokuyow",
+  "license": "MIT",
+  "homepage": "https://lokuyow.github.io/",
+  "bugs": {
+    "url": "https://github.com/Lokuyow/nostr-zap-view/issues"
+  },
+  "dependencies": {
+    "light-bolt11-decoder": "^3.2.0",
+    "nostr-tools": "^2.10.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "to-string-loader": "^1.2.0",
+    "url-loader": "^4.1.1",
+    "webpack": "^5.96.1",
+    "webpack-cli": "^5.1.4"
+  }
+}
