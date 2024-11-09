@@ -58,11 +58,23 @@ class ZapSubscriptionManager {
 
     if (!this.zapEventsCache.some((e) => e.id === event.id)) {
       this.zapEventsCache.push(event);
+      
+      // 作成日時でソート
       this.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
+      // インデックスを取得し、maxCount以内の場合のみ表示
       const index = this.zapEventsCache.findIndex((e) => e.id === event.id);
       if (index < maxCount) {
-        await replacePlaceholderWithZap(event, index);
+        try {
+          await replacePlaceholderWithZap(event, index);
+          
+          // インデックスが変わった可能性があるため、再描画
+          if (index < maxCount) {
+            await renderZapListFromCache(this.zapEventsCache, maxCount);
+          }
+        } catch (error) {
+          console.error("Zap表示の更新に失敗:", error);
+        }
       }
 
       if (this.zapEventsCache.length >= maxCount) {
