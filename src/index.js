@@ -14,7 +14,7 @@ const APP_CONFIG = {
   },
   DEFAULT_OPTIONS: {
     theme: "light",
-    maxCount: 10,
+    maxCount: 5,
   },
 };
 

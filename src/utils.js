@@ -113,12 +113,10 @@ export async function fetchZapStats(identifier) {
   }
 }
 
-// プロフィール関連のヘルパー関数
 export function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.displayName || profile?.name || "Anonymous";
 }
 
-// Zap情報解析のヘルパー��数
 export async function parseZapEvent(event, defaultIcon) {
   const { pubkey, content } = await parseDescriptionTag(event);
   const satsText = await parseBolt11(event);

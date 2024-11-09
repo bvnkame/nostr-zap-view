@@ -1,7 +1,7 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, parseBolt11 } from "./utils.js";
+import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -11,7 +11,7 @@ class ZapDialog extends HTMLElement {
   #state = {
     isInitialized: false,
     theme: "light",
-    maxCount: 10,
+    maxCount: 5,
   };
 
   constructor() {
@@ -224,9 +224,7 @@ class ZapDialog extends HTMLElement {
     if (!list) return;
 
     // 表示対象のZapイベントを作成日時でソートして取得
-    const sortedZaps = [...zapEventsCache]
-      .sort((a, b) => b.created_at - a.created_at)
-      .slice(0, maxCount);
+    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
 
     // プロフィール情報を一括で先に取得
     const pubkeys = await Promise.all(
@@ -238,11 +236,11 @@ class ZapDialog extends HTMLElement {
     await profileManager.fetchProfiles(pubkeys.filter(Boolean));
 
     // 全てのZap情報を並列で取得
-    const zapInfoPromises = sortedZaps.map(event => this.#extractZapInfo(event));
+    const zapInfoPromises = sortedZaps.map((event) => this.#extractZapInfo(event));
     const zapInfos = await Promise.all(zapInfoPromises);
 
     // DOMの更新は一括で行う
-    list.innerHTML = '';
+    list.innerHTML = "";
     const fragment = document.createDocumentFragment();
 
     zapInfos.forEach((zapInfo, index) => {
