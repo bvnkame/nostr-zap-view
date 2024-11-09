@@ -9,6 +9,7 @@
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
   --border: #edf2f7;
+  --new-mark: #ff707c;
 }
 
 * {
@@ -134,6 +135,7 @@
   width: 32px;
   height: 32px;
   flex-shrink: 0;
+  position: relative;
 }
 
 .sender-icon img {
@@ -142,6 +144,19 @@
   border-radius: 4px;
   object-fit: cover;
   object-position: center;
+}
+
+.sender-icon.is-new::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--new-mark);
+  border-radius: 50%;
+  border: 1px solid var(--dialog-bg);
+  z-index: 1;
 }
 
 .sender-info {

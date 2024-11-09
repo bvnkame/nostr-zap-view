@@ -63,6 +63,13 @@ export function formatNumber(num) {
   return new Intl.NumberFormat().format(num);
 }
 
+// 24時間以内かどうかをチェックする関数を追加
+export function isWithin24Hours(timestamp) {
+  const now = Math.floor(Date.now() / 1000);
+  const hours24 = 24 * 60 * 60;
+  return now - timestamp < hours24;
+}
+
 // formatNpub関数を汎用的な関数に変更
 export function formatIdentifier(identifier) {
   const decoded = safeNip19Decode(identifier);

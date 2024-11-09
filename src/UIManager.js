@@ -1,7 +1,7 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag } from "./utils.js";
+import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -124,27 +124,18 @@ class ZapDialog extends HTMLElement {
       satsText,
       comment: content || "",
       pubkey: pubkey || "",
-    };
-  }
-
-  async #getProfileInfo(pubkey) {
-    if (!pubkey) return { senderName: "Anonymous", senderIcon: defaultIcon };
-
-    const profile = profileManager.profileCache.get(pubkey) || (await profileManager.fetchProfile(pubkey));
-
-    return {
-      senderName: getProfileDisplayName(profile),
-      senderIcon: profile?.picture || defaultIcon,
+      created_at: event.created_at, // イベントの作成時刻を追加
     };
   }
 
   // UI要素生成メソッド
-  #createZapHTML({ senderName, senderIcon, satsText, comment, pubkey }) {
+  #createZapHTML({ senderName, senderIcon, satsText, comment, pubkey, created_at }) {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
+    const isNew = isWithin24Hours(created_at);
     return `
       <div class="zap-sender">
-        <div class="sender-icon">
+        <div class="sender-icon${isNew ? " is-new" : ""}">
           <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy" onerror="this.onerror=null;this.src='${defaultIcon}';">
         </div>
         <div class="sender-info">
@@ -243,7 +234,7 @@ class ZapDialog extends HTMLElement {
     list.innerHTML = "";
     const fragment = document.createDocumentFragment();
 
-    zapInfos.forEach((zapInfo, index) => {
+    zapInfos.forEach((zapInfo) => {
       const li = document.createElement("li");
       li.classList.add("zap-list-item");
       li.innerHTML = this.#createZapHTML(zapInfo);
