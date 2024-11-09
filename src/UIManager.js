@@ -69,9 +69,11 @@ class ZapDialog extends HTMLElement {
     let senderIcon = defaultIcon;
 
     if (pubkey) {
-      const profile = await this.#getProfileInfo(pubkey);
-      senderName = profile.senderName;
-      senderIcon = profile.senderIcon;
+      const profile = await profileManager.fetchProfile(pubkey);
+      if (profile) {
+        senderName = getProfileDisplayName(profile);
+        senderIcon = profile.picture || defaultIcon;
+      }
     }
 
     return {
@@ -173,10 +175,8 @@ class ZapDialog extends HTMLElement {
     if (!placeholder) return;
 
     const zapInfo = await this.#extractZapInfo(event);
-    if (zapInfo) {
-      placeholder.innerHTML = this.#createZapHTML(zapInfo);
-      placeholder.removeAttribute("data-index");
-    }
+    placeholder.innerHTML = this.#createZapHTML(zapInfo);
+    placeholder.removeAttribute("data-index");
   }
 
   async renderZapListFromCache(zapEventsCache, maxCount) {

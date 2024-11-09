@@ -1,172 +1,172 @@
 import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName } from "./utils.js";
 
-// Nostrのプロフィール情報を管理するクラス
+/**
+ * @typedef {Object} ProfileResult
+ * @property {string} name
+ * @property {string} display_name
+ * @property {string} [picture]
+ * @property {string} [about]
+ */
+
 export class ProfileManager {
   constructor() {
-    // デフォルトのリレーサーバー一覧
     this.profileRelays = ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"];
     this.profileCache = new Map();
     this.profileFetchPromises = new Map();
-    this.batchQueue = new Set(); // バッチ処理用のキュー
-    this.BATCH_SIZE = 20; // 一度に取得するプロフィールの最大数
-    this.batchTimer = null;
-    this.BATCH_DELAY = 100; // バッチ処理の待機時間（ミリ秒）
-    this.resolvers = new Map(); // resolve関数を保存するMapを追加
+    this.batchQueue = new Set();
+    this.BATCH_SIZE = 20;
+    this.BATCH_DELAY = 100;
+    this.resolvers = new Map();
   }
 
-  // 単一プロフィール取得（リアルタイム用）
+  /**
+   * @param {string} pubkey
+   * @returns {Promise<ProfileResult>}
+   */
   async fetchProfile(pubkey) {
     if (this.profileCache.has(pubkey)) {
       return this.profileCache.get(pubkey);
     }
 
+    return this._getOrCreateFetchPromise(pubkey);
+  }
+
+  /**
+   * @param {string[]} pubkeys
+   * @returns {Promise<ProfileResult[]>}
+   */
+  async fetchProfiles(pubkeys) {
+    const uncachedPubkeys = pubkeys.filter(key => !this.profileCache.has(key));
+    
+    if (uncachedPubkeys.length > 0) {
+      await this._batchFetch(uncachedPubkeys);
+    }
+
+    return pubkeys.map(key => this.profileCache.get(key) || this._createDefaultProfile());
+  }
+
+  async _getOrCreateFetchPromise(pubkey) {
     if (this.profileFetchPromises.has(pubkey)) {
       return this.profileFetchPromises.get(pubkey);
     }
 
-    const promise = new Promise((resolve) => {
+    const promise = new Promise(resolve => {
       this.resolvers.set(pubkey, resolve);
     });
 
     this.profileFetchPromises.set(pubkey, promise);
     this.batchQueue.add(pubkey);
 
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-    }
-
-    this.batchTimer = setTimeout(() => this._processBatchQueue(), this.BATCH_DELAY);
-
+    this._scheduleBatchProcess();
     return promise;
   }
 
-  // バッチ処理用のプロフィール取得
-  async fetchProfiles(pubkeys) {
-    const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key));
-    if (uncachedPubkeys.length === 0) {
-      return pubkeys.map((key) => this.profileCache.get(key));
-    }
-
-    uncachedPubkeys.forEach((key) => this.batchQueue.add(key));
-
+  _scheduleBatchProcess() {
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
     }
+    this.batchTimer = setTimeout(() => this._processBatchQueue(), this.BATCH_DELAY);
+  }
 
-    await new Promise((resolve) => {
+  async _batchFetch(pubkeys) {
+    pubkeys.forEach(key => this.batchQueue.add(key));
+    return new Promise(resolve => {
       this.batchTimer = setTimeout(async () => {
         await this._processBatchQueue();
         resolve();
       }, this.BATCH_DELAY);
     });
-
-    return pubkeys.map((key) => this.profileCache.get(key));
   }
 
-  // バッチキューの処理を再帰的に行うように修正
   async _processBatchQueue() {
     if (this.batchQueue.size === 0) return;
 
     const batchPubkeys = Array.from(this.batchQueue).slice(0, this.BATCH_SIZE);
     this.batchQueue = new Set(Array.from(this.batchQueue).slice(this.BATCH_SIZE));
 
-    console.log(`バッチ処理でプロフィールを取得: ${batchPubkeys.length}件`);
     await this._fetchProfileFromRelay(batchPubkeys);
 
-    // 取得できなかったpubkeyに対してデフォルト値を設定
-    batchPubkeys.forEach((pubkey) => {
-      if (!this.profileCache.has(pubkey)) {
-        this.profileCache.set(pubkey, {
-          name: "Unknown",
-          display_name: "Unknown",
-        });
-      }
-    });
-
-    // キューにまだデータが残っている場合は再帰的に処理
     if (this.batchQueue.size > 0) {
-      // 次のバッチ処理を少し遅延させて実行
-      await new Promise((resolve) => setTimeout(resolve, this.BATCH_DELAY));
+      await new Promise(resolve => setTimeout(resolve, this.BATCH_DELAY));
       await this._processBatchQueue();
     }
   }
 
-  // リレーサーバーからプロフィール情報を取得する内部メソッド
   async _fetchProfileFromRelay(pubkeys) {
     try {
-      console.log(`リレーからプロフィールを取得`);
-      const req = {
+      const profiles = await profilePool.querySync(this.profileRelays, {
         kinds: [0],
-        authors: pubkeys,
-      };
-
-      console.log("Sending REQ to relays:", this.profileRelays, req);
-
-      const profiles = await profilePool.querySync(this.profileRelays, req);
-      const profileMap = new Map();
-
-      // 受信した全てのプロフィールを確実にキャッシュに保存
-      profiles.forEach((profile) => {
-        try {
-          const parsedProfile = JSON.parse(profile.content);
-          const pubkey = profile.pubkey;
-          
-          // プロフィールにデフォルト名を設定
-          if (!parsedProfile.name && !parsedProfile.display_name) {
-            parsedProfile.name = getProfileDisplayName(parsedProfile);
-          }
-          
-          this.profileCache.set(pubkey, parsedProfile);
-          profileMap.set(pubkey, parsedProfile);
-
-          // resolve関数を呼び出してプロミスを解決
-          const resolver = this.resolvers.get(pubkey);
-          if (resolver) {
-            resolver(parsedProfile);
-            this.resolvers.delete(pubkey);
-          }
-          console.log(`プロフィールをキャッシュに保存: ${pubkey}`);
-        } catch (error) {
-          console.error(`プロフィールのパースに失敗: ${profile.pubkey}`, error);
-        }
+        authors: pubkeys
       });
 
-      // 取得できなかったpubkeyのプロミスをnullで解決
-      pubkeys.forEach((pubkey) => {
+      this._processProfiles(profiles);
+      
+      // プロフィールが取得できなかったpubkeyに対してnullを設定
+      pubkeys.forEach(pubkey => {
         if (!this.profileCache.has(pubkey)) {
-          const resolver = this.resolvers.get(pubkey);
-          if (resolver) {
-            resolver(null);
-            this.resolvers.delete(pubkey);
-          }
+          this.profileCache.set(pubkey, null);
+          this._resolvePromise(pubkey, null);
         }
       });
-
-      return profileMap;
+      
     } catch (error) {
-      console.error("プロフィールの取得に失敗しました:", error);
-      // エラー時は全てのプロミスをnullで解決
-      pubkeys.forEach((pubkey) => {
-        const resolver = this.resolvers.get(pubkey);
-        if (resolver) {
-          resolver(null);
-          this.resolvers.delete(pubkey);
-        }
-      });
-      return new Map();
+      console.error("プロフィールの取得に失敗:", error);
+      this._handleFetchError(pubkeys);
     } finally {
-      pubkeys.forEach((key) => this.profileFetchPromises.delete(key));
+      this._cleanupPromises(pubkeys);
     }
   }
 
-  // キャッシュされたプロフィール情報をクリアする
+  _processProfiles(profiles) {
+    profiles.forEach(profile => {
+      try {
+        const parsedProfile = {
+          ...JSON.parse(profile.content),
+          name: getProfileDisplayName(JSON.parse(profile.content))
+        };
+        
+        this.profileCache.set(profile.pubkey, parsedProfile);
+        this._resolvePromise(profile.pubkey, parsedProfile);
+      } catch (error) {
+        console.error(`プロフィールのパース失敗: ${profile.pubkey}`, error);
+        this._resolvePromise(profile.pubkey, this._createDefaultProfile());
+      }
+    });
+  }
+
+  _createDefaultProfile() {
+    return {
+      name: "Unknown",
+      display_name: "Unknown"
+    };
+  }
+
+  _handleFetchError(pubkeys) {
+    pubkeys.forEach(pubkey => {
+      const defaultProfile = this._createDefaultProfile();
+      this.profileCache.set(pubkey, defaultProfile);
+      this._resolvePromise(pubkey, defaultProfile);
+    });
+  }
+
+  _resolvePromise(pubkey, profile) {
+    const resolver = this.resolvers.get(pubkey);
+    if (resolver) {
+      resolver(profile);
+      this.resolvers.delete(pubkey);
+    }
+  }
+
+  _cleanupPromises(pubkeys) {
+    pubkeys.forEach(key => this.profileFetchPromises.delete(key));
+  }
+
   clearCache() {
     this.profileCache.clear();
     this.profileFetchPromises.clear();
-    this.resolvers.clear(); // resolversもクリア
+    this.resolvers.clear();
   }
 }
 
-// シングルトンインスタンスをエクスポート
 export const profileManager = new ProfileManager();
