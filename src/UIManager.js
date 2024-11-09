@@ -191,7 +191,7 @@ class ZapDialog extends HTMLElement {
         (_, i) => `
         <li class="zap-list-item" data-index="${i}">
           <div class="zap-placeholder-icon"></div>
-          <span>Loading...</span>
+          <span class="zap-placeholder-comment">Loading...</span>
         </li>
       `
       )

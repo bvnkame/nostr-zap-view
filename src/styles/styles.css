@@ -68,13 +68,13 @@
   border-radius: 4px;
 }
 
-.zap-list-item > span {
+.zap-placeholder-comment {
   color: var(--pubkey-text);
-  min-height: 30px;
+  font-size: 0.9375rem;
+  height: 24px;
   display: inline-block;
 }
 
-/* 統計情報セクション */
 .zap-stats {
   min-height: 80px;
   padding: 6px 14px;
