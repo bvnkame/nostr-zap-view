@@ -8,7 +8,6 @@ import {
   getProfileDisplayName, 
   parseDescriptionTag, 
   isWithin24Hours, 
-  isValidImageUrl,
   preloadImage 
 } from "./utils.js";
 

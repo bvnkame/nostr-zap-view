@@ -22,7 +22,6 @@ export class ProfileManager {
   #config = {
     BATCH_SIZE: 20,
     BATCH_DELAY: 100,
-    CACHE_EXPIRE: 1000 * 60 * 5, // 5分
     RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"],
   };
 
@@ -38,18 +37,6 @@ export class ProfileManager {
     this.profileFetchPromises = new Map();
     this.batchQueue = new Set();
     this.resolvers = new Map();
-
-    // 定期的なキャッシュクリーンアップ
-    setInterval(() => this.#cleanupExpiredCache(), this.#config.CACHE_EXPIRE);
-  }
-
-  #cleanupExpiredCache() {
-    const now = Date.now();
-    for (const [key, value] of this.profileCache.entries()) {
-      if (value.timestamp < now - this.#config.CACHE_EXPIRE) {
-        this.profileCache.delete(key);
-      }
-    }
   }
 
   /**
