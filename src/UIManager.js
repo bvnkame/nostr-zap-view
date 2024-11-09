@@ -151,11 +151,9 @@ class ZapDialog extends HTMLElement {
           <span class="sender-name">${senderName}</span>
           <span class="sender-pubkey">${npubKey}</span>
         </div>
+        <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
-      <div class="zap-details">
-        <span class="zap-amount"><span class="number">${amount}</span> ${unit}</span>
-        ${comment ? `<span class="zap-comment">${comment}</span>` : ""}
-      </div>
+      ${comment ? `<div class="zap-details"><span class="zap-comment">${comment}</span></div>` : ""}
     `;
   }
 
