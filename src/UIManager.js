@@ -1,15 +1,7 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { 
-  formatNumber, 
-  formatIdentifier, 
-  parseZapEvent, 
-  getProfileDisplayName, 
-  parseDescriptionTag, 
-  isWithin24Hours, 
-  preloadImage 
-} from "./utils.js";
+import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -123,7 +115,7 @@ class ZapDialog extends HTMLElement {
       if (profile) {
         senderName = getProfileDisplayName(profile);
         if (profile.picture) {
-          senderIcon = await preloadImage(profile.picture) || defaultIcon;
+          senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
         }
       }
     }
@@ -168,9 +160,16 @@ class ZapDialog extends HTMLElement {
     if (dialog && !dialog.open) {
       const fetchButton = document.querySelector("button[data-identifier]");
       if (fetchButton) {
-        const identifier = fetchButton.getAttribute("data-identifier");
         const title = this.#getElement("#dialogTitle");
-        title.textContent = "To " + formatIdentifier(identifier);
+        const customTitle = fetchButton.getAttribute("data-title");
+        if (customTitle && customTitle.trim()) {
+          title.textContent = customTitle;
+          title.classList.add("custom-title");
+        } else {
+          const identifier = fetchButton.getAttribute("data-identifier");
+          title.textContent = "To " + formatIdentifier(identifier);
+          title.classList.remove("custom-title");
+        }
       }
       dialog.showModal();
     }
@@ -238,7 +237,7 @@ class ZapDialog extends HTMLElement {
 
     // 現在表示中のアイテムを保持するためのMap
     const existingItems = new Map();
-    list.querySelectorAll('.zap-list-item').forEach(item => {
+    list.querySelectorAll(".zap-list-item").forEach((item) => {
       const zapContent = item.innerHTML;
       existingItems.set(zapContent, item);
     });
@@ -253,7 +252,7 @@ class ZapDialog extends HTMLElement {
 
     zapInfos.forEach((zapInfo) => {
       const zapHTML = this.#createZapHTML(zapInfo);
-      
+
       // 既存のアイテムがあれば再利用
       let li = null;
       if (existingItems.has(zapHTML)) {
@@ -264,20 +263,20 @@ class ZapDialog extends HTMLElement {
         li.classList.add("zap-list-item");
         li.innerHTML = zapHTML;
       }
-      
+
       newItems.add(li);
       fragment.appendChild(li);
     });
 
     // 不要になった古いアイテムを削除
-    existingItems.forEach(item => {
+    existingItems.forEach((item) => {
       if (!newItems.has(item)) {
         item.remove();
       }
     });
 
     // 新しいコンテンツを追加
-    list.innerHTML = '';
+    list.innerHTML = "";
     list.appendChild(fragment);
   }
 
