@@ -140,6 +140,9 @@ async function initializeSubscriptions(config) {
   }
   subscriptionManager.isZapClosed = false;
 
+  // 送信するREQをコンソールに表示
+  console.log("Sending REQ to relays:", config.relayUrls, decoded.req);
+
   // 初期データの取得
   subscriptionManager.zapSubscription = zapPool.subscribeMany(config.relayUrls, [{ ...decoded.req }], {
     onevent: (event) => subscriptionManager.handleZapEvent(event, config.maxCount),

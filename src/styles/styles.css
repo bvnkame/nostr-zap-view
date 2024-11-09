@@ -4,7 +4,7 @@
   --main-text: Black;
   --pubkey-text: #999;
   --stats-item-text: #333;
-  --zap-comment-text: #333;
+  --zap-comment-text: #444;
   --dialog-bg: #ffffff;
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
@@ -19,7 +19,7 @@
   color: var(--main-text);
   font-size: medium;
   font-weight: normal;
-  width: 400px;
+  width: 340px;
   margin: auto;
   padding: 0 12px;
   border: none;
@@ -43,7 +43,7 @@
 }
 
 #dialogTitle {
-  height: 30px;
+  height: 34px;
   margin: 0;
   padding: 0;
   font-size: 0.9rem;
@@ -77,13 +77,13 @@
   display: grid;
   grid-template-columns: 90px 1fr 40px;
   grid-template-rows: repeat(3, 1fr);
-  gap: 5px;
+  gap: 4px;
 }
 
 .stats-item {
   display: flex;
   align-items: center;
-  height: 27px;
+  height: 23px;
   color: var(--stats-item-text);
   font-size: 0.9rem;
 }
@@ -113,14 +113,14 @@
   flex-direction: column;
   border-top: 1px solid var(--border);
   padding: 4px 0;
-  gap: 2px;
+  gap: 4px;
 }
 
 .zap-sender {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
+  height: 36px;
 }
 
 .sender-icon {
@@ -144,7 +144,8 @@
 }
 
 .sender-name {
-  font-weight: 500;
+  font-size: 0.9375rem;
+  font-weight: bold;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -161,7 +162,7 @@
 
 .zap-details {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
 }
 
@@ -171,7 +172,7 @@
 }
 
 .zap-amount .number {
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   font-weight: 500;
   text-align: right;
 }
@@ -180,7 +181,7 @@
   color: var(--zap-comment-text);
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 1rem;
+  font-size: 0.9375rem;
 }
 
 .zap-list-item > span {
