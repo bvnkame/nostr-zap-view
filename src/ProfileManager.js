@@ -1,4 +1,5 @@
 import { profilePool } from "./ZapPool.js";
+import { getProfileDisplayName } from "./utils.js";
 
 // Nostrのプロフィール情報を管理するクラス
 export class ProfileManager {
@@ -110,6 +111,12 @@ export class ProfileManager {
         try {
           const parsedProfile = JSON.parse(profile.content);
           const pubkey = profile.pubkey;
+          
+          // プロフィールにデフォルト名を設定
+          if (!parsedProfile.name && !parsedProfile.display_name) {
+            parsedProfile.name = getProfileDisplayName(parsedProfile);
+          }
+          
           this.profileCache.set(pubkey, parsedProfile);
           profileMap.set(pubkey, parsedProfile);
 

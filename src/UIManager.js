@@ -1,7 +1,7 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { formatNumber, formatIdentifier } from "./utils.js";
+import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, parseBolt11 } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   constructor() {
@@ -66,9 +66,9 @@ class ZapDialog extends HTMLElement {
     return this.shadowRoot.querySelector(selector);
   }
 
+  // extractZapInfo メソッドを簡略化
   async extractZapInfo(event) {
-    const { pubkey, content } = await this.parseDescriptionTag(event);
-    const satsText = await this.parseBolt11(event);
+    const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
 
     let senderName = "Anonymous";
     let senderIcon = defaultIcon;
@@ -88,53 +88,17 @@ class ZapDialog extends HTMLElement {
     };
   }
 
-  async parseDescriptionTag(event) {
-    const descriptionTag = event.tags.find((tag) => tag[0] === "description")?.[1];
-    if (!descriptionTag) return { pubkey: null, content: "" };
-
-    try {
-      const parsed = JSON.parse(descriptionTag);
-      return { pubkey: parsed.pubkey, content: parsed.content || "" };
-    } catch (error) {
-      console.error("Description tag parse error:", error);
-      return { pubkey: null, content: "" };
-    }
-  }
-
+  // getProfileInfo メソッドを簡略化
   async getProfileInfo(pubkey) {
     if (!pubkey) return { senderName: "Anonymous", senderIcon: defaultIcon };
 
-    // キャッシュから直接取得
-    const profile = profileManager.profileCache.get(pubkey);
+    const profile = profileManager.profileCache.get(pubkey) || 
+                   await profileManager.fetchProfile(pubkey);
 
-    if (profile) {
-      // キャッシュにプロフィールが存在する場合
-      return {
-        senderName: profile.display_name || profile.displayName || profile.name || "Anonymous",
-        senderIcon: profile.picture || defaultIcon,
-      };
-    } else {
-      // リアルタイムZap用に個別取得
-      const fetchedProfile = await profileManager.fetchProfile(pubkey);
-      return {
-        senderName: fetchedProfile?.display_name || fetchedProfile?.displayName || fetchedProfile?.name || "Anonymous",
-        senderIcon: fetchedProfile?.picture || defaultIcon,
-      };
-    }
-  }
-
-  async parseBolt11(event) {
-    const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-    if (!bolt11Tag) return "Amount: Unknown";
-
-    try {
-      const decoded = window.decodeBolt11(bolt11Tag);
-      const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
-      return amountMsat ? `${formatNumber(Math.floor(amountMsat / 1000))} sats` : "Amount: Unknown";
-    } catch (error) {
-      console.error("BOLT11 decode error:", error);
-      return "Amount: Unknown";
-    }
+    return {
+      senderName: getProfileDisplayName(profile),
+      senderIcon: profile?.picture || defaultIcon,
+    };
   }
 
   // 重複していたshowDialogを1つに統合
@@ -223,42 +187,20 @@ class ZapDialog extends HTMLElement {
 
     const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
 
-    // 一括でプロフィール情報を取得
+    // プロフィール情報の一括取得
     const pubkeys = sortedZaps
-      .map((event) => event.tags.find((tag) => tag[0] === "description"))
-      .filter((tag) => tag)
-      .map((tag) => {
-        try {
-          const parsed = JSON.parse(tag[1]);
-          return parsed.pubkey;
-        } catch (e) {
-          return null;
-        }
+      .map((event) => {
+        const { pubkey } = parseDescriptionTag(event);
+        return pubkey;
       })
-      .filter((pubkey) => pubkey);
+      .filter(Boolean);
 
-    // バッチでプロフィール取得
     await profileManager.fetchProfiles(pubkeys);
 
     // Zapリストの描画（キャッシュから取得）
     list.innerHTML = "";
     for (const event of sortedZaps) {
-      const { pubkey, content } = await this.parseDescriptionTag(event);
-      const satsText = await this.parseBolt11(event);
-
-      // キャッシュから直接プロフィール情報を取得
-      const profile = pubkey ? profileManager.profileCache.get(pubkey) : null;
-      const senderName = profile?.display_name || profile?.displayName || profile?.name || "Anonymous";
-      const senderIcon = profile?.picture || defaultIcon;
-
-      const zapInfo = {
-        senderName,
-        senderIcon,
-        satsText,
-        comment: content || "",
-        pubkey: pubkey || "",
-      };
-
+      const zapInfo = await this.extractZapInfo(event);
       const li = document.createElement("li");
       li.classList.add("zap-list-item");
       li.innerHTML = this.createZapHTML(zapInfo);

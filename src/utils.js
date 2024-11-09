@@ -86,3 +86,47 @@ export async function fetchZapStats(identifier) {
     return null;
   }
 }
+
+// プロフィール関連のヘルパー関数
+export function getProfileDisplayName(profile) {
+  return profile?.display_name || profile?.displayName || profile?.name || "Anonymous";
+}
+
+// Zap情報解析のヘルパー関数
+export async function parseZapEvent(event, defaultIcon) {
+  const { pubkey, content } = await parseDescriptionTag(event);
+  const satsText = await parseBolt11(event);
+
+  return {
+    pubkey,
+    content,
+    satsText
+  };
+}
+
+export function parseDescriptionTag(event) {
+  const descriptionTag = event.tags.find((tag) => tag[0] === "description")?.[1];
+  if (!descriptionTag) return { pubkey: null, content: "" };
+
+  try {
+    const parsed = JSON.parse(descriptionTag);
+    return { pubkey: parsed.pubkey, content: parsed.content || "" };
+  } catch (error) {
+    console.error("Description tag parse error:", error);
+    return { pubkey: null, content: "" };
+  }
+}
+
+export async function parseBolt11(event) {
+  const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+  if (!bolt11Tag) return "Amount: Unknown";
+
+  try {
+    const decoded = window.decodeBolt11(bolt11Tag);
+    const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
+    return amountMsat ? `${formatNumber(Math.floor(amountMsat / 1000))} sats` : "Amount: Unknown";
+  } catch (error) {
+    console.error("BOLT11 decode error:", error);
+    return "Amount: Unknown";
+  }
+}
