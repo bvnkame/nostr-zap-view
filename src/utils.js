@@ -161,3 +161,34 @@ export async function parseBolt11(event) {
     return "Amount: Unknown";
   }
 }
+
+// イメージキャッシュの追加
+const imageCache = new Map();
+
+export async function preloadImage(url) {
+  if (!url) return null;
+  
+  // キャッシュにある場合は、そのまま返す（失敗したURLの場合はnullが返される）
+  if (imageCache.has(url)) return imageCache.get(url);
+  
+  try {
+    const img = new Image();
+    const promise = new Promise((resolve, reject) => {
+      img.onload = () => {
+        imageCache.set(url, url); // 成功した場合はURLをキャッシュ
+        resolve(url);
+      };
+      img.onerror = () => {
+        imageCache.set(url, null); // 失敗した場合はnullをキャッシュ
+        resolve(null); // rejectではなくresolve(null)を使用
+      };
+    });
+
+    img.src = url;
+    return await promise;
+  } catch (error) {
+    console.error('Image preload error:', error);
+    imageCache.set(url, null);
+    return null;
+  }
+}

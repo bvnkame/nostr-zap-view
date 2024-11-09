@@ -1,7 +1,16 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours } from "./utils.js";
+import { 
+  formatNumber, 
+  formatIdentifier, 
+  parseZapEvent, 
+  getProfileDisplayName, 
+  parseDescriptionTag, 
+  isWithin24Hours, 
+  isValidImageUrl,
+  preloadImage 
+} from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -114,7 +123,9 @@ class ZapDialog extends HTMLElement {
       const profile = await profileManager.fetchProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile);
-        senderIcon = profile.picture || defaultIcon;
+        if (profile.picture) {
+          senderIcon = await preloadImage(profile.picture) || defaultIcon;
+        }
       }
     }
 
@@ -136,7 +147,7 @@ class ZapDialog extends HTMLElement {
     return `
       <div class="zap-sender">
         <div class="sender-icon${isNew ? " is-new" : ""}">
-          <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy" onerror="this.onerror=null;this.src='${defaultIcon}';">
+          <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy">
         </div>
         <div class="sender-info">
           <span class="sender-name">${senderName}</span>
@@ -226,21 +237,48 @@ class ZapDialog extends HTMLElement {
     );
     await profileManager.fetchProfiles(pubkeys.filter(Boolean));
 
+    // 現在表示中のアイテムを保持するためのMap
+    const existingItems = new Map();
+    list.querySelectorAll('.zap-list-item').forEach(item => {
+      const zapContent = item.innerHTML;
+      existingItems.set(zapContent, item);
+    });
+
     // 全てのZap情報を並列で取得
     const zapInfoPromises = sortedZaps.map((event) => this.#extractZapInfo(event));
     const zapInfos = await Promise.all(zapInfoPromises);
 
-    // DOMの更新は一括で行う
-    list.innerHTML = "";
+    // DOMの更新は既存要素を維持しながら行う
     const fragment = document.createDocumentFragment();
+    const newItems = new Set();
 
     zapInfos.forEach((zapInfo) => {
-      const li = document.createElement("li");
-      li.classList.add("zap-list-item");
-      li.innerHTML = this.#createZapHTML(zapInfo);
+      const zapHTML = this.#createZapHTML(zapInfo);
+      
+      // 既存のアイテムがあれば再利用
+      let li = null;
+      if (existingItems.has(zapHTML)) {
+        li = existingItems.get(zapHTML);
+        existingItems.delete(zapHTML);
+      } else {
+        li = document.createElement("li");
+        li.classList.add("zap-list-item");
+        li.innerHTML = zapHTML;
+      }
+      
+      newItems.add(li);
       fragment.appendChild(li);
     });
 
+    // 不要になった古いアイテムを削除
+    existingItems.forEach(item => {
+      if (!newItems.has(item)) {
+        item.remove();
+      }
+    });
+
+    // 新しいコンテンツを追加
+    list.innerHTML = '';
     list.appendChild(fragment);
   }
 
