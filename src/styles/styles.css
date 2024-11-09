@@ -63,9 +63,15 @@
 .zap-placeholder-icon {
   width: 32px;
   height: 32px;
-  margin-right: 8px;
+  margin: 2px 0;
   background: var(--hover-bg);
   border-radius: 4px;
+}
+
+.zap-list-item > span {
+  color: var(--pubkey-text);
+  min-height: 30px;
+  display: inline-block;
 }
 
 /* 統計情報セクション */
@@ -164,6 +170,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  min-height: 30px;
 }
 
 .zap-amount {
@@ -182,15 +189,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 0.9375rem;
-}
-
-.zap-list-item > span {
-  min-height: 1.2em;
-  min-width: 200px;
-  display: inline-block;
-}
-
-.zap-list-item span:empty::before {
-  content: "Loading...";
-  color: var(--hover-bg);
 }
