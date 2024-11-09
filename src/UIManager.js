@@ -103,7 +103,7 @@ class ZapDialog extends HTMLElement {
     return `
       <div class="zap-sender">
         <div class="sender-icon">
-          <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy">
+          <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy" onerror="this.onerror=null;this.src='${defaultIcon}';">
         </div>
         <div class="sender-info">
           <span class="sender-name">${senderName}</span>
