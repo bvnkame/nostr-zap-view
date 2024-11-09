@@ -227,25 +227,31 @@ class ZapDialog extends HTMLElement {
 
     const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
 
-    // プロフィール情報の一括取得
-    const pubkeys = sortedZaps
-      .map((event) => {
-        const { pubkey } = parseDescriptionTag(event);
-        return pubkey;
-      })
-      .filter(Boolean);
+    // バッチ処理の準備
+    const pubkeyPromises = sortedZaps.map(async (event) => {
+      const { pubkey } = parseDescriptionTag(event);
+      return pubkey;
+    });
 
+    // 並列でプロフィール情報を取得
+    const pubkeys = (await Promise.all(pubkeyPromises)).filter(Boolean);
     await profileManager.fetchProfiles(pubkeys);
 
-    // Zapリストの描画（キャッシュから取得）
-    list.innerHTML = "";
+    // レンダリン��を一括で行う
+    const fragment = document.createDocumentFragment();
     for (const event of sortedZaps) {
-      const zapInfo = await this.#extractZapInfo(event);
       const li = document.createElement("li");
       li.classList.add("zap-list-item");
-      li.innerHTML = this.#createZapHTML(zapInfo);
-      list.appendChild(li);
+      fragment.appendChild(li);
+      
+      // 非同期でZap情報を取得しつつ、UIをブロックしない
+      this.#extractZapInfo(event).then(zapInfo => {
+        li.innerHTML = this.#createZapHTML(zapInfo);
+      });
     }
+    
+    list.innerHTML = '';
+    list.appendChild(fragment);
   }
 
   async prependZap(event) {

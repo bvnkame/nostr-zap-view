@@ -28,12 +28,20 @@ class ZapSubscriptionManager {
   }
 
   async getZapStats(identifier) {
-    if (this.zapStatsCache.has(identifier)) {
-      return this.zapStatsCache.get(identifier);
+    const cached = this.zapStatsCache.get(identifier);
+    const now = Date.now();
+    
+    // キャッシュが有効な場合はそれを返す
+    if (cached && (now - cached.timestamp) < 300000) { // 5分
+      return cached.stats;
     }
+
     const stats = await fetchZapStats(identifier);
     if (stats) {
-      this.zapStatsCache.set(identifier, stats);
+      this.zapStatsCache.set(identifier, {
+        stats,
+        timestamp: now
+      });
     }
     return stats;
   }
@@ -153,8 +161,14 @@ export async function fetchLatestZaps() {
 }
 
 async function handleCachedZaps(config) {
+  // 統計情報の取得を先に開始
+  const statsPromise = subscriptionManager.getZapStats(config.identifier);
+  
+  // UIの描画を並列で実行
   await renderZapListFromCache(subscriptionManager.zapEventsCache, config.maxCount);
-  const stats = await subscriptionManager.getZapStats(config.identifier);
+  
+  // 統計情報の取得完了を待つ
+  const stats = await statsPromise;
   if (stats) displayZapStats(stats);
 }
 

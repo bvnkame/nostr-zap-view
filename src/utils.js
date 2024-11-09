@@ -6,8 +6,17 @@ const TypeChecker = {
   isValidCount: (count) => typeof count === "number" && count > 0,
 };
 
+// デコード結果をキャッシュ
+const decodedCache = new Map();
+
 // src/utils.js
 export function decodeIdentifier(identifier, maxCount) {
+  const cacheKey = `${identifier}:${maxCount}`;
+  
+  if (decodedCache.has(cacheKey)) {
+    return decodedCache.get(cacheKey);
+  }
+
   if (!TypeChecker.isValidIdentifier(identifier) || !TypeChecker.isValidCount(maxCount)) {
     throw new Error(CONFIG.ERRORS.DECODE_FAILED);
   }
@@ -15,7 +24,12 @@ export function decodeIdentifier(identifier, maxCount) {
   const decoded = safeNip19Decode(identifier);
   if (!decoded) return null;
 
-  return createReqFromType(decoded.type, decoded.data, maxCount);
+  const result = createReqFromType(decoded.type, decoded.data, maxCount);
+  if (result) {
+    decodedCache.set(cacheKey, result);
+  }
+
+  return result;
 }
 
 function safeNip19Decode(identifier) {
@@ -104,7 +118,7 @@ export function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.displayName || profile?.name || "Anonymous";
 }
 
-// Zap情報解析のヘルパー関数
+// Zap情報解析のヘルパー��数
 export async function parseZapEvent(event, defaultIcon) {
   const { pubkey, content } = await parseDescriptionTag(event);
   const satsText = await parseBolt11(event);
