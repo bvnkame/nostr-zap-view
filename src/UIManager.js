@@ -4,9 +4,51 @@ import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
 import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, parseBolt11 } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
+  static get observedAttributes() {
+    return ["data-theme", "data-max-count"];
+  }
+
+  #state = {
+    isInitialized: false,
+    theme: "light",
+    maxCount: 10,
+  };
+
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+  }
+
+  attributeChangedCallback(name, oldValue, newValue) {
+    if (oldValue === newValue) return;
+
+    switch (name) {
+      case "data-theme":
+        this.#updateTheme(newValue);
+        break;
+      case "data-max-count":
+        this.#updateMaxCount(parseInt(newValue, 10));
+        break;
+    }
+  }
+
+  #updateTheme(theme) {
+    this.#state.theme = theme;
+    if (this.#state.isInitialized) {
+      this.#applyTheme();
+    }
+  }
+
+  #updateMaxCount(count) {
+    if (TypeChecker.isValidCount(count)) {
+      this.#state.maxCount = count;
+    }
+  }
+
+  #applyTheme() {
+    // Implement the theme application logic here
+    const themeClass = this.#state.theme === "dark" ? "dark-theme" : "light-theme";
+    this.shadowRoot.host.classList.add(themeClass);
   }
 
   // ライフサイクルメソッド

@@ -2,44 +2,25 @@ import { zapPool } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
 
-// 設定を別オブジェクトとして分離
-const ZAP_CONFIG = {
-  SUBSCRIPTION_TIMEOUT: 20000,
-  DEFAULT_LIMIT: 1,
+// 設定をグローバルな設定オブジェクトに統合
+export const CONFIG = {
+  ZAP: {
+    SUBSCRIPTION_TIMEOUT: 20000,
+    DEFAULT_LIMIT: 1,
+  },
+  ERRORS: {
+    DIALOG_NOT_FOUND: "Zapダイアログが見つかりません",
+    BUTTON_NOT_FOUND: "取得ボタンが見つかりません",
+    DECODE_FAILED: "識別子のデコードに失敗しました",
+  },
 };
-
-const ERROR_MESSAGES = {
-  DIALOG_NOT_FOUND: "Zapダイアログが見つかりません",
-  BUTTON_NOT_FOUND: "取得ボタンが見つかりません",
-  DECODE_FAILED: "識別子のデコードに失敗しました",
-};
-
-class ZapSubscriptionState {
-  constructor() {
-    this.isZapClosed = false;
-    this.isInitialFetchComplete = false;
-  }
-}
-
-class ZapConfig {
-  constructor(identifier, maxCount, relayUrls) {
-    this.identifier = identifier;
-    this.maxCount = maxCount;
-    this.relayUrls = relayUrls;
-  }
-
-  static fromButton(button) {
-    if (!button) throw new Error(ERROR_MESSAGES.BUTTON_NOT_FOUND);
-    return new ZapConfig(button.getAttribute("data-identifier"), parseInt(button.getAttribute("data-max-count"), 10), button.getAttribute("data-relay-urls").split(","));
-  }
-}
 
 class ZapSubscriptionManager {
   constructor() {
     this.zapEventsCache = [];
     this.zapStatsCache = new Map();
     this.subscriptions = { zap: null, realTime: null };
-    this.state = new ZapSubscriptionState();
+    this.state = { isZapClosed: false, isInitialFetchComplete: false };
   }
 
   clearCache() {
@@ -93,7 +74,7 @@ class ZapSubscriptionManager {
 
   async initializeSubscriptions(config) {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
-    if (!decoded) throw new Error(ERROR_MESSAGES.DECODE_FAILED);
+    if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
     this.closeZapSubscription();
     this.state.isZapClosed = false;
@@ -106,7 +87,7 @@ class ZapSubscriptionManager {
       },
     });
 
-    setTimeout(() => this.closeZapSubscription(), ZAP_CONFIG.SUBSCRIPTION_TIMEOUT);
+    setTimeout(() => this.closeZapSubscription(), CONFIG.ZAP.SUBSCRIPTION_TIMEOUT);
   }
 
   createSubscription(config, decoded, handler) {
@@ -116,15 +97,15 @@ class ZapSubscriptionManager {
   initializeRealTimeSubscription(config) {
     if (this.subscriptions.realTime) return;
 
-    const decoded = decodeIdentifier(config.identifier, ZAP_CONFIG.DEFAULT_LIMIT);
-    if (!decoded) throw new Error(ERROR_MESSAGES.DECODE_FAILED);
+    const decoded = decodeIdentifier(config.identifier, CONFIG.ZAP.DEFAULT_LIMIT);
+    if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
     this.subscriptions.realTime = zapPool.subscribeMany(
       config.relayUrls,
       [
         {
           ...decoded.req,
-          limit: ZAP_CONFIG.DEFAULT_LIMIT,
+          limit: CONFIG.ZAP.DEFAULT_LIMIT,
           since: Math.floor(Date.now() / 1000),
         },
       ],
@@ -136,12 +117,25 @@ class ZapSubscriptionManager {
   }
 }
 
+class ZapConfig {
+  constructor(identifier, maxCount, relayUrls) {
+    this.identifier = identifier;
+    this.maxCount = maxCount;
+    this.relayUrls = relayUrls;
+  }
+
+  static fromButton(button) {
+    if (!button) throw new Error(CONFIG.ERRORS.BUTTON_NOT_FOUND);
+    return new ZapConfig(button.getAttribute("data-identifier"), parseInt(button.getAttribute("data-max-count"), 10), button.getAttribute("data-relay-urls").split(","));
+  }
+}
+
 const subscriptionManager = new ZapSubscriptionManager();
 
 export async function fetchLatestZaps() {
   try {
     const zapDialog = document.querySelector("zap-dialog");
-    if (!zapDialog) throw new Error(ERROR_MESSAGES.DIALOG_NOT_FOUND);
+    if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
     const config = ZapConfig.fromButton(document.querySelector("button[data-identifier]"));
     const hasCache = subscriptionManager.zapEventsCache.length > 0;

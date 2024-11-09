@@ -1,7 +1,15 @@
+import { CONFIG } from "./ZapManager.js";
+
+// 型チェック用のユーティリティ
+const TypeChecker = {
+  isValidIdentifier: (identifier) => typeof identifier === "string" && identifier.length > 0,
+  isValidCount: (count) => typeof count === "number" && count > 0,
+};
+
 // src/utils.js
 export function decodeIdentifier(identifier, maxCount) {
-  if (!identifier || !maxCount) {
-    throw new Error("識別子またはカウント値が無効です");
+  if (!TypeChecker.isValidIdentifier(identifier) || !TypeChecker.isValidCount(maxCount)) {
+    throw new Error(CONFIG.ERRORS.DECODE_FAILED);
   }
 
   const decoded = safeNip19Decode(identifier);
@@ -51,6 +59,10 @@ export function formatIdentifier(identifier) {
 }
 
 export async function fetchZapStats(identifier) {
+  if (!TypeChecker.isValidIdentifier(identifier)) {
+    throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+  }
+
   const decoded = safeNip19Decode(identifier);
   if (!decoded) return null;
 
@@ -100,7 +112,7 @@ export async function parseZapEvent(event, defaultIcon) {
   return {
     pubkey,
     content,
-    satsText
+    satsText,
   };
 }
 
