@@ -11,23 +11,23 @@ class ZapDialog extends HTMLElement {
 
   // ライフサイクルメソッド
   connectedCallback() {
-    this.initializeDialog();
+    this.#initializeDialog();
   }
 
-  // 初期化メソッド
-  initializeDialog() {
-    this.setupStyles();
-    this.setupTemplate();
-    this.setupEventListeners();
+  // 初期化関連メソッド
+  #initializeDialog() {
+    this.#setupStyles();
+    this.#setupTemplate();
+    this.#setupEventListeners();
   }
 
-  setupStyles() {
+  #setupStyles() {
     const styleSheet = document.createElement("style");
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
   }
 
-  setupTemplate() {
+  #setupTemplate() {
     const template = document.createElement("template");
     template.innerHTML = `
       <dialog id="zapDialog">
@@ -40,9 +40,9 @@ class ZapDialog extends HTMLElement {
     this.shadowRoot.appendChild(template.content.cloneNode(true));
   }
 
-  setupEventListeners() {
-    const dialog = this.getElement("#zapDialog");
-    const closeButton = this.getElement("#closeDialogButton");
+  #setupEventListeners() {
+    const dialog = this.#getElement("#zapDialog");
+    const closeButton = this.#getElement("#closeDialogButton");
 
     closeButton.addEventListener("click", () => this.closeDialog());
 
@@ -61,20 +61,15 @@ class ZapDialog extends HTMLElement {
     });
   }
 
-  // ユーティリティメソッド
-  getElement(selector) {
-    return this.shadowRoot.querySelector(selector);
-  }
-
-  // extractZapInfo メソッドを簡略化
-  async extractZapInfo(event) {
+  // プロフィール関連メソッド
+  async #extractZapInfo(event) {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
 
     let senderName = "Anonymous";
     let senderIcon = defaultIcon;
 
     if (pubkey) {
-      const profile = await this.getProfileInfo(pubkey);
+      const profile = await this.#getProfileInfo(pubkey);
       senderName = profile.senderName;
       senderIcon = profile.senderIcon;
     }
@@ -88,12 +83,10 @@ class ZapDialog extends HTMLElement {
     };
   }
 
-  // getProfileInfo メソッドを簡略化
-  async getProfileInfo(pubkey) {
+  async #getProfileInfo(pubkey) {
     if (!pubkey) return { senderName: "Anonymous", senderIcon: defaultIcon };
 
-    const profile = profileManager.profileCache.get(pubkey) || 
-                   await profileManager.fetchProfile(pubkey);
+    const profile = profileManager.profileCache.get(pubkey) || (await profileManager.fetchProfile(pubkey));
 
     return {
       senderName: getProfileDisplayName(profile),
@@ -101,21 +94,8 @@ class ZapDialog extends HTMLElement {
     };
   }
 
-  // 重複していたshowDialogを1つに統合
-  showDialog() {
-    const dialog = this.getElement("#zapDialog");
-    if (dialog && !dialog.open) {
-      const fetchButton = document.querySelector("button[data-identifier]");
-      if (fetchButton) {
-        const identifier = fetchButton.getAttribute("data-identifier");
-        const title = this.getElement("#dialogTitle");
-        title.textContent = "To " + formatIdentifier(identifier);
-      }
-      dialog.showModal();
-    }
-  }
-
-  createZapHTML({ senderName, senderIcon, satsText, comment, pubkey }) {
+  // UI要素生成メソッド
+  #createZapHTML({ senderName, senderIcon, satsText, comment, pubkey }) {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
     return `
@@ -135,14 +115,32 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // 公開メソッド
+  #getElement(selector) {
+    return this.shadowRoot.querySelector(selector);
+  }
+
+  // 公開API
+  showDialog() {
+    const dialog = this.#getElement("#zapDialog");
+    if (dialog && !dialog.open) {
+      const fetchButton = document.querySelector("button[data-identifier]");
+      if (fetchButton) {
+        const identifier = fetchButton.getAttribute("data-identifier");
+        const title = this.#getElement("#dialogTitle");
+        title.textContent = "To " + formatIdentifier(identifier);
+      }
+      dialog.showModal();
+    }
+  }
+
   closeDialog() {
-    const dialog = this.getElement("#zapDialog");
+    const dialog = this.#getElement("#zapDialog");
     if (dialog?.open) dialog.close();
   }
 
+  // Zap表示関連メソッド
   initializeZapPlaceholders(maxCount) {
-    const list = this.getElement("#dialogZapList");
+    const list = this.#getElement("#dialogZapList");
     if (!list) return;
 
     list.innerHTML = Array(maxCount)
@@ -159,8 +157,8 @@ class ZapDialog extends HTMLElement {
   }
 
   initializeZapStats() {
-    const dialog = this.getElement("#zapDialog");
-    const statsDiv = this.getElement(".zap-stats");
+    const dialog = this.#getElement("#zapDialog");
+    const statsDiv = this.#getElement(".zap-stats");
     if (!dialog || !statsDiv) return;
 
     statsDiv.innerHTML = `
@@ -171,18 +169,18 @@ class ZapDialog extends HTMLElement {
   }
 
   async replacePlaceholderWithZap(event, index) {
-    const placeholder = this.getElement(`[data-index="${index}"]`);
+    const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!placeholder) return;
 
-    const zapInfo = await this.extractZapInfo(event);
+    const zapInfo = await this.#extractZapInfo(event);
     if (zapInfo) {
-      placeholder.innerHTML = this.createZapHTML(zapInfo);
+      placeholder.innerHTML = this.#createZapHTML(zapInfo);
       placeholder.removeAttribute("data-index");
     }
   }
 
   async renderZapListFromCache(zapEventsCache, maxCount) {
-    const list = this.getElement("#dialogZapList");
+    const list = this.#getElement("#dialogZapList");
     if (!list) return;
 
     const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
@@ -200,27 +198,27 @@ class ZapDialog extends HTMLElement {
     // Zapリストの描画（キャッシュから取得）
     list.innerHTML = "";
     for (const event of sortedZaps) {
-      const zapInfo = await this.extractZapInfo(event);
+      const zapInfo = await this.#extractZapInfo(event);
       const li = document.createElement("li");
       li.classList.add("zap-list-item");
-      li.innerHTML = this.createZapHTML(zapInfo);
+      li.innerHTML = this.#createZapHTML(zapInfo);
       list.appendChild(li);
     }
   }
 
   async prependZap(event) {
-    const list = this.getElement("#dialogZapList");
+    const list = this.#getElement("#dialogZapList");
     if (!list) return;
 
-    const zapInfo = await this.extractZapInfo(event);
+    const zapInfo = await this.#extractZapInfo(event);
     const li = document.createElement("li");
     li.classList.add("zap-list-item");
-    li.innerHTML = this.createZapHTML(zapInfo);
+    li.innerHTML = this.#createZapHTML(zapInfo);
     list.prepend(li);
   }
 
   displayZapStats(stats) {
-    const statsDiv = this.getElement(".zap-stats");
+    const statsDiv = this.#getElement(".zap-stats");
     if (!statsDiv) return;
 
     statsDiv.innerHTML = `
