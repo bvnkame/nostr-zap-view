@@ -106,6 +106,8 @@ class ZapDialog extends HTMLElement {
   // プロフィール関連メソッド
   async #extractZapInfo(event) {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
+    // カンマを削除してから数値に変換
+    const satsAmount = parseInt(satsText.replace(/,/g, '').split(" ")[0], 10); // 更新
 
     let senderName = "Anonymous";
     let senderIcon = ""; // 初期状態は空文字列（プレースホルダー表示用）
@@ -129,20 +131,43 @@ class ZapDialog extends HTMLElement {
       senderName,
       senderIcon,
       satsText,
+      satsAmount, // 追加
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
     };
   }
 
+  // #getAmountColorClass メソッドにログを追加
+  #getAmountColorClass(amount) {
+    const button = document.querySelector("button[data-identifier]");
+    if (!button || button.getAttribute("data-color-mode") !== "true") {
+      console.log("Color mode is not enabled.");
+      return "";
+    }
+    
+    let colorClass = "";
+    if (amount >= 100000) colorClass = "zap-amount-100k";
+    else if (amount >= 50000) colorClass = "zap-amount-50k";
+    else if (amount >= 20000) colorClass = "zap-amount-20k";
+    else if (amount >= 10000) colorClass = "zap-amount-10k";
+    else if (amount >= 5000) colorClass = "zap-amount-5k";
+    else if (amount >= 2000) colorClass = "zap-amount-2k";
+    else if (amount >= 1000) colorClass = "zap-amount-1k";
+
+    console.log(`Amount: ${amount}, Color Class: ${colorClass}`);
+    return colorClass;
+  }
+
   // UI要素生成メソッド
-  #createZapHTML({ senderName, senderIcon, satsText, comment, pubkey, created_at }) {
+  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at }) {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
     const nip05 = pubkey ? profileManager.getNip05(pubkey) : "";
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
+    const colorClass = this.#getAmountColorClass(satsAmount);
 
     const iconHTML = senderIcon ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">` : `<div class="zap-placeholder-icon"></div>`;
 
@@ -159,6 +184,62 @@ class ZapDialog extends HTMLElement {
       </div>
       ${comment ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>` : ""}
     `;
+  }
+
+  // メソッド内でクラスを適用する際にログを追加
+  async replacePlaceholderWithZap(event, index) {
+    const placeholder = this.#getElement(`[data-index="${index}"]`);
+    if (!placeholder) return;
+
+    await this.#prefetchProfiles([event]);
+
+    const zapInfo = await this.#extractZapInfo(event);
+    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    placeholder.className = `zap-list-item ${colorClass}`;
+    console.log(`Setting className: zap-list-item ${colorClass} for index ${index}`);
+    placeholder.innerHTML = this.#createZapHTML(zapInfo);
+    placeholder.removeAttribute("data-index");
+  }
+
+  // メソッド内でクラスを適用する際にログを追加
+  async renderZapListFromCache(zapEventsCache, maxCount) {
+    const list = this.#getElement("#dialogZapList");
+    if (!list) return;
+
+    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
+    await this.#prefetchProfiles(sortedZaps);
+
+    const fragment = document.createDocumentFragment();
+    const zapInfoPromises = sortedZaps.map((event) => this.#extractZapInfo(event));
+    const zapInfos = await Promise.all(zapInfoPromises);
+
+    zapInfos.forEach((zapInfo) => {
+      const li = document.createElement("li");
+      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      li.className = `zap-list-item ${colorClass}`;
+      console.log(`Setting className: zap-list-item ${colorClass} for zapInfo`);
+      li.innerHTML = this.#createZapHTML(zapInfo);
+      fragment.appendChild(li);
+    });
+
+    list.innerHTML = "";
+    list.appendChild(fragment);
+  }
+
+  // メソッド内でクラスを適用する際にログを追加
+  async prependZap(event) {
+    const list = this.#getElement("#dialogZapList");
+    if (!list) return;
+
+    await this.#prefetchProfiles([event]);
+
+    const zapInfo = await this.#extractZapInfo(event);
+    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    const li = document.createElement("li");
+    li.className = `zap-list-item ${colorClass}`;
+    console.log(`Setting className: zap-list-item ${colorClass} for prepended zap`);
+    li.innerHTML = this.#createZapHTML(zapInfo);
+    list.prepend(li);
   }
 
   #getElement(selector) {
@@ -219,87 +300,6 @@ class ZapDialog extends HTMLElement {
       <div class="stats-item"></div>
       <div class="stats-item"></div>
     `;
-  }
-
-  async replacePlaceholderWithZap(event, index) {
-    const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!placeholder) return;
-
-    // プロフィール情報を事前取得
-    await this.#prefetchProfiles([event]);
-
-    const zapInfo = await this.#extractZapInfo(event);
-    placeholder.innerHTML = this.#createZapHTML(zapInfo);
-    placeholder.removeAttribute("data-index");
-  }
-
-  async renderZapListFromCache(zapEventsCache, maxCount) {
-    const list = this.#getElement("#dialogZapList");
-    if (!list) return;
-
-    // 表示対象のZapイベントを作成日時でソートして取得
-    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
-
-    // プロフィール情報を一括で事前取得（一回だけ）
-    await this.#prefetchProfiles(sortedZaps);
-
-    // 現在表示中のアイテムを保持するためのMap
-    const existingItems = new Map();
-    list.querySelectorAll(".zap-list-item").forEach((item) => {
-      const zapContent = item.innerHTML;
-      existingItems.set(zapContent, item);
-    });
-
-    // 全てのZap情報を並列で取得
-    const zapInfoPromises = sortedZaps.map((event) => this.#extractZapInfo(event));
-    const zapInfos = await Promise.all(zapInfoPromises);
-
-    // DOMの更新は既存要素を維持しながら行う
-    const fragment = document.createDocumentFragment();
-    const newItems = new Set();
-
-    zapInfos.forEach((zapInfo) => {
-      const zapHTML = this.#createZapHTML(zapInfo);
-
-      // 既存のアイテムがあれば再利用
-      let li = null;
-      if (existingItems.has(zapHTML)) {
-        li = existingItems.get(zapHTML);
-        existingItems.delete(zapHTML);
-      } else {
-        li = document.createElement("li");
-        li.classList.add("zap-list-item");
-        li.innerHTML = zapHTML;
-      }
-
-      newItems.add(li);
-      fragment.appendChild(li);
-    });
-
-    // 不要になった古いアイテムを削除
-    existingItems.forEach((item) => {
-      if (!newItems.has(item)) {
-        item.remove();
-      }
-    });
-
-    // 新しいコンテンツを追加
-    list.innerHTML = "";
-    list.appendChild(fragment);
-  }
-
-  async prependZap(event) {
-    const list = this.#getElement("#dialogZapList");
-    if (!list) return;
-
-    // プロフィール情報を事前取得
-    await this.#prefetchProfiles([event]);
-
-    const zapInfo = await this.#extractZapInfo(event);
-    const li = document.createElement("li");
-    li.classList.add("zap-list-item");
-    li.innerHTML = this.#createZapHTML(zapInfo);
-    list.prepend(li);
   }
 
   displayZapStats(stats) {

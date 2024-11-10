@@ -10,6 +10,13 @@
   --hover-bg: #edf2f7;
   --border: #edf2f7;
   --new-mark: #ff707c;
+  --zap-1k-bg: rgba(0, 0, 255, 0.1);
+  --zap-2k-bg: rgba(0, 255, 255, 0.1);
+  --zap-5k-bg: rgba(144, 238, 144, 0.1);
+  --zap-10k-bg: rgba(255, 255, 0, 0.1);
+  --zap-20k-bg: rgba(255, 165, 0, 0.1);
+  --zap-50k-bg: rgba(255, 0, 255, 0.1);
+  --zap-100k-bg: rgba(255, 0, 0, 0.1);
 }
 
 * {
@@ -222,4 +229,33 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 0.9375rem;
+}
+
+/* Zap amount color classes */
+.zap-list-item.zap-amount-1k {
+  background-color: var(--zap-1k-bg);
+}
+
+.zap-list-item.zap-amount-2k {
+  background-color: var(--zap-2k-bg);
+}
+
+.zap-list-item.zap-amount-5k {
+  background-color: var(--zap-5k-bg);
+}
+
+.zap-list-item.zap-amount-10k {
+  background-color: var(--zap-10k-bg);
+}
+
+.zap-list-item.zap-amount-20k {
+  background-color: var(--zap-20k-bg);
+}
+
+.zap-list-item.zap-amount-50k {
+  background-color: var(--zap-50k-bg);
+}
+
+.zap-list-item.zap-amount-100k {
+  background-color: var(--zap-100k-bg);
 }
