@@ -12,7 +12,7 @@ const decodedCache = new Map();
 // src/utils.js
 export function decodeIdentifier(identifier, maxCount) {
   const cacheKey = `${identifier}:${maxCount}`;
-  
+
   if (decodedCache.has(cacheKey)) {
     return decodedCache.get(cacheKey);
   }
@@ -167,10 +167,10 @@ const imageCache = new Map();
 
 export async function preloadImage(url) {
   if (!url) return null;
-  
+
   // キャッシュにある場合は、そのまま返す（失敗したURLの場合はnullが返される）
   if (imageCache.has(url)) return imageCache.get(url);
-  
+
   try {
     const img = new Image();
     const promise = new Promise((resolve, reject) => {
@@ -187,7 +187,7 @@ export async function preloadImage(url) {
     img.src = url;
     return await promise;
   } catch (error) {
-    console.error('Image preload error:', error);
+    console.error("Image preload error:", error);
     imageCache.set(url, null);
     return null;
   }

@@ -21,6 +21,7 @@ class ZapSubscriptionManager {
     this.zapStatsCache = new Map();
     this.subscriptions = { zap: null, realTime: null };
     this.state = { isZapClosed: false, isInitialFetchComplete: false };
+    this.currentStats = null; // 現在の統計情報を保持
   }
 
   clearCache() {
@@ -30,9 +31,10 @@ class ZapSubscriptionManager {
   async getZapStats(identifier) {
     const cached = this.zapStatsCache.get(identifier);
     const now = Date.now();
-    
+
     // キャッシュが有効な場合はそれを返す
-    if (cached && (now - cached.timestamp) < 300000) { // 5分
+    if (cached && now - cached.timestamp < 300000) {
+      // 5分
       return cached.stats;
     }
 
@@ -40,10 +42,33 @@ class ZapSubscriptionManager {
     if (stats) {
       this.zapStatsCache.set(identifier, {
         stats,
-        timestamp: now
+        timestamp: now,
       });
+      this.currentStats = { ...stats }; // 現在の統計情報を保持
     }
     return stats;
+  }
+
+  async updateStatsFromZapEvent(event) {
+    if (!this.currentStats) return;
+
+    try {
+      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+      if (!bolt11Tag) return;
+
+      const decoded = window.decodeBolt11(bolt11Tag);
+      const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
+
+      if (amountMsat) {
+        this.currentStats.count++;
+        // millisatoshiからsatoshiに変換してから加算
+        this.currentStats.msats += Math.floor(amountMsat / 1000) * 1000;
+        this.currentStats.maxMsats = Math.max(this.currentStats.maxMsats, amountMsat);
+        displayZapStats(this.currentStats);
+      }
+    } catch (error) {
+      console.error("Zap統計の更新に失敗:", error);
+    }
   }
 
   closeZapSubscription() {
@@ -58,7 +83,7 @@ class ZapSubscriptionManager {
 
     if (!this.zapEventsCache.some((e) => e.id === event.id)) {
       this.zapEventsCache.push(event);
-      
+
       // 作成日時でソート
       this.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
@@ -67,7 +92,7 @@ class ZapSubscriptionManager {
       if (index < maxCount) {
         try {
           await replacePlaceholderWithZap(event, index);
-          
+
           // インデックスが変わった可能性があるため、再描画
           if (index < maxCount) {
             await renderZapListFromCache(this.zapEventsCache, maxCount);
@@ -88,7 +113,7 @@ class ZapSubscriptionManager {
 
     if (!this.zapEventsCache.some((e) => e.id === event.id)) {
       this.zapEventsCache.unshift(event);
-      await prependZap(event);
+      await Promise.all([prependZap(event), this.updateStatsFromZapEvent(event)]);
     }
   }
 
@@ -175,10 +200,10 @@ export async function fetchLatestZaps() {
 async function handleCachedZaps(config) {
   // 統計情報の取得を先に開始
   const statsPromise = subscriptionManager.getZapStats(config.identifier);
-  
+
   // UIの描画を並列で実行
   await renderZapListFromCache(subscriptionManager.zapEventsCache, config.maxCount);
-  
+
   // 統計情報の取得完了を待つ
   const stats = await statsPromise;
   if (stats) displayZapStats(stats);
