@@ -110,9 +110,8 @@ class ZapDialog extends HTMLElement {
     let senderName = "Anonymous";
     let senderIcon = defaultIcon;
 
-    if (pubkey) {
-      // 配列として渡して fetchProfiles を使用
-      const [profile] = await profileManager.fetchProfiles([pubkey]);
+    if (pubkey && this.profileManager) {
+      const profile = this.profileManager.getProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile);
         if (profile.picture) {
@@ -221,7 +220,7 @@ class ZapDialog extends HTMLElement {
 
     // プロフィール情報を事前取得
     await this.#prefetchProfiles([event]);
-    
+
     const zapInfo = await this.#extractZapInfo(event);
     placeholder.innerHTML = this.#createZapHTML(zapInfo);
     placeholder.removeAttribute("data-index");
@@ -232,9 +231,7 @@ class ZapDialog extends HTMLElement {
     if (!list) return;
 
     // 表示対象のZapイベントを作成日時でソートして取得
-    const sortedZaps = [...zapEventsCache]
-      .sort((a, b) => b.created_at - a.created_at)
-      .slice(0, maxCount);
+    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
 
     // プロフィール情報を一括で事前取得（一回だけ）
     await this.#prefetchProfiles(sortedZaps);
@@ -317,12 +314,15 @@ class ZapDialog extends HTMLElement {
 
   // プロフィール情報の事前取得用のメソッドを追加
   async #prefetchProfiles(sortedZaps) {
-    const pubkeys = sortedZaps
-      .map(event => parseDescriptionTag(event).pubkey)
-      .filter(Boolean);
-    
+    const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
+
     if (pubkeys.length > 0) {
-      await profileManager.fetchProfiles([...new Set(pubkeys)]);
+      this.profileManager = {
+        profiles: new Map((await profileManager.fetchProfiles(pubkeys)).map((profile, index) => [pubkeys[index], profile])),
+        getProfile: function (pubkey) {
+          return this.profiles.get(pubkey);
+        },
+      };
     }
   }
 }
