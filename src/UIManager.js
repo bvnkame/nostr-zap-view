@@ -1,7 +1,7 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
-import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage } from "./utils.js";
+import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage, escapeHTML } from "./utils.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -135,18 +135,21 @@ class ZapDialog extends HTMLElement {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
     const isNew = isWithin24Hours(created_at);
+    const escapedName = escapeHTML(senderName);
+    const escapedComment = escapeHTML(comment);
+
     return `
       <div class="zap-sender">
         <div class="sender-icon${isNew ? " is-new" : ""}">
-          <img src="${senderIcon}" alt="${senderName}'s icon" loading="lazy">
+          <img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy">
         </div>
         <div class="sender-info">
-          <span class="sender-name">${senderName}</span>
+          <span class="sender-name">${escapedName}</span>
           <span class="sender-pubkey">${npubKey}</span>
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
-      ${comment ? `<div class="zap-details"><span class="zap-comment">${comment}</span></div>` : ""}
+      ${comment ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>` : ""}
     `;
   }
 

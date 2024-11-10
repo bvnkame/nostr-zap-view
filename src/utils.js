@@ -166,21 +166,26 @@ export async function parseBolt11(event) {
 const imageCache = new Map();
 
 export async function preloadImage(url) {
-  if (!url) return null;
+  if (!url || !isValidImageUrl(url)) {
+    return null;
+  }
 
-  // キャッシュにある場合は、そのまま返す（失敗したURLの場合はnullが返される）
-  if (imageCache.has(url)) return imageCache.get(url);
+  // キャッシュにある場合は、そのまま返す
+  if (imageCache.has(url)) {
+    return imageCache.get(url);
+  }
 
   try {
     const img = new Image();
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve) => {
       img.onload = () => {
-        imageCache.set(url, url); // 成功した場合はURLをキャッシュ
-        resolve(url);
+        const validatedUrl = escapeHTML(url);
+        imageCache.set(url, validatedUrl);
+        resolve(validatedUrl);
       };
       img.onerror = () => {
-        imageCache.set(url, null); // 失敗した場合はnullをキャッシュ
-        resolve(null); // rejectではなくresolve(null)を使用
+        imageCache.set(url, null);
+        resolve(null);
       };
     });
 
@@ -190,5 +195,20 @@ export async function preloadImage(url) {
     console.error("Image preload error:", error);
     imageCache.set(url, null);
     return null;
+  }
+}
+
+export function escapeHTML(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function isValidImageUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol);
+  } catch {
+    return false;
   }
 }
