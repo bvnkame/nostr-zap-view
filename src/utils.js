@@ -242,6 +242,7 @@ export function escapeHTML(str) {
 
 // NIP-05検証関数を追加
 export async function verifyNip05(nip05, pubkey) {
+  console.log("NIP-05検証:", nip05, pubkey);
   if (!nip05 || !pubkey) return null;
 
   try {

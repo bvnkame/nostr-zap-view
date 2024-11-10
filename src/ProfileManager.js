@@ -100,6 +100,7 @@ export class ProfileManager {
   }
 
   async _processBatchQueue() {
+    console.log("バッチ処理開始:", this.batchQueue);
     if (this.batchQueue.size === 0) return;
 
     const batchPubkeys = Array.from(this.batchQueue).slice(0, this.#config.BATCH_SIZE);
@@ -114,6 +115,7 @@ export class ProfileManager {
   }
 
   async _fetchProfileFromRelay(pubkeys) {
+    console.log("プロフィール取得リクエスト:", pubkeys);
     try {
       const profiles = await profilePool.querySync(this.#config.RELAYS, {
         kinds: [0],
@@ -139,6 +141,11 @@ export class ProfileManager {
 
   async _processProfiles(profiles) {
     await Promise.all(profiles.map(async (profile) => {
+      // 既に検証済みのNIP-05はスキップ
+      if (this.nip05Cache.has(profile.pubkey)) {
+        console.log("NIP-05キャッシュ済み:", profile.pubkey);
+        return;
+      }
       try {
         const parsedContent = JSON.parse(profile.content);
         const parsedProfile = {
