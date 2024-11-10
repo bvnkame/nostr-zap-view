@@ -108,16 +108,21 @@ class ZapDialog extends HTMLElement {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
 
     let senderName = "Anonymous";
-    let senderIcon = defaultIcon;
+    let senderIcon = ""; // 初期状態は空文字列（プレースホルダー表示用）
 
     if (pubkey && this.profileManager) {
       const profile = this.profileManager.getProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile);
         if (profile.picture) {
+          // 画像読み込みを試行し、失敗したらdefaultIconを使用
           senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
+        } else {
+          senderIcon = defaultIcon;
         }
       }
+    } else {
+      senderIcon = defaultIcon;
     }
 
     return {
@@ -126,7 +131,7 @@ class ZapDialog extends HTMLElement {
       satsText,
       comment: content || "",
       pubkey: pubkey || "",
-      created_at: event.created_at, // イベントの作成時刻を追加
+      created_at: event.created_at,
     };
   }
 
@@ -139,10 +144,12 @@ class ZapDialog extends HTMLElement {
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
 
+    const iconHTML = senderIcon ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">` : `<div class="zap-placeholder-icon"></div>`;
+
     return `
       <div class="zap-sender">
         <div class="sender-icon${isNew ? " is-new" : ""}">
-          <img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy">
+          ${iconHTML}
         </div>
         <div class="sender-info">
           <span class="sender-name">${escapedName}</span>
