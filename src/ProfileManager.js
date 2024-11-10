@@ -217,10 +217,6 @@ export class ProfileManager {
     console.log("_processProfiles：プロフィール情報処理:", profiles);
     await Promise.all(
       profiles.map(async (profile) => {
-        // 既に検証済みのNIP-05はスキップ
-        if (this.nip05Cache.has(profile.pubkey)) {
-          return;
-        }
         try {
           const parsedContent = JSON.parse(profile.content);
           const parsedProfile = {
