@@ -61,7 +61,7 @@ export class ProfileManager {
    * @returns {Promise<ProfileResult>} プロフィール情報
    */
   async fetchProfile(pubkey) {
-    console.log("単一プロフィール取得リクエスト:", pubkey);
+    console.log("fetchProfile：単一プロフィール取得リクエスト:", pubkey);
     if (this.profileCache.has(pubkey)) {
       return this.profileCache.get(pubkey);
     }
@@ -75,7 +75,7 @@ export class ProfileManager {
    * @returns {Promise<ProfileResult[]>} プロフィール情報の配列
    */
   async fetchProfiles(pubkeys) {
-    console.log("複数プロフィール取得リクエスト:", pubkeys);
+    console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
     const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key));
 
     if (uncachedPubkeys.length > 0) {
@@ -90,6 +90,7 @@ export class ProfileManager {
    * 同一の公開鍵に対する重複リクエストを防ぐ
    */
   async _getOrCreateFetchPromise(pubkey) {
+    console.log("_getOrCreateFetchPromise：プロフィール取得Promise管理:", pubkey);
     if (this.profileFetchPromises.has(pubkey)) {
       return this.profileFetchPromises.get(pubkey);
     }
@@ -110,7 +111,7 @@ export class ProfileManager {
    * 連続的なリクエストを1つのバッチにまとめる
    */
   _scheduleBatchProcess() {
-    console.log("バッチ処理スケジュール");
+    console.log("_scheduleBatchProcess：バッチ処理スケジュール");
     if (this.batchTimer) {
       clearTimeout(this.batchTimer);
     }
@@ -118,7 +119,7 @@ export class ProfileManager {
   }
 
   async _batchFetch(pubkeys) {
-    console.log("バッチ取得:", pubkeys);
+    console.log("_batchFetch：バッチ取得:", pubkeys);
     pubkeys.forEach((key) => this.batchQueue.add(key));
     return new Promise((resolve) => {
       this.batchTimer = setTimeout(async () => {
@@ -133,7 +134,7 @@ export class ProfileManager {
    * バッチサイズに応じて複数回に分けて処理
    */
   async _processBatchQueue() {
-    console.log("バッチ処理開始:", this.batchQueue);
+    console.log("_processBatchQueue：バッチ処理開始:", this.batchQueue);
     if (this.batchQueue.size === 0) return;
 
     const batchPubkeys = Array.from(this.batchQueue).slice(0, this.#config.BATCH_SIZE);
@@ -152,7 +153,7 @@ export class ProfileManager {
    * 取得したプロフィールの処理とキャッシュへの保存を行う
    */
   async _fetchProfileFromRelay(pubkeys) {
-    console.log("プロフィール取得リクエスト:", pubkeys);
+    console.log("_fetchProfileFromRelay：プロフィール取得リクエスト:", pubkeys);
     try {
       const profiles = await profilePool.querySync(this.#config.RELAYS, {
         kinds: [0],
@@ -181,11 +182,11 @@ export class ProfileManager {
    * JSON解析とNIP-05の検証を行う
    */
   async _processProfiles(profiles) {
+    console.log("_processProfiles：プロフィール情報処理:", profiles);
     await Promise.all(
       profiles.map(async (profile) => {
         // 既に検証済みのNIP-05はスキップ
         if (this.nip05Cache.has(profile.pubkey)) {
-          console.log("NIP-05キャッシュ済み:", profile.pubkey);
           return;
         }
         try {
