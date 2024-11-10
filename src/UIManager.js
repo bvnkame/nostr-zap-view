@@ -142,7 +142,13 @@ class ZapDialog extends HTMLElement {
   // #getAmountColorClass メソッドにログを追加
   #getAmountColorClass(amount) {
     const button = document.querySelector("button[data-identifier]");
-    if (!button || button.getAttribute("data-color-mode") !== "true") {
+    const colorModeAttr = button?.getAttribute("data-color-mode");
+    // data-color-modeが未設定、空文字列、不正な値の場合はデフォルト値を使用
+    const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr)
+      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
+      : colorModeAttr === "true";
+
+    if (!isColorModeEnabled) {
       console.log("Color mode is not enabled.");
       return "";
     }
@@ -320,7 +326,7 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // プロフィール情報の事前取得用のメソッドを追加
+  // プロフィー��情報の事前取得用のメソッドを追加
   async #prefetchProfiles(sortedZaps) {
     const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
 
