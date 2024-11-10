@@ -77,32 +77,17 @@ export class ProfileManager {
    */
   async fetchProfiles(pubkeys) {
     console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
-    const uniquePubkeys = [...new Set(pubkeys)];
-    const result = new Map();
-    const unfetchedPubkeys = [];
-
-    // キャッシュチェック
-    for (const pubkey of uniquePubkeys) {
-      if (this.profileCache.has(pubkey)) {
-        result.set(pubkey, this.profileCache.get(pubkey));
-      } else if (!this.#profileFetchQueue.has(pubkey)) {
-        unfetchedPubkeys.push(pubkey);
-        this.#profileFetchQueue.set(pubkey, new Promise((resolve) => {
-          this.resolvers.set(pubkey, resolve);
-        }));
-      }
-    }
-
-    // 未取得のプロファイルがあれば取得処理を開始
-    if (unfetchedPubkeys.length > 0 && !this.#processingProfiles) {
-      this.#processProfileQueue();
-    }
-
-    // 全てのプロファイル取得を待機
-    await Promise.all([...this.#profileFetchQueue.values()]);
+    // キャッシュ済みのpubkeyは除外
+    const uncachedPubkeys = pubkeys.filter(key => !this.profileCache.has(key));
     
-    // 結果の組み立て
-    return uniquePubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+    if (uncachedPubkeys.length > 0) {
+      // キャッシュにないものだけを取得
+      const uniqueUncachedPubkeys = [...new Set(uncachedPubkeys)];
+      await this._fetchProfileFromRelay(uniqueUncachedPubkeys);
+    }
+
+    // キャッシュから結果を返す
+    return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
   }
 
   async #processProfileQueue() {

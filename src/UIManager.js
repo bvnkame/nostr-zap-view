@@ -219,6 +219,9 @@ class ZapDialog extends HTMLElement {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!placeholder) return;
 
+    // プロフィール情報を事前取得
+    await this.#prefetchProfiles([event]);
+    
     const zapInfo = await this.#extractZapInfo(event);
     placeholder.innerHTML = this.#createZapHTML(zapInfo);
     placeholder.removeAttribute("data-index");
@@ -233,13 +236,8 @@ class ZapDialog extends HTMLElement {
       .sort((a, b) => b.created_at - a.created_at)
       .slice(0, maxCount);
 
-    // プロフィール情報を一括で取得
-    const pubkeys = sortedZaps
-      .map(event => parseDescriptionTag(event).pubkey)
-      .filter(Boolean);
-    
-    // プロフィール情報を一括取得（一回だけ）
-    await profileManager.fetchProfiles([...new Set(pubkeys)]);
+    // プロフィール情報を一括で事前取得（一回だけ）
+    await this.#prefetchProfiles(sortedZaps);
 
     // 現在表示中のアイテムを保持するためのMap
     const existingItems = new Map();
@@ -290,6 +288,9 @@ class ZapDialog extends HTMLElement {
     const list = this.#getElement("#dialogZapList");
     if (!list) return;
 
+    // プロフィール情報を事前取得
+    await this.#prefetchProfiles([event]);
+
     const zapInfo = await this.#extractZapInfo(event);
     const li = document.createElement("li");
     li.classList.add("zap-list-item");
@@ -312,6 +313,17 @@ class ZapDialog extends HTMLElement {
       <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.maxMsats / 1000))}</span></div>
       <div class="stats-item">sats</div>
     `;
+  }
+
+  // プロフィール情報の事前取得用のメソッドを追加
+  async #prefetchProfiles(sortedZaps) {
+    const pubkeys = sortedZaps
+      .map(event => parseDescriptionTag(event).pubkey)
+      .filter(Boolean);
+    
+    if (pubkeys.length > 0) {
+      await profileManager.fetchProfiles([...new Set(pubkeys)]);
+    }
   }
 }
 
