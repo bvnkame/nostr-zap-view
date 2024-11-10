@@ -1,6 +1,7 @@
 import { zapPool } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
+import { ZapConfig } from "./ZapConfig.js";
 
 // 設定をグローバルな設定オブジェクトに統合
 export const CONFIG = {
@@ -159,19 +160,6 @@ class ZapSubscriptionManager {
         oneose: () => console.log("リアルタイムZapのEOSEを受信。"),
       }
     );
-  }
-}
-
-class ZapConfig {
-  constructor(identifier, maxCount, relayUrls) {
-    this.identifier = identifier;
-    this.maxCount = maxCount;
-    this.relayUrls = relayUrls;
-  }
-
-  static fromButton(button) {
-    if (!button) throw new Error(CONFIG.ERRORS.BUTTON_NOT_FOUND);
-    return new ZapConfig(button.getAttribute("data-identifier"), parseInt(button.getAttribute("data-max-count"), 10), button.getAttribute("data-relay-urls").split(","));
   }
 }
 
