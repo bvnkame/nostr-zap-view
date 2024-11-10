@@ -52,12 +52,13 @@ export class ProfileManager {
     this.profileFetchPromises = new Map();
     this.batchQueue = new Set();
     this.resolvers = new Map();
+    this.fetchingPubkeys = new Set(); // フェッチ中のpubkeyを管理
   }
 
   /**
    * 単一の公開鍵に対応するプロフィール情報を取得
    * キャッシュに存在する場合はキャッシュから返却、存在しない場合は新規取得
-   * @param {string} pubkey - 取得対象の公開鍵
+   * @param {string} pubkey - 取得対象の公��鍵
    * @returns {Promise<ProfileResult>} プロフィール情報
    */
   async fetchProfile(pubkey) {
@@ -76,7 +77,8 @@ export class ProfileManager {
    */
   async fetchProfiles(pubkeys) {
     console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
-    const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key));
+    // キャッシュ済みとフェッチ中のpubkeyを除外
+    const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key) && !this.fetchingPubkeys.has(key));
 
     if (uncachedPubkeys.length > 0) {
       await this._batchFetch(uncachedPubkeys);
@@ -86,7 +88,7 @@ export class ProfileManager {
   }
 
   /**
-   * 公開鍵に対するプロフィール取得のPromiseを管理
+   * 公開鍵に対するプロ��ィール取得のPromiseを管理
    * 同一の公開鍵に対する重複リクエストを防ぐ
    */
   async _getOrCreateFetchPromise(pubkey) {
@@ -137,10 +139,23 @@ export class ProfileManager {
     console.log("_processBatchQueue：バッチ処理開始:", this.batchQueue);
     if (this.batchQueue.size === 0) return;
 
-    const batchPubkeys = Array.from(this.batchQueue).slice(0, this.#config.BATCH_SIZE);
-    this.batchQueue = new Set(Array.from(this.batchQueue).slice(this.#config.BATCH_SIZE));
+    // フェッチ中でないpubkeyのみを対象にする
+    const availablePubkeys = Array.from(this.batchQueue).filter((key) => !this.fetchingPubkeys.has(key));
 
-    await this._fetchProfileFromRelay(batchPubkeys);
+    if (availablePubkeys.length === 0) return;
+
+    const batchPubkeys = availablePubkeys.slice(0, this.#config.BATCH_SIZE);
+    this.batchQueue = new Set(Array.from(this.batchQueue).filter((key) => !batchPubkeys.includes(key)));
+
+    // フェッチ開始前にフェッチ中として記録
+    batchPubkeys.forEach((key) => this.fetchingPubkeys.add(key));
+
+    try {
+      await this._fetchProfileFromRelay(batchPubkeys);
+    } finally {
+      // フェッチ完了後にフェッチ中リストから削除
+      batchPubkeys.forEach((key) => this.fetchingPubkeys.delete(key));
+    }
 
     if (this.batchQueue.size > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.#config.BATCH_DELAY));
@@ -208,7 +223,7 @@ export class ProfileManager {
           this._resolvePromise(profile.pubkey, parsedProfile);
         } catch (error) {
           console.error(`プロフィールのパース失敗: ${profile.pubkey}`, error);
-          this._resolvePromise(profile.pubkey, this._createDefaultProfile());
+          this._resolvePromise(pubkey, this._createDefaultProfile());
         }
       })
     );
