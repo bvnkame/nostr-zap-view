@@ -44,6 +44,7 @@ export class ProfileManager {
     }
     this.#initialize();
     this.nip05Cache = new Map();
+    this.pendingFetches = new Map(); // 進行中のフェッチを追跡
   }
 
   /**
@@ -56,6 +57,7 @@ export class ProfileManager {
     this.batchQueue = new Set();
     this.resolvers = new Map();
     this.fetchingPubkeys = new Set(); // フェッチ中のpubkeyを管理
+    this.batchTimer = null;
   }
 
   /**
@@ -77,14 +79,36 @@ export class ProfileManager {
    */
   async fetchProfiles(pubkeys) {
     console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
-    // キャッシュ済みのpubkeyは除外
+    // キャッシュ済みのpubkeyを除外
     const uncachedPubkeys = pubkeys.filter(key => !this.profileCache.has(key));
     
-    if (uncachedPubkeys.length > 0) {
-      // キャッシュにないものだけを取得
-      const uniqueUncachedPubkeys = [...new Set(uncachedPubkeys)];
-      await this._fetchProfileFromRelay(uniqueUncachedPubkeys);
+    if (uncachedPubkeys.length === 0) {
+      // 全てキャッシュ済みの場合は即座に結果を返す
+      return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
     }
+
+    // 未キャッシュのpubkeysに対して一括フェッチをスケジュール
+    const fetchPromises = uncachedPubkeys.map(pubkey => {
+      // 既に進行中のフェッチがある場合はそれを返す
+      if (this.pendingFetches.has(pubkey)) {
+        return this.pendingFetches.get(pubkey);
+      }
+
+      // 新しいフェッチPromiseを作成
+      const promise = new Promise(resolve => {
+        this.resolvers.set(pubkey, resolve);
+      });
+      this.pendingFetches.set(pubkey, promise);
+      this.batchQueue.add(pubkey);
+
+      return promise;
+    });
+
+    // バッチ処理をスケジュール
+    this._scheduleBatchProcess();
+
+    // 全てのフェッチが完了するのを待つ
+    await Promise.all(fetchPromises);
 
     // キャッシュから結果を返す
     return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
@@ -140,10 +164,12 @@ export class ProfileManager {
    */
   _scheduleBatchProcess() {
     console.log("_scheduleBatchProcess：バッチ処理スケジュール");
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-    }
-    this.batchTimer = setTimeout(() => this._processBatchQueue(), this.#config.BATCH_DELAY);
+    if (this.batchTimer) return;
+    
+    this.batchTimer = setTimeout(() => {
+      this.batchTimer = null;
+      this._processBatchQueue();
+    }, this.#config.BATCH_DELAY);
   }
 
   async _batchFetch(pubkeys) {
@@ -180,18 +206,21 @@ export class ProfileManager {
       await this._fetchProfileFromRelay(batchPubkeys);
     } finally {
       // フェッチ完了後にフェッチ中リストから削除
-      batchPubkeys.forEach((key) => this.fetchingPubkeys.delete(key));
-    }
+      batchPubkeys.forEach((key) => {
+        this.fetchingPubkeys.delete(key);
+        this.pendingFetches.delete(key);
+      });
 
-    if (this.batchQueue.size > 0) {
-      await new Promise((resolve) => setTimeout(resolve, this.#config.BATCH_DELAY));
-      await this._processBatchQueue();
+      // キューに残りがある場合は次のバッチを処理
+      if (this.batchQueue.size > 0) {
+        this._scheduleBatchProcess();
+      }
     }
   }
 
   /**
    * リレーからプロフィール情報を取得
-   * 取得したプロフィールの処理とキャッシュへの保存を行う
+   * 取得したプロフィールの処理とキャッシュへの保存を��う
    */
   async _fetchProfileFromRelay(pubkeys) {
     console.log("_fetchProfileFromRelay：プロフィール取得リクエスト:", pubkeys);
