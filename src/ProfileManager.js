@@ -61,18 +61,6 @@ export class ProfileManager {
   }
 
   /**
-   * 単一の公開鍵に対応するプロフィール情報を取得
-   * キャッシュに存在する場合はキャッシュから返却、存在しない場合は新規取得
-   * @param {string} pubkey - 取得対象の公開鍵
-   * @returns {Promise<ProfileResult>} プロフィール情報
-   */
-  async fetchProfile(pubkey) {
-    console.log("fetchProfile：単一プロフィール取得リクエスト:", pubkey);
-    const [profile] = await this.fetchProfiles([pubkey]);
-    return profile;
-  }
-
-  /**
    * 複数の公開鍵に対応するプロフィール情報を一括取得
    * @param {string[]} pubkeys - 取得対象の公開鍵の配列
    * @returns {Promise<ProfileResult[]>} プロフィール情報の配列
@@ -220,7 +208,7 @@ export class ProfileManager {
 
   /**
    * リレーからプロフィール情報を取得
-   * 取得したプロフィールの処理とキャッシュへの保存を��う
+   * 取得したプロフィールの処理とキャッシュへの保存を行う
    */
   async _fetchProfileFromRelay(pubkeys) {
     console.log("_fetchProfileFromRelay：プロフィール取得リクエスト:", pubkeys);

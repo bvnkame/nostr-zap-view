@@ -111,8 +111,8 @@ class ZapDialog extends HTMLElement {
     let senderIcon = defaultIcon;
 
     if (pubkey) {
-      // キャッシュから直接取得（新規リクエストは発生しない）
-      const profile = await profileManager.fetchProfile(pubkey);
+      // 配列として渡して fetchProfiles を使用
+      const [profile] = await profileManager.fetchProfiles([pubkey]);
       if (profile) {
         senderName = getProfileDisplayName(profile);
         if (profile.picture) {
