@@ -35,9 +35,6 @@ export class ProfileManager {
     RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"],
   };
 
-  #profileFetchQueue = new Map();
-  #processingProfiles = false;
-
   constructor() {
     if (ProfileManager.#instance) {
       throw new Error("Use ProfileManager.getInstance()");
@@ -68,22 +65,22 @@ export class ProfileManager {
   async fetchProfiles(pubkeys) {
     console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
     // キャッシュ済みのpubkeyを除外
-    const uncachedPubkeys = pubkeys.filter(key => !this.profileCache.has(key));
-    
+    const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key));
+
     if (uncachedPubkeys.length === 0) {
       // 全てキャッシュ済みの場合は即座に結果を返す
-      return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+      return pubkeys.map((pubkey) => this.profileCache.get(pubkey) || this._createDefaultProfile());
     }
 
     // 未キャッシュのpubkeysに対して一括フェッチをスケジュール
-    const fetchPromises = uncachedPubkeys.map(pubkey => {
+    const fetchPromises = uncachedPubkeys.map((pubkey) => {
       // 既に進行中のフェッチがある場合はそれを返す
       if (this.pendingFetches.has(pubkey)) {
         return this.pendingFetches.get(pubkey);
       }
 
       // 新しいフェッチPromiseを作成
-      const promise = new Promise(resolve => {
+      const promise = new Promise((resolve) => {
         this.resolvers.set(pubkey, resolve);
       });
       this.pendingFetches.set(pubkey, promise);
@@ -99,30 +96,7 @@ export class ProfileManager {
     await Promise.all(fetchPromises);
 
     // キャッシュから結果を返す
-    return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
-  }
-
-  async #processProfileQueue() {
-    if (this.#processingProfiles) return;
-    this.#processingProfiles = true;
-
-    try {
-      while (this.#profileFetchQueue.size > 0) {
-        const batchPubkeys = Array.from(this.#profileFetchQueue.keys())
-          .slice(0, this.#config.BATCH_SIZE);
-
-        await this._fetchProfileFromRelay(batchPubkeys);
-
-        // 処理済みのpubkeyをキューから削除
-        batchPubkeys.forEach(key => this.#profileFetchQueue.delete(key));
-
-        if (this.#profileFetchQueue.size > 0) {
-          await new Promise(resolve => setTimeout(resolve, this.#config.BATCH_DELAY));
-        }
-      }
-    } finally {
-      this.#processingProfiles = false;
-    }
+    return pubkeys.map((pubkey) => this.profileCache.get(pubkey) || this._createDefaultProfile());
   }
 
   /**
@@ -153,7 +127,7 @@ export class ProfileManager {
   _scheduleBatchProcess() {
     console.log("_scheduleBatchProcess：バッチ処理スケジュール");
     if (this.batchTimer) return;
-    
+
     this.batchTimer = setTimeout(() => {
       this.batchTimer = null;
       this._processBatchQueue();
@@ -304,7 +278,7 @@ export class ProfileManager {
   }
 
   _cleanupPromises(pubkeys) {
-    pubkeys.forEach(key => {
+    pubkeys.forEach((key) => {
       this.resolvers.delete(key);
     });
   }
