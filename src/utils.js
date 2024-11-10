@@ -1,15 +1,58 @@
 import { CONFIG } from "./ZapManager.js";
 
-// 型チェック用のユーティリティ
-const TypeChecker = {
-  isValidIdentifier: (identifier) => typeof identifier === "string" && identifier.length > 0,
-  isValidCount: (count) => typeof count === "number" && count > 0,
+// 定数定義
+const CONSTANTS = {
+  CACHE_MAX_SIZE: 1000,
+  DEFAULT_ERROR_MESSAGE: "処理に失敗しました",
+  SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent"],
 };
 
-// デコード結果をキャッシュ
-const decodedCache = new Map();
+// キャッシュマネージャー
+class CacheManager {
+  constructor(maxSize = CONSTANTS.CACHE_MAX_SIZE) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
 
-// src/utils.js
+  get(key) {
+    return this.cache.get(key);
+  }
+
+  set(key, value) {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  has(key) {
+    return this.cache.has(key);
+  }
+}
+
+// 共有キャッシュインスタンス
+const decodedCache = new CacheManager();
+const imageCache = new CacheManager();
+
+// バリデーションユーティリティ
+const Validator = {
+  isValidIdentifier: (identifier) => typeof identifier === "string" && identifier.length > 0,
+  isValidCount: (count) => typeof count === "number" && count > 0,
+  isValidUrl: (url) => {
+    try {
+      const parsed = new URL(url);
+      return ["http:", "https:"].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  },
+  isValidTimestamp: (timestamp) => {
+    return typeof timestamp === "number" && timestamp > 0;
+  },
+};
+
+// デコード関連の関数
 export function decodeIdentifier(identifier, maxCount) {
   const cacheKey = `${identifier}:${maxCount}`;
 
@@ -17,7 +60,7 @@ export function decodeIdentifier(identifier, maxCount) {
     return decodedCache.get(cacheKey);
   }
 
-  if (!TypeChecker.isValidIdentifier(identifier) || !TypeChecker.isValidCount(maxCount)) {
+  if (!Validator.isValidIdentifier(identifier) || !Validator.isValidCount(maxCount)) {
     throw new Error(CONFIG.ERRORS.DECODE_FAILED);
   }
 
@@ -80,44 +123,48 @@ export function formatIdentifier(identifier) {
 }
 
 export async function fetchZapStats(identifier) {
-  if (!TypeChecker.isValidIdentifier(identifier)) {
+  if (!Validator.isValidIdentifier(identifier)) {
     throw new Error(CONFIG.ERRORS.DECODE_FAILED);
   }
 
   const decoded = safeNip19Decode(identifier);
   if (!decoded) return null;
 
-  const { type, data } = decoded;
-  const isProfile = type === "npub" || type === "nprofile";
-  const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
-
   try {
-    const response = await fetch(endpoint);
-    const responseData = await response.json();
-
-    if (!responseData?.stats) {
-      console.error("無効なAPIレスポース形式:", responseData);
-      return null;
-    }
-
-    const statsKey = isProfile ? (type === "npub" ? data : data.pubkey) : type === "note" ? data : data.id;
-
-    const stats = isProfile ? responseData.stats[statsKey]?.zaps_received : responseData.stats[statsKey]?.zaps;
-
-    if (!stats) {
-      console.error("Zap統計が見つかりません");
-      return null;
-    }
-
-    return {
-      count: stats.count || 0,
-      msats: stats.msats || 0,
-      maxMsats: stats.max_msats || 0,
-    };
+    const stats = await fetchZapStatsFromApi(identifier, decoded);
+    return formatZapStats(stats);
   } catch (error) {
     console.error("Zap統計の取得に失敗:", error);
     return null;
   }
+}
+
+async function fetchZapStatsFromApi(identifier, decoded) {
+  const { type, data } = decoded;
+  const isProfile = type === "npub" || type === "nprofile";
+  const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
+
+  const response = await fetch(endpoint);
+  return response.json();
+}
+
+function formatZapStats(responseData) {
+  if (!responseData?.stats) {
+    console.error("無効なAPIレスポース形式:", responseData);
+    return null;
+  }
+
+  const stats = Object.values(responseData.stats)[0];
+  if (!stats) {
+    console.error("Zap統計が見つかりません");
+    return null;
+  }
+
+  return {
+    count: stats.zaps_received?.count || stats.zaps?.count || 0,
+    msats: stats.zaps_received?.msats || stats.zaps?.msats || 0,
+    maxMsats: stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0,
+  };
 }
 
 export function getProfileDisplayName(profile) {
@@ -162,35 +209,15 @@ export async function parseBolt11(event) {
   }
 }
 
-// イメージキャッシュの追加
-const imageCache = new Map();
-
+// 画像関連の関数
 export async function preloadImage(url) {
-  if (!url || !isValidImageUrl(url)) {
-    return null;
-  }
-
-  // キャッシュにある場合は、そのまま返す
-  if (imageCache.has(url)) {
-    return imageCache.get(url);
-  }
+  if (!url || !Validator.isValidUrl(url)) return null;
+  if (imageCache.has(url)) return imageCache.get(url);
 
   try {
-    const img = new Image();
-    const promise = new Promise((resolve) => {
-      img.onload = () => {
-        const validatedUrl = escapeHTML(url);
-        imageCache.set(url, validatedUrl);
-        resolve(validatedUrl);
-      };
-      img.onerror = () => {
-        imageCache.set(url, null);
-        resolve(null);
-      };
-    });
-
-    img.src = url;
-    return await promise;
+    const validatedUrl = await loadAndValidateImage(url);
+    imageCache.set(url, validatedUrl);
+    return validatedUrl;
   } catch (error) {
     console.error("Image preload error:", error);
     imageCache.set(url, null);
@@ -198,17 +225,17 @@ export async function preloadImage(url) {
   }
 }
 
+async function loadAndValidateImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(escapeHTML(url));
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export function escapeHTML(str) {
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
-}
-
-function isValidImageUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return ["http:", "https:"].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
 }
