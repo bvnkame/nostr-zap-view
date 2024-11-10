@@ -2,6 +2,7 @@ import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
 import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage, escapeHTML } from "./utils.js";
+import { APP_CONFIG } from "./index.js";
 
 class ZapDialog extends HTMLElement {
   static get observedAttributes() {
@@ -10,8 +11,8 @@ class ZapDialog extends HTMLElement {
 
   #state = {
     isInitialized: false,
-    theme: "light",
-    maxCount: 5,
+    theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
+    maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
   };
 
   constructor() {
@@ -107,7 +108,7 @@ class ZapDialog extends HTMLElement {
   async #extractZapInfo(event) {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
     // カンマを削除してから数値に変換
-    const satsAmount = parseInt(satsText.replace(/,/g, '').split(" ")[0], 10); // 更新
+    const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10); // 更新
 
     let senderName = "Anonymous";
     let senderIcon = ""; // 初期状態は空文字列（プレースホルダー表示用）
@@ -145,7 +146,7 @@ class ZapDialog extends HTMLElement {
       console.log("Color mode is not enabled.");
       return "";
     }
-    
+
     let colorClass = "";
     if (amount >= 100000) colorClass = "zap-amount-100k";
     else if (amount >= 50000) colorClass = "zap-amount-50k";

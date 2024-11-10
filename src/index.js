@@ -39,4 +39,4 @@ function initializeApp() {
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 // 公開API
-export { CONFIG, profileManager, zapPool };
+export { CONFIG, profileManager, zapPool, APP_CONFIG };
