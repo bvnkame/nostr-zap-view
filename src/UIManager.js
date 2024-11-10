@@ -111,6 +111,7 @@ class ZapDialog extends HTMLElement {
     let senderIcon = defaultIcon;
 
     if (pubkey) {
+      // キャッシュから直接取得（新規リクエストは発生しない）
       const profile = await profileManager.fetchProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile);
@@ -228,16 +229,17 @@ class ZapDialog extends HTMLElement {
     if (!list) return;
 
     // 表示対象のZapイベントを作成日時でソートして取得
-    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
+    const sortedZaps = [...zapEventsCache]
+      .sort((a, b) => b.created_at - a.created_at)
+      .slice(0, maxCount);
 
-    // プロフィール情報を一括で先に取得
-    const pubkeys = await Promise.all(
-      sortedZaps.map(async (event) => {
-        const { pubkey } = parseDescriptionTag(event);
-        return pubkey;
-      })
-    );
-    await profileManager.fetchProfiles(pubkeys.filter(Boolean));
+    // プロフィール情報を一括で取得
+    const pubkeys = sortedZaps
+      .map(event => parseDescriptionTag(event).pubkey)
+      .filter(Boolean);
+    
+    // プロフィール情報を一括取得（一回だけ）
+    await profileManager.fetchProfiles([...new Set(pubkeys)]);
 
     // 現在表示中のアイテムを保持するためのMap
     const existingItems = new Map();

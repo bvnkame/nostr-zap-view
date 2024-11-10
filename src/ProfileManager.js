@@ -35,6 +35,9 @@ export class ProfileManager {
     RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"],
   };
 
+  #profileFetchQueue = new Map();
+  #processingProfiles = false;
+
   constructor() {
     if (ProfileManager.#instance) {
       throw new Error("Use ProfileManager.getInstance()");
@@ -58,16 +61,13 @@ export class ProfileManager {
   /**
    * 単一の公開鍵に対応するプロフィール情報を取得
    * キャッシュに存在する場合はキャッシュから返却、存在しない場合は新規取得
-   * @param {string} pubkey - 取得対象の公��鍵
+   * @param {string} pubkey - 取得対象の公開鍵
    * @returns {Promise<ProfileResult>} プロフィール情報
    */
   async fetchProfile(pubkey) {
     console.log("fetchProfile：単一プロフィール取得リクエスト:", pubkey);
-    if (this.profileCache.has(pubkey)) {
-      return this.profileCache.get(pubkey);
-    }
-
-    return this._getOrCreateFetchPromise(pubkey);
+    const [profile] = await this.fetchProfiles([pubkey]);
+    return profile;
   }
 
   /**
@@ -77,18 +77,59 @@ export class ProfileManager {
    */
   async fetchProfiles(pubkeys) {
     console.log("fetchProfiles：複数プロフィール取得リクエスト:", pubkeys);
-    // キャッシュ済みとフェッチ中のpubkeyを除外
-    const uncachedPubkeys = pubkeys.filter((key) => !this.profileCache.has(key) && !this.fetchingPubkeys.has(key));
+    const uniquePubkeys = [...new Set(pubkeys)];
+    const result = new Map();
+    const unfetchedPubkeys = [];
 
-    if (uncachedPubkeys.length > 0) {
-      await this._batchFetch(uncachedPubkeys);
+    // キャッシュチェック
+    for (const pubkey of uniquePubkeys) {
+      if (this.profileCache.has(pubkey)) {
+        result.set(pubkey, this.profileCache.get(pubkey));
+      } else if (!this.#profileFetchQueue.has(pubkey)) {
+        unfetchedPubkeys.push(pubkey);
+        this.#profileFetchQueue.set(pubkey, new Promise((resolve) => {
+          this.resolvers.set(pubkey, resolve);
+        }));
+      }
     }
 
-    return pubkeys.map((key) => this.profileCache.get(key) || this._createDefaultProfile());
+    // 未取得のプロファイルがあれば取得処理を開始
+    if (unfetchedPubkeys.length > 0 && !this.#processingProfiles) {
+      this.#processProfileQueue();
+    }
+
+    // 全てのプロファイル取得を待機
+    await Promise.all([...this.#profileFetchQueue.values()]);
+    
+    // 結果の組み立て
+    return uniquePubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+  }
+
+  async #processProfileQueue() {
+    if (this.#processingProfiles) return;
+    this.#processingProfiles = true;
+
+    try {
+      while (this.#profileFetchQueue.size > 0) {
+        const batchPubkeys = Array.from(this.#profileFetchQueue.keys())
+          .slice(0, this.#config.BATCH_SIZE);
+
+        await this._fetchProfileFromRelay(batchPubkeys);
+
+        // 処理済みのpubkeyをキューから削除
+        batchPubkeys.forEach(key => this.#profileFetchQueue.delete(key));
+
+        if (this.#profileFetchQueue.size > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.#config.BATCH_DELAY));
+        }
+      }
+    } finally {
+      this.#processingProfiles = false;
+    }
   }
 
   /**
-   * 公開鍵に対するプロ��ィール取得のPromiseを管理
+   * 公開鍵に対するプロフィール取得のPromiseを管理
    * 同一の公開鍵に対する重複リクエストを防ぐ
    */
   async _getOrCreateFetchPromise(pubkey) {
@@ -261,7 +302,9 @@ export class ProfileManager {
   }
 
   _cleanupPromises(pubkeys) {
-    pubkeys.forEach((key) => this.profileFetchPromises.delete(key));
+    pubkeys.forEach(key => {
+      this.resolvers.delete(key);
+    });
   }
 
   /**
