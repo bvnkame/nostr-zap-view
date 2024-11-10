@@ -134,6 +134,7 @@ class ZapDialog extends HTMLElement {
   #createZapHTML({ senderName, senderIcon, satsText, comment, pubkey, created_at }) {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
+    const nip05 = pubkey ? profileManager.getNip05(pubkey) : "";
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
@@ -145,7 +146,7 @@ class ZapDialog extends HTMLElement {
         </div>
         <div class="sender-info">
           <span class="sender-name">${escapedName}</span>
-          <span class="sender-pubkey">${npubKey}</span>
+          <span class="sender-pubkey">${nip05 || npubKey}</span>
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>

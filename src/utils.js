@@ -239,3 +239,16 @@ export function escapeHTML(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// NIP-05検証関数を追加
+export async function verifyNip05(nip05, pubkey) {
+  if (!nip05 || !pubkey) return null;
+
+  try {
+    const profile = await window.NostrTools.nip05.queryProfile(nip05);
+    return profile?.pubkey === pubkey ? nip05 : null;
+  } catch (error) {
+    console.error("NIP-05検証エラー:", error);
+    return null;
+  }
+}

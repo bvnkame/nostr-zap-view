@@ -1,5 +1,5 @@
 import { profilePool } from "./ZapPool.js";
-import { getProfileDisplayName } from "./utils.js";
+import { getProfileDisplayName, verifyNip05 } from "./utils.js";
 
 /**
  * @typedef {Object} ProfileResult
@@ -30,6 +30,7 @@ export class ProfileManager {
       throw new Error("Use ProfileManager.getInstance()");
     }
     this.#initialize();
+    this.nip05Cache = new Map();
   }
 
   #initialize() {
@@ -119,7 +120,7 @@ export class ProfileManager {
         authors: pubkeys,
       });
 
-      this._processProfiles(profiles);
+      await this._processProfiles(profiles);
 
       // プロフィールが取得できなかったpubkeyに対してnullを設定
       pubkeys.forEach((pubkey) => {
@@ -136,13 +137,22 @@ export class ProfileManager {
     }
   }
 
-  _processProfiles(profiles) {
-    profiles.forEach((profile) => {
+  async _processProfiles(profiles) {
+    await Promise.all(profiles.map(async (profile) => {
       try {
+        const parsedContent = JSON.parse(profile.content);
         const parsedProfile = {
-          ...JSON.parse(profile.content),
-          name: getProfileDisplayName(JSON.parse(profile.content)),
+          ...parsedContent,
+          name: getProfileDisplayName(parsedContent),
         };
+
+        // NIP-05の検証
+        if (parsedContent.nip05) {
+          const verifiedNip05 = await verifyNip05(parsedContent.nip05, profile.pubkey);
+          if (verifiedNip05) {
+            this.nip05Cache.set(profile.pubkey, verifiedNip05);
+          }
+        }
 
         this.profileCache.set(profile.pubkey, parsedProfile);
         this._resolvePromise(profile.pubkey, parsedProfile);
@@ -150,7 +160,7 @@ export class ProfileManager {
         console.error(`プロフィールのパース失敗: ${profile.pubkey}`, error);
         this._resolvePromise(profile.pubkey, this._createDefaultProfile());
       }
-    });
+    }));
   }
 
   _createDefaultProfile() {
@@ -180,10 +190,19 @@ export class ProfileManager {
     pubkeys.forEach((key) => this.profileFetchPromises.delete(key));
   }
 
+  getNip05(pubkey) {
+    const nip05 = this.nip05Cache.get(pubkey);
+    if (!nip05) return null;
+    
+    // _@で始まる場合は_を削除
+    return nip05.startsWith('_@') ? nip05.slice(1) : nip05;
+  }
+
   clearCache() {
     this.profileCache.clear();
     this.profileFetchPromises.clear();
     this.resolvers.clear();
+    this.nip05Cache.clear();
   }
 }
 
