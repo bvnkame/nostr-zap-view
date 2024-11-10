@@ -1,22 +1,9 @@
-import { decode as decodeBolt11 } from "light-bolt11-decoder";
-import * as NostrTools from "nostr-tools";
-import { CONFIG } from "./ZapManager.js";
+import { APP_CONFIG } from "./ZapConfig.js";
+import { ZAP_CONFIG } from "./ZapConfig.js";
 import { fetchLatestZaps } from "./ZapManager.js";
 import { createDialog } from "./UIManager.js";
 import { profileManager } from "./ProfileManager.js";
 import { zapPool } from "./ZapPool.js";
-
-// グローバル設定の定義
-const APP_CONFIG = {
-  LIBRARIES: {
-    decodeBolt11,
-    NostrTools,
-  },
-  DEFAULT_OPTIONS: {
-    theme: "light",
-    maxCount: 5,
-  },
-};
 
 // アプリケーションの初期化
 function initializeApp() {
@@ -39,4 +26,4 @@ function initializeApp() {
 document.addEventListener("DOMContentLoaded", initializeApp);
 
 // 公開API
-export { CONFIG, profileManager, zapPool, APP_CONFIG };
+export { ZAP_CONFIG as CONFIG, profileManager, zapPool, APP_CONFIG };

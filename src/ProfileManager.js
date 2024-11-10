@@ -1,5 +1,6 @@
 import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName, verifyNip05 } from "./utils.js";
+import { PROFILE_CONFIG } from "./ZapConfig.js";
 
 /**
  * @typedef {Object} ProfileResult
@@ -29,11 +30,7 @@ export class ProfileManager {
    * - BATCH_DELAY: バッチ処理間の待機時間（ミリ秒）
    * - RELAYS: プロフィール情報を取得するリレーサーバーのリスト
    */
-  #config = {
-    BATCH_SIZE: 20,
-    BATCH_DELAY: 100,
-    RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"],
-  };
+  #config = PROFILE_CONFIG;
 
   constructor() {
     if (ProfileManager.#instance) {

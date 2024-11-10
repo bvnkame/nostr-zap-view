@@ -1,20 +1,7 @@
 import { zapPool } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
-import { ZapConfig } from "./ZapConfig.js";
-
-// 設定をグローバルな設定オブジェクトに統合
-export const CONFIG = {
-  ZAP: {
-    SUBSCRIPTION_TIMEOUT: 20000,
-    DEFAULT_LIMIT: 1,
-  },
-  ERRORS: {
-    DIALOG_NOT_FOUND: "Zapダイアログが見つかりません",
-    BUTTON_NOT_FOUND: "取得ボタンが見つかりません",
-    DECODE_FAILED: "識別子のデコードに失敗しました",
-  },
-};
+import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 
 class ZapSubscriptionManager {
   constructor() {
@@ -133,7 +120,7 @@ class ZapSubscriptionManager {
       },
     });
 
-    setTimeout(() => this.closeZapSubscription(), CONFIG.ZAP.SUBSCRIPTION_TIMEOUT);
+    setTimeout(() => this.closeZapSubscription(), CONFIG.SUBSCRIPTION_TIMEOUT);
   }
 
   createSubscription(config, decoded, handler) {
@@ -143,7 +130,7 @@ class ZapSubscriptionManager {
   initializeRealTimeSubscription(config) {
     if (this.subscriptions.realTime) return;
 
-    const decoded = decodeIdentifier(config.identifier, CONFIG.ZAP.DEFAULT_LIMIT);
+    const decoded = decodeIdentifier(config.identifier, CONFIG.DEFAULT_LIMIT);  // 変更: ZAP.を削除
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
     this.subscriptions.realTime = zapPool.subscribeMany(
@@ -151,7 +138,7 @@ class ZapSubscriptionManager {
       [
         {
           ...decoded.req,
-          limit: CONFIG.ZAP.DEFAULT_LIMIT,
+          limit: CONFIG.DEFAULT_LIMIT,  // 変更: ZAP.を削除
           since: Math.floor(Date.now() / 1000),
         },
       ],

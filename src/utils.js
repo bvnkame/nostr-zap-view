@@ -1,4 +1,4 @@
-import { CONFIG } from "./ZapManager.js";
+import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 
 // 定数定義
 const CONSTANTS = {
