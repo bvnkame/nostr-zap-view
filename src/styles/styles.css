@@ -10,13 +10,13 @@
   --hover-bg: #edf2f7;
   --border: #edf2f7;
   --new-mark: #ff707c;
-  --zap-1k-bg: rgba(0, 0, 255, 0.1);
-  --zap-2k-bg: rgba(0, 255, 255, 0.1);
-  --zap-5k-bg: rgba(144, 238, 144, 0.1);
-  --zap-10k-bg: rgba(255, 255, 0, 0.1);
-  --zap-20k-bg: rgba(255, 165, 0, 0.1);
-  --zap-50k-bg: rgba(255, 0, 255, 0.1);
-  --zap-100k-bg: rgba(255, 0, 0, 0.1);
+  --zap-1k-bg: #1e88e5ff;
+  --zap-2k-bg: #00e5ffff;
+  --zap-5k-bg: #1de9b6ff;
+  --zap-10k-bg: #ffca28ff;
+  --zap-20k-bg: #f57c00ff;
+  --zap-50k-bg: #e91e63ff;
+  --zap-100k-bg: #e62117ff;
 }
 
 * {
@@ -132,7 +132,7 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border);
-  padding: 6px 0;
+  padding: 6px 6px;
   gap: 6px;
 }
 
