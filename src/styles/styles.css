@@ -10,13 +10,6 @@
   --hover-bg: #edf2f7;
   --border: #edf2f7;
   --new-mark: #ff707c;
-  --zap-1k-bg: #1e88e5ff;
-  --zap-2k-bg: #00e5ffff;
-  --zap-5k-bg: #1de9b6ff;
-  --zap-10k-bg: #ffca28ff;
-  --zap-20k-bg: #f57c00ff;
-  --zap-50k-bg: #e91e63ff;
-  --zap-100k-bg: #e62117ff;
 }
 
 * {
@@ -132,16 +125,18 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border);
-  padding: 6px 6px;
-  gap: 6px;
+  padding: 1px 0;
+  /* gap: 6px; */
 }
 
 .zap-sender {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 36px;
+  height: 48px;
   justify-content: space-between;
+  padding: 6px;
+  border-radius: 6px 6px 0 0;
 }
 
 .sender-icon {
@@ -174,9 +169,15 @@
 }
 
 @keyframes pulse {
-  35% { opacity: 1; }
-  50% { opacity: 0; }
-  65% { opacity: 1; }
+  35% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  65% {
+    opacity: 1;
+  }
 }
 
 .sender-info {
@@ -220,8 +221,10 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  min-height: 24px;
-  padding-left: 44px;
+  min-height: 37px;
+  padding: 6px 6px 6px 50px;
+  border-radius: 0 0 6px 6px;
+  margin: 0;
 }
 
 .zap-comment {
@@ -231,31 +234,160 @@
   font-size: 0.9375rem;
 }
 
-/* Zap amount color classes */
-.zap-list-item.zap-amount-1k {
-  background-color: var(--zap-1k-bg);
+/* 送信者情報部分の色 (濃い色) */
+.zap-amount-1k .zap-sender {
+  background-color: #1565c0;
 }
 
-.zap-list-item.zap-amount-2k {
-  background-color: var(--zap-2k-bg);
+.zap-amount-2k .zap-sender {
+  background-color: #00b8d4;
 }
 
-.zap-list-item.zap-amount-5k {
-  background-color: var(--zap-5k-bg);
+.zap-amount-5k .zap-sender {
+  background-color: #00bfa5;
 }
 
-.zap-list-item.zap-amount-10k {
-  background-color: var(--zap-10k-bg);
+.zap-amount-10k .zap-sender {
+  background-color: #ffb300;
 }
 
-.zap-list-item.zap-amount-20k {
-  background-color: var(--zap-20k-bg);
+.zap-amount-20k .zap-sender {
+  background-color: #e65100;
 }
 
-.zap-list-item.zap-amount-50k {
-  background-color: var(--zap-50k-bg);
+.zap-amount-50k .zap-sender {
+  background-color: #c2185b;
 }
 
-.zap-list-item.zap-amount-100k {
-  background-color: var(--zap-100k-bg);
+.zap-amount-100k .zap-sender {
+  background-color: #d00000;
+}
+
+/* コメント部分の色 (薄い色) */
+.zap-amount-1k .zap-details {
+  background-color: #1e88e5;
+}
+
+.zap-amount-2k .zap-details {
+  background-color: #00e5ff;
+}
+
+.zap-amount-5k .zap-details {
+  background-color: #1de9b6;
+}
+
+.zap-amount-10k .zap-details {
+  background-color: #ffca28;
+}
+
+.zap-amount-20k .zap-details {
+  background-color: #f57c00;
+}
+
+.zap-amount-50k .zap-details {
+  background-color: #e91e63;
+}
+
+.zap-amount-100k .zap-details {
+  background-color: #e62117;
+}
+
+/* Zap amount color classes  */
+
+/* 1,000 - 1,999 sats (青) */
+.zap-amount-1k .zap-amount {
+  color: #ffffff;
+}
+.zap-amount-1k .sender-name {
+  color: rgba(255, 255, 255, 0.701961);
+}
+.zap-amount-1k .sender-pubkey {
+  color: rgba(255, 255, 255, 0.501961);
+}
+.zap-amount-1k .zap-comment {
+  color: #ffffff;
+}
+
+/* 2,000 - 4,999 sats (水) */
+.zap-amount-2k .zap-amount {
+  color: #000000;
+}
+.zap-amount-2k .sender-name {
+  color: rgba(0, 0, 0, 0.701961);
+}
+.zap-amount-2k .sender-pubkey {
+  color: rgba(0, 0, 0, 0.501961);
+}
+.zap-amount-2k .zap-comment {
+  color: #000000;
+}
+
+/* 5,000 - 9,999 sats (黄緑) */
+.zap-amount-5k .zap-amount {
+  color: #000000;
+}
+.zap-amount-5k .sender-name {
+  color: rgba(0, 0, 0, 0.541176);
+}
+.zap-amount-5k .sender-pubkey {
+  color: rgba(0, 0, 0, 0.4);
+}
+.zap-amount-5k .zap-comment {
+  color: #000000;
+}
+
+/* 10,000 - 19,999 sats (黄) */
+.zap-amount-10k .zap-amount {
+  color: rgba(0, 0, 0, 0.87451);
+}
+.zap-amount-10k .sender-name {
+  color: rgba(0, 0, 0, 0.541176);
+}
+.zap-amount-10k .sender-pubkey {
+  color: rgba(0, 0, 0, 0.4);
+}
+.zap-amount-10k .zap-comment {
+  color: #000000;
+}
+
+/* 20,000 - 49,999 sats (橙) */
+.zap-amount-20k .zap-amount {
+  color: rgba(255, 255, 255, 0.87451);
+}
+.zap-amount-20k .sender-name {
+  color: rgba(255, 255, 255, 0.701961);
+}
+.zap-amount-20k .sender-pubkey {
+  color: rgba(255, 255, 255, 0.501961);
+}
+.zap-amount-20k .zap-comment {
+  color: #ffffff;
+}
+
+/* 50,000 - 99,999 sats (マゼンタ) */
+.zap-amount-50k .zap-amount {
+  color: #ffffff;
+}
+.zap-amount-50k .sender-name {
+  color: rgba(255, 255, 255, 0.701961);
+}
+.zap-amount-50k .sender-pubkey {
+  color: rgba(255, 255, 255, 0.501961);
+}
+.zap-amount-50k .zap-comment {
+  color: #ffffff;
+}
+
+/* 100,000+ sats (赤) */
+.zap-amount-100k .zap-amount {
+  color: #ffffff;
+}
+.zap-amount-100k .sender-name {
+  color: rgba(255, 255, 255, 0.701961);
+}
+.zap-amount-100k .sender-pubkey {
+  color: rgba(255, 255, 255, 0.501961);
+}
+.zap-amount-100k .zap-comment {
+  color: #ffffff;
 }
