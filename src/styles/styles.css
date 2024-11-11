@@ -163,7 +163,6 @@
   height: 8px;
   background-color: var(--new-mark);
   border-radius: 50%;
-  border: 1px solid var(--dialog-bg);
   z-index: 1;
   animation: pulse 3500ms ease-in-out infinite;
 }
@@ -299,10 +298,10 @@
   color: #ffffff;
 }
 .zap-amount-1k .sender-name {
-  color: rgba(255, 255, 255, 0.701961);
+  color: rgba(255, 255, 255, 0.85);
 }
 .zap-amount-1k .sender-pubkey {
-  color: rgba(255, 255, 255, 0.501961);
+  color: rgba(255, 255, 255, 0.5);
 }
 .zap-amount-1k .zap-comment {
   color: #ffffff;
@@ -313,10 +312,10 @@
   color: #000000;
 }
 .zap-amount-2k .sender-name {
-  color: rgba(0, 0, 0, 0.701961);
+  color: rgba(0, 0, 0, 0.65);
 }
 .zap-amount-2k .sender-pubkey {
-  color: rgba(0, 0, 0, 0.501961);
+  color: rgba(0, 0, 0, 0.5);
 }
 .zap-amount-2k .zap-comment {
   color: #000000;
@@ -327,10 +326,10 @@
   color: #000000;
 }
 .zap-amount-5k .sender-name {
-  color: rgba(0, 0, 0, 0.541176);
+  color: rgba(0, 0, 0, 0.65);
 }
 .zap-amount-5k .sender-pubkey {
-  color: rgba(0, 0, 0, 0.4);
+  color: rgba(0, 0, 0, 0.5);
 }
 .zap-amount-5k .zap-comment {
   color: #000000;
@@ -338,13 +337,13 @@
 
 /* 10,000 - 19,999 sats (黄) */
 .zap-amount-10k .zap-amount {
-  color: rgba(0, 0, 0, 0.87451);
+  color: #000000;
 }
 .zap-amount-10k .sender-name {
-  color: rgba(0, 0, 0, 0.541176);
+  color: rgba(0, 0, 0, 0.65);
 }
 .zap-amount-10k .sender-pubkey {
-  color: rgba(0, 0, 0, 0.4);
+  color: rgba(0, 0, 0, 0.5);
 }
 .zap-amount-10k .zap-comment {
   color: #000000;
@@ -352,13 +351,13 @@
 
 /* 20,000 - 49,999 sats (橙) */
 .zap-amount-20k .zap-amount {
-  color: rgba(255, 255, 255, 0.87451);
+  color: #ffffff;
 }
 .zap-amount-20k .sender-name {
-  color: rgba(255, 255, 255, 0.701961);
+  color: rgba(255, 255, 255, 0.85);
 }
 .zap-amount-20k .sender-pubkey {
-  color: rgba(255, 255, 255, 0.501961);
+  color: rgba(255, 255, 255, 0.5);
 }
 .zap-amount-20k .zap-comment {
   color: #ffffff;
@@ -369,10 +368,10 @@
   color: #ffffff;
 }
 .zap-amount-50k .sender-name {
-  color: rgba(255, 255, 255, 0.701961);
+  color: rgba(255, 255, 255, 0.85);
 }
 .zap-amount-50k .sender-pubkey {
-  color: rgba(255, 255, 255, 0.501961);
+  color: rgba(255, 255, 255, 0.5);
 }
 .zap-amount-50k .zap-comment {
   color: #ffffff;
@@ -383,10 +382,10 @@
   color: #ffffff;
 }
 .zap-amount-100k .sender-name {
-  color: rgba(255, 255, 255, 0.701961);
+  color: rgba(255, 255, 255, 0.85);
 }
 .zap-amount-100k .sender-pubkey {
-  color: rgba(255, 255, 255, 0.501961);
+  color: rgba(255, 255, 255, 0.5);
 }
 .zap-amount-100k .zap-comment {
   color: #ffffff;
