@@ -180,7 +180,7 @@ class ZapDialog extends HTMLElement {
     const iconHTML = senderIcon ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">` : `<div class="zap-placeholder-icon"></div>`;
 
     return `
-      <div class="zap-sender">
+      <div class="zap-sender${comment ? ' with-comment' : ''}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
           ${iconHTML}
         </div>
@@ -202,7 +202,7 @@ class ZapDialog extends HTMLElement {
 
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-    placeholder.className = `zap-list-item ${colorClass}`;
+    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
     placeholder.innerHTML = this.#createZapHTML(zapInfo);
     placeholder.removeAttribute("data-index");
   }
@@ -221,7 +221,7 @@ class ZapDialog extends HTMLElement {
     zapInfos.forEach((zapInfo) => {
       const li = document.createElement("li");
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      li.className = `zap-list-item ${colorClass}`;
+      li.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
       li.innerHTML = this.#createZapHTML(zapInfo);
       fragment.appendChild(li);
     });
@@ -239,7 +239,7 @@ class ZapDialog extends HTMLElement {
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     const li = document.createElement("li");
-    li.className = `zap-list-item ${colorClass}`;
+    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
     li.innerHTML = this.#createZapHTML(zapInfo);
     list.prepend(li);
   }

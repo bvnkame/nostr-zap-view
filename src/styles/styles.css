@@ -135,7 +135,7 @@
   height: 48px;
   justify-content: space-between;
   padding: 6px;
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px; /* コメントがない場合のデフォルト */
 }
 
 .sender-icon {
@@ -221,44 +221,73 @@
   align-items: center;
   min-height: 37px;
   padding: 6px 6px 6px 50px;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 6px 6px; /* コメントがある場合の設定 */
   margin: 0;
-}
-
-.zap-comment {
-  color: var(--zap-comment-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.9375rem;
 }
 
 /* 送信者情報部分の色 (濃い色) */
 .zap-amount-1k .zap-sender {
   background-color: #1565c0;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-2k .zap-sender {
   background-color: #00b8d4;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-5k .zap-sender {
   background-color: #00bfa5;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-10k .zap-sender {
   background-color: #ffb300;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-20k .zap-sender {
   background-color: #e65100;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-50k .zap-sender {
   background-color: #c2185b;
+  border-radius: 6px; /* コメントがない場合の設定 */
 }
 
 .zap-amount-100k .zap-sender {
   background-color: #d00000;
+  border-radius: 6px; /* コメントがない場合の設定 */
+}
+
+/* コメントがある色付きZap */
+.zap-amount-1k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-2k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-5k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-10k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-20k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-50k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
+}
+
+.zap-amount-100k .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0; /* コメントがある場合の設定 */
 }
 
 /* コメント部分の色 (薄い色) */
