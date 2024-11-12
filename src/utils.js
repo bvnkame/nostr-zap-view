@@ -187,7 +187,9 @@ export function parseDescriptionTag(event) {
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
-    const parsed = JSON.parse(descriptionTag);
+    // 制御文字を削除
+    const sanitizedDescription = descriptionTag.replace(/[\u0000-\u001F\u007F]/g, "");
+    const parsed = JSON.parse(sanitizedDescription);
     return { pubkey: parsed.pubkey, content: parsed.content || "" };
   } catch (error) {
     console.error("Description tag parse error:", error);
