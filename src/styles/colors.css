@@ -1,8 +1,3 @@
-/* Base Styles */
-.zap-sender {
-  border-radius: 6px;
-}
-
 .zap-sender.with-comment {
   border-radius: 6px 6px 0 0;
 }
@@ -14,6 +9,10 @@
 
 [class*="zap-amount-"] .zap-sender.with-comment {
   border-radius: 6px 6px 0 0;
+}
+
+li[class*="zap-amount-"] {
+  border: none;
 }
 
 /* Amount-based Styles */

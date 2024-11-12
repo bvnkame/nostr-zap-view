@@ -104,7 +104,7 @@
 .zap-placeholder-comment {
   color: var(--pubkey-text);
   font-size: 0.9375rem;
-  height: 37px;
+  height: 32px;
   display: inline-block;
 }
 
@@ -242,12 +242,17 @@
 
 .zap-details {
   display: flex;
-  gap: 12px;
   align-items: center;
-  min-height: 37px;
-  padding: 4px 4px 4px 50px;
+  min-height: 32px;
+  padding: 4px 4px 4px 48px;
   border-radius: 0 0 6px 6px;
   margin: 0;
+}
+
+.zap-comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.9375rem;
 }
 
 /* Import colors.css at the beginning */
