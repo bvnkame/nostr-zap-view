@@ -146,7 +146,7 @@ class ZapDialog extends HTMLElement {
 
   #getAmountColorClass(amount) {
     const button = document.querySelector("button[data-identifier]");
-    const colorModeAttr = button?.getAttribute("data-color-mode");
+    const colorModeAttr = button?.getAttribute("data-zap-color-mode");
     const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr)
       ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
       : colorModeAttr === "true";

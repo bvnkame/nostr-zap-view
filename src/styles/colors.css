@@ -1,0 +1,51 @@
+/* Base Styles */
+.zap-sender {
+  border-radius: 6px;
+}
+
+.zap-sender.with-comment {
+  border-radius: 6px 6px 0 0;
+}
+
+/* Color Classes Generator */
+[class*="zap-amount-"] .zap-sender {
+  border-radius: 6px;
+}
+
+[class*="zap-amount-"] .zap-sender.with-comment {
+  border-radius: 6px 6px 0 0;
+}
+
+/* Amount-based Styles */
+.zap-amount-1k .zap-sender { background-color: var(--zap-1k); }
+.zap-amount-2k .zap-sender { background-color: var(--zap-2k); }
+.zap-amount-5k .zap-sender { background-color: var(--zap-5k); }
+.zap-amount-10k .zap-sender { background-color: var(--zap-10k); }
+.zap-amount-20k .zap-sender { background-color: var(--zap-20k); }
+.zap-amount-50k .zap-sender { background-color: var(--zap-50k); }
+.zap-amount-100k .zap-sender { background-color: var(--zap-100k); }
+
+/* Details Background Colors */
+.zap-amount-1k .zap-details { background-color: var(--zap-1k-light); }
+.zap-amount-2k .zap-details { background-color: var(--zap-2k-light); }
+.zap-amount-5k .zap-details { background-color: var(--zap-5k-light); }
+.zap-amount-10k .zap-details { background-color: var(--zap-10k-light); }
+.zap-amount-20k .zap-details { background-color: var(--zap-20k-light); }
+.zap-amount-50k .zap-details { background-color: var(--zap-50k-light); }
+.zap-amount-100k .zap-details { background-color: var(--zap-100k-light); }
+
+/* Dark Text Colors */
+.zap-amount-1k, .zap-amount-20k, .zap-amount-50k, .zap-amount-100k {
+  .zap-amount { color: var(--text-light); }
+  .sender-name { color: var(--text-light-secondary); }
+  .sender-pubkey { color: var(--text-light-tertiary); }
+  .zap-comment { color: var(--text-light); }
+}
+
+/* Light Text Colors */
+.zap-amount-2k, .zap-amount-5k, .zap-amount-10k {
+  .zap-amount { color: var(--text-dark); }
+  .sender-name { color: var(--text-dark-secondary); }
+  .sender-pubkey { color: var(--text-dark-tertiary); }
+  .zap-comment { color: var(--text-dark); }
+}
