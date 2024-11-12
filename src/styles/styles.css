@@ -126,7 +126,6 @@
   flex-direction: column;
   border-top: 1px solid var(--border);
   padding: 1px 0;
-  /* gap: 6px; */
 }
 
 .zap-sender {

@@ -49,7 +49,6 @@ class ZapSubscriptionManager {
 
       if (amountMsat) {
         this.currentStats.count++;
-        // millisatoshiからsatoshiに変換してから加算
         this.currentStats.msats += Math.floor(amountMsat / 1000) * 1000;
         this.currentStats.maxMsats = Math.max(this.currentStats.maxMsats, amountMsat);
         displayZapStats(this.currentStats);
@@ -130,7 +129,7 @@ class ZapSubscriptionManager {
   initializeRealTimeSubscription(config) {
     if (this.subscriptions.realTime) return;
 
-    const decoded = decodeIdentifier(config.identifier, CONFIG.DEFAULT_LIMIT);  // 変更: ZAP.を削除
+    const decoded = decodeIdentifier(config.identifier, CONFIG.DEFAULT_LIMIT);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
     this.subscriptions.realTime = zapPool.subscribeMany(
@@ -138,7 +137,7 @@ class ZapSubscriptionManager {
       [
         {
           ...decoded.req,
-          limit: CONFIG.DEFAULT_LIMIT,  // 変更: ZAP.を削除
+          limit: CONFIG.DEFAULT_LIMIT,
           since: Math.floor(Date.now() / 1000),
         },
       ],

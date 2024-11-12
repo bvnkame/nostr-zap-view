@@ -139,17 +139,14 @@ class ZapDialog extends HTMLElement {
     };
   }
 
-  // #getAmountColorClass メソッドにログを追加
   #getAmountColorClass(amount) {
     const button = document.querySelector("button[data-identifier]");
     const colorModeAttr = button?.getAttribute("data-color-mode");
-    // data-color-modeが未設定、空文字列、不正な値の場合はデフォルト値を使用
     const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr)
       ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
       : colorModeAttr === "true";
 
     if (!isColorModeEnabled) {
-      console.log("Color mode is not enabled.");
       return "";
     }
 
@@ -162,7 +159,6 @@ class ZapDialog extends HTMLElement {
     else if (amount >= 2000) colorClass = "zap-amount-2k";
     else if (amount >= 1000) colorClass = "zap-amount-1k";
 
-    console.log(`Amount: ${amount}, Color Class: ${colorClass}`);
     return colorClass;
   }
 
@@ -193,7 +189,6 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // メソッド内でクラスを適用する際にログを追加
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!placeholder) return;
@@ -203,12 +198,10 @@ class ZapDialog extends HTMLElement {
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     placeholder.className = `zap-list-item ${colorClass}`;
-    console.log(`Setting className: zap-list-item ${colorClass} for index ${index}`);
     placeholder.innerHTML = this.#createZapHTML(zapInfo);
     placeholder.removeAttribute("data-index");
   }
 
-  // メソッド内でクラスを適用する際にログを追加
   async renderZapListFromCache(zapEventsCache, maxCount) {
     const list = this.#getElement("#dialogZapList");
     if (!list) return;
@@ -224,7 +217,6 @@ class ZapDialog extends HTMLElement {
       const li = document.createElement("li");
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
       li.className = `zap-list-item ${colorClass}`;
-      console.log(`Setting className: zap-list-item ${colorClass} for zapInfo`);
       li.innerHTML = this.#createZapHTML(zapInfo);
       fragment.appendChild(li);
     });
@@ -233,7 +225,6 @@ class ZapDialog extends HTMLElement {
     list.appendChild(fragment);
   }
 
-  // メソッド内でクラスを適用する際にログを追加
   async prependZap(event) {
     const list = this.#getElement("#dialogZapList");
     if (!list) return;
@@ -244,7 +235,6 @@ class ZapDialog extends HTMLElement {
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     const li = document.createElement("li");
     li.className = `zap-list-item ${colorClass}`;
-    console.log(`Setting className: zap-list-item ${colorClass} for prepended zap`);
     li.innerHTML = this.#createZapHTML(zapInfo);
     list.prepend(li);
   }
@@ -326,7 +316,7 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // プロフィー��情報の事前取得用のメソッドを追加
+  // プロフィール情報の事前取得用のメソッドを追加
   async #prefetchProfiles(sortedZaps) {
     const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
 
