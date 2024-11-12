@@ -183,6 +183,8 @@ export class ProfileManager {
         authors: pubkeys,
       });
 
+      console.log("Debug: Fetched kind: 0 events:", profiles);
+
       await this._processProfiles(profiles);
 
       // プロフィールが取得できなかったpubkeyに対してnullを設定
@@ -209,10 +211,14 @@ export class ProfileManager {
       profiles.map(async (profile) => {
         try {
           const parsedContent = JSON.parse(profile.content);
-          const parsedProfile = {
+          let parsedProfile = {
             ...parsedContent,
             name: getProfileDisplayName(parsedContent),
           };
+
+          if (!parsedProfile.name) {
+            parsedProfile.name = "nameless";
+          }
 
           // NIP-05の検証
           if (parsedContent.nip05) {
@@ -226,7 +232,7 @@ export class ProfileManager {
           this._resolvePromise(profile.pubkey, parsedProfile);
         } catch (error) {
           console.error(`プロフィールのパース失敗: ${profile.pubkey}`, error);
-          this._resolvePromise(pubkey, this._createDefaultProfile());
+          this._resolvePromise(profile.pubkey, this._createDefaultProfile());
         }
       })
     );
@@ -237,9 +243,10 @@ export class ProfileManager {
    * プロフィール取得に失敗した場合のフォールバック
    */
   _createDefaultProfile() {
+    console.log("Debug: Creating default profile with name 'anonymous'");
     return {
-      name: "Unknown",
-      display_name: "Unknown",
+      name: "anonymous",
+      display_name: "anonymous",
     };
   }
 
@@ -250,6 +257,7 @@ export class ProfileManager {
   _handleFetchError(pubkeys) {
     pubkeys.forEach((pubkey) => {
       const defaultProfile = this._createDefaultProfile();
+      console.log("Debug: Fetch error for pubkey:", pubkey, "Setting default profile:", defaultProfile);
       this.profileCache.set(pubkey, defaultProfile);
       this._resolvePromise(pubkey, defaultProfile);
     });

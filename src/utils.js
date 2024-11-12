@@ -168,7 +168,7 @@ function formatZapStats(responseData) {
 }
 
 export function getProfileDisplayName(profile) {
-  return profile?.display_name || profile?.displayName || profile?.name || "Anonymous";
+  return profile?.display_name || profile?.displayName || profile?.name || "nameless";
 }
 
 export async function parseZapEvent(event, defaultIcon) {

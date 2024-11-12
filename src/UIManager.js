@@ -107,18 +107,19 @@ class ZapDialog extends HTMLElement {
   // プロフィール関連メソッド
   async #extractZapInfo(event) {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
-    // カンマを削除してから数値に変換
-    const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10); // 更新
+    const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
 
-    let senderName = "Anonymous";
-    let senderIcon = ""; // 初期状態は空文字列（プレースホルダー表示用）
+    let senderName = "anonymous";
+    let senderIcon = "";
 
     if (pubkey && this.profileManager) {
       const profile = this.profileManager.getProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile);
+        if (!senderName) {
+          senderName = "nameless";
+        }
         if (profile.picture) {
-          // 画像読み込みを試行し、失敗したらdefaultIconを使用
           senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
         } else {
           senderIcon = defaultIcon;
@@ -128,11 +129,15 @@ class ZapDialog extends HTMLElement {
       senderIcon = defaultIcon;
     }
 
+    if (senderName === "anonymous" || senderName === "nameless") {
+      console.log("Debug: senderName is", senderName, "for pubkey:", pubkey, "Event:", event);
+    }
+
     return {
       senderName,
       senderIcon,
       satsText,
-      satsAmount, // 追加
+      satsAmount,
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
