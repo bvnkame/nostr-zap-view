@@ -10,7 +10,7 @@
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
   --border: #edf2f7;
-  --new-mark: #ff707c;
+  --new-mark: #22c55e;
 
   /* Zap Amount Colors */
   --zap-1k: #1565c0;
@@ -189,18 +189,12 @@
   background-color: var(--new-mark);
   border-radius: 50%;
   z-index: 1;
-  animation: pulse 3200ms ease-in-out infinite;
+  animation: pulse 3000ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 @keyframes pulse {
-  35% {
-    opacity: 1;
-  }
   50% {
-    opacity: 0;
-  }
-  65% {
-    opacity: 1;
+    opacity: 0.3;
   }
 }
 
