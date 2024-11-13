@@ -156,13 +156,13 @@ class ZapDialog extends HTMLElement {
     }
 
     let colorClass = "";
-    if (amount >= 100000) colorClass = "zap-amount-100k";
-    else if (amount >= 50000) colorClass = "zap-amount-50k";
-    else if (amount >= 20000) colorClass = "zap-amount-20k";
-    else if (amount >= 10000) colorClass = "zap-amount-10k";
+    if (amount >= 10000) colorClass = "zap-amount-10k";
     else if (amount >= 5000) colorClass = "zap-amount-5k";
     else if (amount >= 2000) colorClass = "zap-amount-2k";
     else if (amount >= 1000) colorClass = "zap-amount-1k";
+    else if (amount >= 500) colorClass = "zap-amount-500";
+    else if (amount >= 200) colorClass = "zap-amount-200";
+    else if (amount >= 100) colorClass = "zap-amount-100";
 
     return colorClass;
   }

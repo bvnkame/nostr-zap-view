@@ -13,22 +13,22 @@
   --new-mark: #22c55e;
 
   /* Zap Amount Colors */
-  --zap-1k: #1565c0;
-  --zap-2k: #00b8d4;
-  --zap-5k: #00bfa5;
-  --zap-10k: #ffb300;
-  --zap-20k: #e65100;
-  --zap-50k: #c2185b;
-  --zap-100k: #d00000;
+  --zap-100: #1565c0;
+  --zap-200: #00b8d4;
+  --zap-500: #00bfa5;
+  --zap-1k: #ffb300;
+  --zap-2k: #e65100;
+  --zap-5k: #c2185b;
+  --zap-10k: #d00000;
 
   /* Light Variants */
-  --zap-1k-light: #1e88e5;
-  --zap-2k-light: #00e5ff;
-  --zap-5k-light: #1de9b6;
-  --zap-10k-light: #ffca28;
-  --zap-20k-light: #f57c00;
-  --zap-50k-light: #e91e63;
-  --zap-100k-light: #e62117;
+  --zap-100-light: #1e88e5;
+  --zap-200-light: #00e5ff;
+  --zap-500-light: #1de9b6;
+  --zap-1k-light: #ffca28;
+  --zap-2k-light: #f57c00;
+  --zap-5k-light: #e91e63;
+  --zap-10k-light: #e62117;
 
   /* Text Colors */
   --text-light: #ffffff;
