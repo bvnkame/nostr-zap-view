@@ -73,26 +73,26 @@ class ZapDialog extends HTMLElement {
   #setupTemplate() {
     const template = document.createElement("template");
     template.innerHTML = `
-      <dialog id="zapDialog">
-        <h2 id="dialogTitle"></h2>
-        <button id="closeDialogButton">X</button>
+      <dialog class="zap-dialog">
+        <h2 class="dialog-title"></h2>
+        <button class="close-dialog-button">X</button>
         <div class="zap-stats"></div>
-        <ul id="dialogZapList"></ul>
+        <ul class="dialog-zap-list"></ul>
       </dialog>
     `;
     this.shadowRoot.appendChild(template.content.cloneNode(true));
   }
 
   #setupEventListeners() {
-    const dialog = this.#getElement("#zapDialog");
-    const closeButton = this.#getElement("#closeDialogButton");
+    const dialog = this.#getElement(".zap-dialog");
+    const closeButton = this.#getElement(".close-dialog-button");
 
     closeButton.addEventListener("click", () => this.closeDialog());
     dialog.addEventListener("click", this.#onDialogClick.bind(this));
   }
 
   #onDialogClick(event) {
-    if (event.target === this.#getElement("#zapDialog")) {
+    if (event.target === this.#getElement(".zap-dialog")) {
       this.closeDialog();
     }
   }
@@ -206,7 +206,7 @@ class ZapDialog extends HTMLElement {
   }
 
   async renderZapListFromCache(zapEventsCache, maxCount) {
-    const list = this.#getElement("#dialogZapList");
+    const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
@@ -229,7 +229,7 @@ class ZapDialog extends HTMLElement {
   }
 
   async prependZap(event) {
-    const list = this.#getElement("#dialogZapList");
+    const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     await this.#prefetchProfiles([event]);
@@ -248,11 +248,11 @@ class ZapDialog extends HTMLElement {
 
   // 公開API
   showDialog() {
-    const dialog = this.#getElement("#zapDialog");
+    const dialog = this.#getElement(".zap-dialog");
     if (dialog && !dialog.open) {
       const fetchButton = document.querySelector("button[data-identifier]");
       if (fetchButton) {
-        const title = this.#getElement("#dialogTitle");
+        const title = this.#getElement(".dialog-title");
         const customTitle = fetchButton.getAttribute("data-title");
         if (customTitle && customTitle.trim()) {
           title.textContent = customTitle;
@@ -268,13 +268,13 @@ class ZapDialog extends HTMLElement {
   }
 
   closeDialog() {
-    const dialog = this.#getElement("#zapDialog");
+    const dialog = this.#getElement(".zap-dialog");
     if (dialog?.open) dialog.close();
   }
 
   // Zap表示関連メソッド
   initializeZapPlaceholders(maxCount) {
-    const list = this.#getElement("#dialogZapList");
+    const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     list.innerHTML = Array(maxCount)
@@ -299,7 +299,7 @@ class ZapDialog extends HTMLElement {
   }
 
   initializeZapStats() {
-    const dialog = this.#getElement("#zapDialog");
+    const dialog = this.#getElement(".zap-dialog");
     const statsDiv = this.#getElement(".zap-stats");
     if (!dialog || !statsDiv) return;
 
@@ -379,7 +379,7 @@ class ZapDialog extends HTMLElement {
   }
 
   showNoZapsMessage() {
-    const list = this.#getElement("#dialogZapList");
+    const list = this.#getElement(".dialog-zap-list");
     if (list) {
       list.innerHTML = this.#createNoZapsMessage();
     }

@@ -44,7 +44,7 @@
   box-sizing: border-box;
 }
 
-#zapDialog {
+.zap-dialog {
   color: var(--main-text);
   font-size: medium;
   font-weight: normal;
@@ -56,7 +56,7 @@
   background: var(--dialog-bg);
 }
 
-#closeDialogButton {
+.close-dialog-button {
   font-size: 16px;
   position: absolute;
   top: 3px;
@@ -71,7 +71,7 @@
   text-align: center;
 }
 
-#dialogTitle {
+.dialog-title {
   height: 42px;
   margin: 0;
   padding: 0;
@@ -85,13 +85,13 @@
   white-space: nowrap;
 }
 
-#dialogTitle.custom-title {
+.dialog-title.custom-title {
   color: var(--tite-text);
   font-weight: 600;
   font-size: 1rem;
 }
 
-#closeDialogButton:hover {
+.close-dialog-button:hover {
   background-color: var(--hover-bg);
 }
 
@@ -143,7 +143,7 @@
   font-weight: 500;
 }
 
-#dialogZapList {
+.dialog-zap-list {
   list-style-type: none;
   margin: 10px 0;
   padding: 0;
