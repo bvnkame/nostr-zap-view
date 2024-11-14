@@ -111,6 +111,7 @@ class ZapDialog extends HTMLElement {
 
     let senderName = "anonymous";
     let senderIcon = "";
+    let npubKey = "";
 
     if (pubkey && this.profileManager) {
       const profile = this.profileManager.getProfile(pubkey);
@@ -125,6 +126,8 @@ class ZapDialog extends HTMLElement {
           senderIcon = defaultIcon;
         }
       }
+      // npubKeyの初期値を設定
+      npubKey = formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
     } else {
       senderIcon = defaultIcon;
     }
@@ -137,6 +140,7 @@ class ZapDialog extends HTMLElement {
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
+      npubKey
     };
   }
 
@@ -162,9 +166,8 @@ class ZapDialog extends HTMLElement {
   }
 
   // UI要素生成メソッド
-  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at }) {
+  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at, npubKey }) {
     const [amount, unit] = satsText.split(" ");
-    const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
@@ -322,7 +325,7 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // プロフィール情報の事前取得用のメソッドを追加
+  // プロフィール情報の事前取得用のメソッドを修正
   async #prefetchProfiles(sortedZaps) {
     const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
 
@@ -334,15 +337,21 @@ class ZapDialog extends HTMLElement {
         },
       };
 
-      // NIP-05検証を非同期で開始
-      pubkeys.forEach((pubkey) => {
+      // NIP-05検証を非同期で処理
+      pubkeys.forEach(async (pubkey) => {
         if (pubkey) {
-          profileManager.verifyNip05Async(pubkey).then((nip05) => {
-            if (nip05) {
+          const nip05 = await profileManager.verifyNip05Async(pubkey);
+          if (nip05) {
+            requestAnimationFrame(() => {
               const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-              elements.forEach((el) => (el.textContent = nip05));
-            }
-          });
+              elements.forEach(el => {
+                if (!el.hasAttribute('data-nip05-updated')) {
+                  el.textContent = nip05;
+                  el.setAttribute('data-nip05-updated', 'true');
+                }
+              });
+            });
+          }
         }
       });
     }
