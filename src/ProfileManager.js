@@ -220,14 +220,6 @@ export class ProfileManager {
             parsedProfile.name = "nameless";
           }
 
-          // NIP-05の検証
-          if (parsedContent.nip05) {
-            const verifiedNip05 = await verifyNip05(parsedContent.nip05, profile.pubkey);
-            if (verifiedNip05) {
-              this.nip05Cache.set(profile.pubkey, verifiedNip05);
-            }
-          }
-
           this.profileCache.set(profile.pubkey, parsedProfile);
           this._resolvePromise(profile.pubkey, parsedProfile);
         } catch (error) {
@@ -236,6 +228,29 @@ export class ProfileManager {
         }
       })
     );
+  }
+
+  async verifyNip05Async(pubkey) {
+    const NIP05_TIMEOUT = 5000; // 5秒タイムアウト
+
+    try {
+      const profile = this.profileCache.get(pubkey);
+      if (!profile?.nip05) return null;
+
+      const nip05Promise = verifyNip05(profile.nip05, pubkey);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('NIP-05 verification timeout')), NIP05_TIMEOUT);
+      });
+
+      const verifiedNip05 = await Promise.race([nip05Promise, timeoutPromise]);
+      if (verifiedNip05) {
+        this.nip05Cache.set(pubkey, verifiedNip05);
+        return verifiedNip05.startsWith("_@") ? verifiedNip05.slice(1) : verifiedNip05;
+      }
+    } catch (error) {
+      console.debug('NIP-05検証失敗またはタイムアウト:', error);
+    }
+    return null;
   }
 
   /**

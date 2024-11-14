@@ -171,7 +171,6 @@ class ZapDialog extends HTMLElement {
   #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at }) {
     const [amount, unit] = satsText.split(" ");
     const npubKey = pubkey ? formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)) : "";
-    const nip05 = pubkey ? profileManager.getNip05(pubkey) : "";
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
@@ -186,7 +185,7 @@ class ZapDialog extends HTMLElement {
         </div>
         <div class="sender-info">
           <span class="sender-name">${escapedName}</span>
-          <span class="sender-pubkey">${nip05 || npubKey}</span>
+          <span class="sender-pubkey" data-pubkey="${pubkey}">${npubKey}</span>
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
@@ -332,6 +331,18 @@ class ZapDialog extends HTMLElement {
           return this.profiles.get(pubkey);
         },
       };
+
+      // NIP-05検証を非同期で開始
+      pubkeys.forEach(pubkey => {
+        if (pubkey) {
+          profileManager.verifyNip05Async(pubkey).then(nip05 => {
+            if (nip05) {
+              const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+              elements.forEach(el => el.textContent = nip05);
+            }
+          });
+        }
+      });
     }
   }
 }
