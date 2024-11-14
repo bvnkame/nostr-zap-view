@@ -191,6 +191,13 @@
   background-color: var(--new-mark);
   border-radius: 50%;
   z-index: 1;
+  animation: pulse 2500ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .sender-info {
@@ -233,8 +240,8 @@
 .zap-details {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 4px 4px 4px 48px;
+  min-height: 34px;
+  padding: 0 0 2px 48px;
   border-radius: 0 0 6px 6px;
   margin: 0;
 }
@@ -243,6 +250,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 0.9375rem;
+  margin: 4px 0;
 }
 
 .no-zaps-message {
@@ -304,8 +312,8 @@
 .zap-placeholder-details {
   display: flex;
   align-items: center;
-  min-height: 32px;
-  padding: 4px 4px 4px 48px;
+  min-height: 34px;
+  padding: 0 0 2px 48px;
   margin: 0;
 }
 
@@ -313,4 +321,5 @@
   height: 22px;
   width: 180px;
   border-radius: 2px;
+  margin: 4px 0;
 }
