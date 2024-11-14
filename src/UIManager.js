@@ -143,9 +143,7 @@ class ZapDialog extends HTMLElement {
   #getAmountColorClass(amount) {
     const button = document.querySelector("button[data-identifier]");
     const colorModeAttr = button?.getAttribute("data-zap-color-mode");
-    const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr)
-      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
-      : colorModeAttr === "true";
+    const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr) ? APP_CONFIG.DEFAULT_OPTIONS.colorMode : colorModeAttr === "true";
 
     if (!isColorModeEnabled) {
       return "";
@@ -175,7 +173,7 @@ class ZapDialog extends HTMLElement {
     const iconHTML = senderIcon ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">` : `<div class="zap-placeholder-icon"></div>`;
 
     return `
-      <div class="zap-sender${comment ? ' with-comment' : ''}">
+      <div class="zap-sender${comment ? " with-comment" : ""}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
           ${iconHTML}
         </div>
@@ -197,7 +195,7 @@ class ZapDialog extends HTMLElement {
 
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
+    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     placeholder.innerHTML = this.#createZapHTML(zapInfo);
     placeholder.removeAttribute("data-index");
   }
@@ -216,7 +214,7 @@ class ZapDialog extends HTMLElement {
     zapInfos.forEach((zapInfo) => {
       const li = document.createElement("li");
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      li.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
+      li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
       li.innerHTML = this.#createZapHTML(zapInfo);
       fragment.appendChild(li);
     });
@@ -234,7 +232,7 @@ class ZapDialog extends HTMLElement {
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     const li = document.createElement("li");
-    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? ' with-comment' : ''}`;
+    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     li.innerHTML = this.#createZapHTML(zapInfo);
     list.prepend(li);
   }
@@ -329,12 +327,12 @@ class ZapDialog extends HTMLElement {
       };
 
       // NIP-05検証を非同期で開始
-      pubkeys.forEach(pubkey => {
+      pubkeys.forEach((pubkey) => {
         if (pubkey) {
-          profileManager.verifyNip05Async(pubkey).then(nip05 => {
+          profileManager.verifyNip05Async(pubkey).then((nip05) => {
             if (nip05) {
               const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-              elements.forEach(el => el.textContent = nip05);
+              elements.forEach((el) => (el.textContent = nip05));
             }
           });
         }
@@ -345,7 +343,7 @@ class ZapDialog extends HTMLElement {
   #createNoZapsMessage() {
     return `
       <div class="no-zaps-message">
-        No Zaps yet!<br>Be the first to send a Zap!
+        No Zaps yet!<br>Send the first Zap!
       </div>
     `;
   }
