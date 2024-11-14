@@ -88,20 +88,13 @@ class ZapDialog extends HTMLElement {
     const closeButton = this.#getElement("#closeDialogButton");
 
     closeButton.addEventListener("click", () => this.closeDialog());
+    dialog.addEventListener("click", this.#onDialogClick.bind(this));
+  }
 
-    // クリックイベントにsetTimeoutを追加して、
-    // DOMの更新が完了した後に判定を行う
-    dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) {
-        setTimeout(() => {
-          // ダイアログの範囲チェックを再度行う
-          const rect = dialog.getBoundingClientRect();
-          if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
-            this.closeDialog();
-          }
-        }, 0);
-      }
-    });
+  #onDialogClick(event) {
+    if (event.target === this.#getElement("#zapDialog")) {
+      this.closeDialog();
+    }
   }
 
   // プロフィール関連メソッド
@@ -109,63 +102,69 @@ class ZapDialog extends HTMLElement {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
     const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
 
+    const senderProfile = await this.#getSenderProfile(pubkey);
+    const displayIdentifier = await this.#getDisplayIdentifier(pubkey, senderProfile);
+
+    return {
+      ...senderProfile,
+      satsText,
+      satsAmount,
+      comment: content || "",
+      pubkey: pubkey || "",
+      created_at: event.created_at,
+      displayIdentifier,
+    };
+  }
+
+  async #getSenderProfile(pubkey) {
     let senderName = "anonymous";
-    let senderIcon = "";
-    let displayIdentifier = "";
+    let senderIcon = defaultIcon;
 
     if (pubkey && this.profileManager) {
       const profile = this.profileManager.getProfile(pubkey);
       if (profile) {
         senderName = getProfileDisplayName(profile) || "nameless";
         senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
-      } else {
-        senderIcon = defaultIcon;
       }
-
-      // NIP-05が利用可能な場合は取得
-      const nip05 = await profileManager.verifyNip05Async(pubkey);
-      if (nip05) {
-        displayIdentifier = nip05;
-      } else {
-        // それ以外の場合はnpubKeyを使用
-        displayIdentifier = formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
-      }
-    } else {
-      senderIcon = defaultIcon;
-      displayIdentifier = "unknown";
     }
 
-    return {
-      senderName,
-      senderIcon,
-      satsText,
-      satsAmount,
-      comment: content || "",
-      pubkey: pubkey || "",
-      created_at: event.created_at,
-      displayIdentifier
-    };
+    return { senderName, senderIcon };
+  }
+
+  async #getDisplayIdentifier(pubkey, profile) {
+    if (pubkey && profileManager) {
+      const nip05 = await profileManager.verifyNip05Async(pubkey);
+      if (nip05) {
+        return nip05;
+      } else {
+        return formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
+      }
+    }
+    return "unknown";
   }
 
   #getAmountColorClass(amount) {
-    const button = document.querySelector("button[data-identifier]");
-    const colorModeAttr = button?.getAttribute("data-zap-color-mode");
-    const isColorModeEnabled = !colorModeAttr || !["true", "false"].includes(colorModeAttr) ? APP_CONFIG.DEFAULT_OPTIONS.colorMode : colorModeAttr === "true";
-
+    const isColorModeEnabled = this.#isColorModeEnabled();
     if (!isColorModeEnabled) {
       return "";
     }
 
-    let colorClass = "";
-    if (amount >= 10000) colorClass = "zap-amount-10k";
-    else if (amount >= 5000) colorClass = "zap-amount-5k";
-    else if (amount >= 2000) colorClass = "zap-amount-2k";
-    else if (amount >= 1000) colorClass = "zap-amount-1k";
-    else if (amount >= 500) colorClass = "zap-amount-500";
-    else if (amount >= 200) colorClass = "zap-amount-200";
-    else if (amount >= 100) colorClass = "zap-amount-100";
+    if (amount >= 10000) return "zap-amount-10k";
+    if (amount >= 5000) return "zap-amount-5k";
+    if (amount >= 2000) return "zap-amount-2k";
+    if (amount >= 1000) return "zap-amount-1k";
+    if (amount >= 500) return "zap-amount-500";
+    if (amount >= 200) return "zap-amount-200";
+    if (amount >= 100) return "zap-amount-100";
+    return "";
+  }
 
-    return colorClass;
+  #isColorModeEnabled() {
+    const button = document.querySelector("button[data-identifier]");
+    const colorModeAttr = button?.getAttribute("data-zap-color-mode");
+    return !colorModeAttr || !["true", "false"].includes(colorModeAttr) 
+      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode 
+      : colorModeAttr === "true";
   }
 
   // UI要素生成メソッド
@@ -343,24 +342,25 @@ class ZapDialog extends HTMLElement {
       };
 
       // NIP-05の検証と表示更新
-      await Promise.all(pubkeys.map(async (pubkey) => {
-        if (!pubkey) return;
-        
-        try {
-          const nip05 = await profileManager.verifyNip05Async(pubkey);
-          if (nip05) {
-            const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-            elements.forEach(el => {
-              if (!el.hasAttribute('data-nip05-updated')) {
-                el.textContent = nip05;
-                el.setAttribute('data-nip05-updated', 'true');
-              }
-            });
+      await Promise.all(pubkeys.map(pubkey => this.#updateDisplayIdentifier(pubkey)));
+    }
+  }
+
+  async #updateDisplayIdentifier(pubkey) {
+    if (!pubkey) return;
+    try {
+      const nip05 = await profileManager.verifyNip05Async(pubkey);
+      if (nip05) {
+        const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+        elements.forEach(el => {
+          if (!el.hasAttribute('data-nip05-updated')) {
+            el.textContent = nip05;
+            el.setAttribute('data-nip05-updated', 'true');
           }
-        } catch (error) {
-          console.debug(`NIP-05検証エラー (${pubkey}):`, error);
-        }
-      }));
+        });
+      }
+    } catch (error) {
+      console.debug(`NIP-05検証エラー (${pubkey}):`, error);
     }
   }
 
