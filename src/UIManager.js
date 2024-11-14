@@ -277,8 +277,16 @@ class ZapDialog extends HTMLElement {
       .map(
         (_, i) => `
         <li class="zap-list-item" data-index="${i}">
-          <div class="zap-placeholder-icon"></div>
-          <span class="zap-placeholder-comment">Loading...</span>
+          <div class="zap-sender">
+            <div class="zap-placeholder-icon skeleton"></div>
+            <div class="zap-placeholder-content">
+              <div class="zap-placeholder-name skeleton"></div>
+            </div>
+            <div class="zap-placeholder-amount skeleton"></div>
+          </div>
+          <div class="zap-placeholder-details">
+            <div class="zap-placeholder-comment skeleton"></div>
+          </div>
         </li>
       `
       )

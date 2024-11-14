@@ -259,3 +259,47 @@
 
 /* Import colors.css at the beginning */
 @import url("./colors.css");
+
+.skeleton {
+  background-color: var(--zap-stats-bg);
+}
+
+.zap-placeholder-icon {
+  width: 32px;
+  height: 32px;
+  margin: 7px 0;
+  border-radius: 4px;
+}
+
+.zap-placeholder-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.zap-placeholder-name {
+  height: 32px;
+  width: 140px;
+  border-radius: 2px;
+}
+
+.zap-placeholder-amount {
+  height: 32px;
+  width: 60px;
+  border-radius: 2px;
+}
+
+.zap-placeholder-details {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 4px 4px 48px;
+  margin: 0;
+}
+
+.zap-placeholder-comment {
+  height: 22px;
+  width: 180px;
+  border-radius: 2px;
+}
