@@ -39,6 +39,7 @@ export class ProfileManager {
     this.#initialize();
     this.nip05Cache = new Map();
     this.pendingFetches = new Map(); // 進行中のフェッチを追跡
+    this.nip05PendingFetches = new Map(); // 追加
   }
 
   /**
@@ -231,26 +232,40 @@ export class ProfileManager {
   }
 
   async verifyNip05Async(pubkey) {
-    const NIP05_TIMEOUT = 5000; // 5秒タイムアウト
-
-    try {
-      const profile = this.profileCache.get(pubkey);
-      if (!profile?.nip05) return null;
-
-      const nip05Promise = verifyNip05(profile.nip05, pubkey);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('NIP-05 verification timeout')), NIP05_TIMEOUT);
-      });
-
-      const verifiedNip05 = await Promise.race([nip05Promise, timeoutPromise]);
-      if (verifiedNip05) {
-        this.nip05Cache.set(pubkey, verifiedNip05);
-        return verifiedNip05.startsWith("_@") ? verifiedNip05.slice(1) : verifiedNip05;
-      }
-    } catch (error) {
-      console.debug('NIP-05検証失敗またはタイムアウト:', error);
+    if (this.nip05Cache.has(pubkey)) {
+      return this.nip05Cache.get(pubkey);
     }
-    return null;
+
+    if (this.nip05PendingFetches.has(pubkey)) {
+      return this.nip05PendingFetches.get(pubkey);
+    }
+
+    const fetchPromise = (async () => {
+      const NIP05_TIMEOUT = 5000; // 5秒タイムアウト
+
+      try {
+        const profile = this.profileCache.get(pubkey);
+        if (!profile?.nip05) return null;
+
+        const nip05 = await Promise.race([
+          verifyNip05(profile.nip05, pubkey),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('NIP-05 verification timeout')), NIP05_TIMEOUT))
+        ]);
+
+        if (nip05) {
+          this.nip05Cache.set(pubkey, nip05.startsWith("_@") ? nip05.slice(1) : nip05);
+          return this.nip05Cache.get(pubkey);
+        }
+      } catch (error) {
+        console.debug('NIP-05検証失敗またはタイムアウト:', error);
+      } finally {
+        this.nip05PendingFetches.delete(pubkey);
+      }
+      return null;
+    })();
+
+    this.nip05PendingFetches.set(pubkey, fetchPromise);
+    return fetchPromise;
   }
 
   /**
