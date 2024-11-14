@@ -241,7 +241,7 @@ export class ProfileManager {
   }
 
   async verifyNip05Async(pubkey) {
-    // すでにキャッシュがある場合はそれを返す
+    // すでにキャッシュがある場合はそれを返す（nullもキャッシュされている）
     if (this.nip05Cache.has(pubkey)) {
       return this.nip05Cache.get(pubkey);
     }
@@ -256,7 +256,11 @@ export class ProfileManager {
 
       try {
         const profile = await this.fetchProfiles([pubkey]).then(profiles => profiles[0]);
-        if (!profile?.nip05) return null;
+        if (!profile?.nip05) {
+          // nip05がない場合もnullをキャッシュ
+          this.nip05Cache.set(pubkey, null);
+          return null;
+        }
 
         const nip05Result = await Promise.race([
           verifyNip05(profile.nip05, pubkey),
@@ -267,13 +271,19 @@ export class ProfileManager {
           const formattedNip05 = nip05Result.startsWith("_@") ? nip05Result.slice(1) : nip05Result;
           this.nip05Cache.set(pubkey, formattedNip05);
           return formattedNip05;
+        } else {
+          // 検証に失敗した場合もnullをキャッシュ
+          this.nip05Cache.set(pubkey, null);
+          return null;
         }
       } catch (error) {
         console.debug('NIP-05検証失敗またはタイムアウト:', error);
+        // エラーの場合もnullをキャッシュ
+        this.nip05Cache.set(pubkey, null);
+        return null;
       } finally {
         this.nip05PendingFetches.delete(pubkey);
       }
-      return null;
     })();
 
     this.nip05PendingFetches.set(pubkey, fetchPromise);
