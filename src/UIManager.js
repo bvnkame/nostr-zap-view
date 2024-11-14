@@ -129,10 +129,6 @@ class ZapDialog extends HTMLElement {
       senderIcon = defaultIcon;
     }
 
-    if (senderName === "anonymous" || senderName === "nameless") {
-      console.log("Debug: senderName is", senderName, "for pubkey:", pubkey, "Event:", event);
-    }
-
     return {
       senderName,
       senderIcon,

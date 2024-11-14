@@ -184,9 +184,18 @@ export class ProfileManager {
         authors: pubkeys,
       });
 
-      console.log("Debug: Fetched kind: 0 events:", profiles);
+      // pubkeyごとに最新のプロフィールだけを選択
+      const latestProfiles = Array.from(
+        profiles.reduce((map, profile) => {
+          const existing = map.get(profile.pubkey);
+          if (!existing || existing.created_at < profile.created_at) {
+            map.set(profile.pubkey, profile);
+          }
+          return map;
+        }, new Map())
+      ).map(([_, profile]) => profile);
 
-      await this._processProfiles(profiles);
+      await this._processProfiles(latestProfiles);
 
       // プロフィールが取得できなかったpubkeyに対してnullを設定
       pubkeys.forEach((pubkey) => {
@@ -273,7 +282,6 @@ export class ProfileManager {
    * プロフィール取得に失敗した場合のフォールバック
    */
   _createDefaultProfile() {
-    console.log("Debug: Creating default profile with name 'anonymous'");
     return {
       name: "anonymous",
       display_name: "anonymous",
@@ -287,7 +295,6 @@ export class ProfileManager {
   _handleFetchError(pubkeys) {
     pubkeys.forEach((pubkey) => {
       const defaultProfile = this._createDefaultProfile();
-      console.log("Debug: Fetch error for pubkey:", pubkey, "Setting default profile:", defaultProfile);
       this.profileCache.set(pubkey, defaultProfile);
       this._resolvePromise(pubkey, defaultProfile);
     });
