@@ -111,25 +111,28 @@ class ZapDialog extends HTMLElement {
 
     let senderName = "anonymous";
     let senderIcon = "";
-    let npubKey = "";
+    let displayIdentifier = "";
 
     if (pubkey && this.profileManager) {
       const profile = this.profileManager.getProfile(pubkey);
       if (profile) {
-        senderName = getProfileDisplayName(profile);
-        if (!senderName) {
-          senderName = "nameless";
-        }
-        if (profile.picture) {
-          senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
-        } else {
-          senderIcon = defaultIcon;
-        }
+        senderName = getProfileDisplayName(profile) || "nameless";
+        senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
+      } else {
+        senderIcon = defaultIcon;
       }
-      // npubKeyの初期値を設定
-      npubKey = formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
+
+      // NIP-05が利用可能な場合は取得
+      const nip05 = await profileManager.verifyNip05Async(pubkey);
+      if (nip05) {
+        displayIdentifier = nip05;
+      } else {
+        // それ以外の場合はnpubKeyを使用
+        displayIdentifier = formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
+      }
     } else {
       senderIcon = defaultIcon;
+      displayIdentifier = "unknown";
     }
 
     return {
@@ -140,7 +143,7 @@ class ZapDialog extends HTMLElement {
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
-      npubKey
+      displayIdentifier
     };
   }
 
@@ -166,7 +169,7 @@ class ZapDialog extends HTMLElement {
   }
 
   // UI要素生成メソッド
-  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at, npubKey }) {
+  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at, displayIdentifier }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
@@ -182,7 +185,7 @@ class ZapDialog extends HTMLElement {
         </div>
         <div class="sender-info">
           <span class="sender-name">${escapedName}</span>
-          <span class="sender-pubkey" data-pubkey="${pubkey}">${npubKey}</span>
+          <span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
@@ -330,30 +333,34 @@ class ZapDialog extends HTMLElement {
     const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
 
     if (pubkeys.length > 0) {
+      // プロフィール情報の取得
+      const profiles = await profileManager.fetchProfiles(pubkeys);
       this.profileManager = {
-        profiles: new Map((await profileManager.fetchProfiles(pubkeys)).map((profile, index) => [pubkeys[index], profile])),
+        profiles: new Map(profiles.map((profile, index) => [pubkeys[index], profile])),
         getProfile: function (pubkey) {
           return this.profiles.get(pubkey);
         },
       };
 
-      // NIP-05検証を非同期で処理
-      pubkeys.forEach(async (pubkey) => {
-        if (pubkey) {
+      // NIP-05の検証と表示更新
+      await Promise.all(pubkeys.map(async (pubkey) => {
+        if (!pubkey) return;
+        
+        try {
           const nip05 = await profileManager.verifyNip05Async(pubkey);
           if (nip05) {
-            requestAnimationFrame(() => {
-              const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-              elements.forEach(el => {
-                if (!el.hasAttribute('data-nip05-updated')) {
-                  el.textContent = nip05;
-                  el.setAttribute('data-nip05-updated', 'true');
-                }
-              });
+            const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+            elements.forEach(el => {
+              if (!el.hasAttribute('data-nip05-updated')) {
+                el.textContent = nip05;
+                el.setAttribute('data-nip05-updated', 'true');
+              }
             });
           }
+        } catch (error) {
+          console.debug(`NIP-05検証エラー (${pubkey}):`, error);
         }
-      });
+      }));
     }
   }
 

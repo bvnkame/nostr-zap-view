@@ -241,29 +241,32 @@ export class ProfileManager {
   }
 
   async verifyNip05Async(pubkey) {
+    // すでにキャッシュがある場合はそれを返す
     if (this.nip05Cache.has(pubkey)) {
       return this.nip05Cache.get(pubkey);
     }
 
+    // 進行中のフェッチがある場合はそれを待つ
     if (this.nip05PendingFetches.has(pubkey)) {
       return this.nip05PendingFetches.get(pubkey);
     }
 
     const fetchPromise = (async () => {
-      const NIP05_TIMEOUT = 5000; // 5秒タイムアウト
+      const NIP05_TIMEOUT = 5000;
 
       try {
-        const profile = this.profileCache.get(pubkey);
+        const profile = await this.fetchProfiles([pubkey]).then(profiles => profiles[0]);
         if (!profile?.nip05) return null;
 
-        const nip05 = await Promise.race([
+        const nip05Result = await Promise.race([
           verifyNip05(profile.nip05, pubkey),
           new Promise((_, reject) => setTimeout(() => reject(new Error('NIP-05 verification timeout')), NIP05_TIMEOUT))
         ]);
 
-        if (nip05) {
-          this.nip05Cache.set(pubkey, nip05.startsWith("_@") ? nip05.slice(1) : nip05);
-          return this.nip05Cache.get(pubkey);
+        if (nip05Result) {
+          const formattedNip05 = nip05Result.startsWith("_@") ? nip05Result.slice(1) : nip05Result;
+          this.nip05Cache.set(pubkey, formattedNip05);
+          return formattedNip05;
         }
       } catch (error) {
         console.debug('NIP-05検証失敗またはタイムアウト:', error);
