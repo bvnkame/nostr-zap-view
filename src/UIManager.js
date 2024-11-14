@@ -304,9 +304,15 @@ class ZapDialog extends HTMLElement {
     if (!dialog || !statsDiv) return;
 
     statsDiv.innerHTML = `
-      <div class="stats-item"></div>
-      <div class="stats-item"></div>
-      <div class="stats-item"></div>
+      <div class="stats-item">Total Count</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">times</div>
+      <div class="stats-item">Total Amount</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">sats</div>
+      <div class="stats-item">Max Amount</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">sats</div>
     `;
   }
 
