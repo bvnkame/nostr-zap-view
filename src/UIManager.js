@@ -341,6 +341,21 @@ class ZapDialog extends HTMLElement {
       });
     }
   }
+
+  #createNoZapsMessage() {
+    return `
+      <div class="no-zaps-message">
+        No Zaps yet!<br>Be the first to send a Zap!
+      </div>
+    `;
+  }
+
+  showNoZapsMessage() {
+    const list = this.#getElement("#dialogZapList");
+    if (list) {
+      list.innerHTML = this.#createNoZapsMessage();
+    }
+  }
 }
 
 customElements.define("zap-dialog", ZapDialog);
@@ -366,3 +381,10 @@ export const { closeDialog, showDialog, initializeZapPlaceholders, initializeZap
     displayZapStats: (stats) => getDialog()?.displayZapStats(stats),
   };
 })();
+
+export async function showNoZapsMessage() {
+  const dialog = document.querySelector("zap-dialog");
+  if (dialog) {
+    dialog.showNoZapsMessage();
+  }
+}

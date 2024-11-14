@@ -250,5 +250,12 @@
   font-size: 0.9375rem;
 }
 
+.no-zaps-message {
+  padding: 20px;
+  text-align: center;
+  color: var(--pubkey-text);
+  font-size: 1rem;
+}
+
 /* Import colors.css at the beginning */
 @import url("./colors.css");

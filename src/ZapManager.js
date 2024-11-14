@@ -1,5 +1,5 @@
 import { poolManager } from "./ZapPool.js";
-import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats } from "./UIManager.js";
+import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 
@@ -135,6 +135,10 @@ export async function fetchLatestZaps() {
     showDialog();
 
     await (hasCache ? handleCachedZaps(config) : initializeNewFetch(config));
+
+    if (subscriptionManager.zapEventsCache.length === 0) {
+      showNoZapsMessage(); // 新しい関数を呼び出す
+    }
   } catch (error) {
     console.error("Zap取得中にエラーが発生しました:", error);
   }
