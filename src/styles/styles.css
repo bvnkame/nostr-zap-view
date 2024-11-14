@@ -10,7 +10,7 @@
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
   --border: #edf2f7;
-  --zap-stats-skeleton-bg: #e1e6eb;
+  --zap-stats-skeleton-bg: #dde4eb;
   --new-mark: #22c55e;
 
   /* Zap Amount Colors */
@@ -265,7 +265,7 @@
 .stats-skeleton {
   background-color: var(--zap-stats-skeleton-bg);
   height: 23px;
-  width: 120px;
+  width: 100px;
 }
 
 /* Zapイベント用スケルトン */
