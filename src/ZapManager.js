@@ -1,4 +1,4 @@
-import { zapPool } from "./ZapPool.js";
+import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
@@ -7,9 +7,8 @@ class ZapSubscriptionManager {
   constructor() {
     this.zapEventsCache = [];
     this.zapStatsCache = new Map();
-    this.subscriptions = { zap: null, realTime: null };
-    this.state = { isZapClosed: false, isInitialFetchComplete: false };
-    this.currentStats = null; // 現在の統計情報を保持
+    this.state = { isInitialFetchComplete: false };
+    this.currentStats = null;
   }
 
   clearCache() {
@@ -58,16 +57,7 @@ class ZapSubscriptionManager {
     }
   }
 
-  closeZapSubscription() {
-    if (this.subscriptions.zap && !this.state.isZapClosed) {
-      this.subscriptions.zap.close();
-      this.state.isZapClosed = true;
-    }
-  }
-
   async handleZapEvent(event, maxCount) {
-    if (this.state.isZapClosed) return;
-
     if (!this.zapEventsCache.some((e) => e.id === event.id)) {
       this.zapEventsCache.push(event);
 
@@ -90,7 +80,7 @@ class ZapSubscriptionManager {
       }
 
       if (this.zapEventsCache.length >= maxCount) {
-        this.closeZapSubscription();
+        poolManager.closeSubscription('zap'); // この行を修正
       }
     }
   }
@@ -108,44 +98,23 @@ class ZapSubscriptionManager {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    this.closeZapSubscription();
-    this.state.isZapClosed = false;
-
-    this.subscriptions.zap = this.createSubscription(config, decoded, {
+    poolManager.subscribeToZaps(config, decoded, {
       onevent: (event) => this.handleZapEvent(event, config.maxCount),
       oneose: () => {
         this.state.isInitialFetchComplete = true;
         this.initializeRealTimeSubscription(config);
-      },
+      }
     });
-
-    setTimeout(() => this.closeZapSubscription(), CONFIG.SUBSCRIPTION_TIMEOUT);
-  }
-
-  createSubscription(config, decoded, handler) {
-    return zapPool.subscribeMany(config.relayUrls, [{ ...decoded.req }], handler);
   }
 
   initializeRealTimeSubscription(config) {
-    if (this.subscriptions.realTime) return;
-
     const decoded = decodeIdentifier(config.identifier, CONFIG.DEFAULT_LIMIT);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    this.subscriptions.realTime = zapPool.subscribeMany(
-      config.relayUrls,
-      [
-        {
-          ...decoded.req,
-          limit: CONFIG.DEFAULT_LIMIT,
-          since: Math.floor(Date.now() / 1000),
-        },
-      ],
-      {
-        onevent: (event) => this.handleRealTimeEvent(event),
-        oneose: () => console.log("リアルタイムZapのEOSEを受信。"),
-      }
-    );
+    poolManager.subscribeToRealTime(config, decoded, {
+      onevent: (event) => this.handleRealTimeEvent(event),
+      oneose: () => console.log("リアルタイムZapのEOSEを受信。")
+    });
   }
 }
 
