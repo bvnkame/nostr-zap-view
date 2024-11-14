@@ -11,8 +11,8 @@ import { PROFILE_CONFIG } from "./ZapConfig.js";
  */
 
 /**
- * Nostrのプロフィール情報を管理するクラス
- * Singletonパターンを採用し、アプリケーション全体で1つのインスタンスを共有
+ * Class to manage Nostr profile information
+ * Singleton pattern is adopted to share one instance throughout the application
  */
 export class ProfileManager {
   static instance = null;
@@ -27,7 +27,7 @@ export class ProfileManager {
   }
 
   _initialize() {
-    // キャッシュやキューの初期化
+    // Initialize cache and queue
     this.profileCache = new Map();
     this.nip05Cache = new Map();
     this.pendingFetches = new Map();
@@ -39,23 +39,23 @@ export class ProfileManager {
   }
 
   async fetchProfiles(pubkeys) {
-    // キャッシュされていない公開鍵をフィルタリング
+    // Filter uncached public keys
     const uncachedPubkeys = pubkeys.filter(pubkey => !this.profileCache.has(pubkey));
 
     if (uncachedPubkeys.length === 0) {
       return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
     }
 
-    // 未キャッシュの公開鍵に対してフェッチをスケジュール
+    // Schedule fetch for uncached public keys
     const fetchPromises = uncachedPubkeys.map(pubkey => this._getOrCreateFetchPromise(pubkey));
 
-    // バッチ処理をスケジュール
+    // Schedule batch processing
     this._scheduleBatchProcess();
 
-    // フェッチが完了するのを待機
+    // Wait for fetch to complete
     await Promise.all(fetchPromises);
 
-    // 結果を返す
+    // Return results
     return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
   }
 
@@ -92,7 +92,7 @@ export class ProfileManager {
     try {
       await this._fetchProfileFromRelay(batchPubkeys);
     } catch (error) {
-      console.error("プロフィールの取得に失敗:", error);
+      console.error("Failed to fetch profile:", error);
       this._handleFetchError(batchPubkeys);
     } finally {
       batchPubkeys.forEach(pubkey => {
@@ -134,7 +134,7 @@ export class ProfileManager {
           this.profileCache.set(profile.pubkey, parsedProfile);
           this._resolvePromise(profile.pubkey, parsedProfile);
         } catch (error) {
-          console.error(`プロフィールのパース失敗: ${profile.pubkey}`, error);
+          console.error(`Failed to parse profile: ${profile.pubkey}`, error);
           this._resolvePromise(profile.pubkey, this._createDefaultProfile());
         }
       })
@@ -181,7 +181,7 @@ export class ProfileManager {
           return null;
         }
       } catch (error) {
-        console.debug('NIP-05検証失敗またはタイムアウト:', error);
+        console.debug('NIP-05 verification failed or timed out:', error);
         this.nip05Cache.set(pubkey, null);
         return null;
       } finally {
@@ -217,7 +217,7 @@ export class ProfileManager {
   }
 
   clearCache() {
-    // キャッシュをクリア
+    // Clear cache
     this.profileCache.clear();
     this.nip05Cache.clear();
     this.pendingFetches.clear();
@@ -226,16 +226,16 @@ export class ProfileManager {
   }
 
   /**
-   * NIP-05アドレスの取得
-   * キャッシュされた検証済みNIP-05アドレスを返却
-   * @param {string} pubkey - 公開鍵
-   * @returns {string|null} 検証済みNIP-05アドレス
+   * Get NIP-05 address
+   * Returns cached verified NIP-05 address
+   * @param {string} pubkey - Public key
+   * @returns {string|null} Verified NIP-05 address
    */
   getNip05(pubkey) {
     const nip05 = this.nip05Cache.get(pubkey);
     if (!nip05) return null;
 
-    // _@で始まる場合は_を削除
+    // Remove _ if it starts with _@
     return nip05.startsWith("_@") ? nip05.slice(1) : nip05;
   }
 }

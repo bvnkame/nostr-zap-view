@@ -52,12 +52,12 @@ class ZapDialog extends HTMLElement {
     this.shadowRoot.host.classList.add(themeClass);
   }
 
-  // ライフサイクルメソッド
+  // Lifecycle methods
   connectedCallback() {
     this.#initializeDialog();
   }
 
-  // 初期化関連メソッド
+  // Initialization methods
   #initializeDialog() {
     this.#setupStyles();
     this.#setupTemplate();
@@ -97,7 +97,7 @@ class ZapDialog extends HTMLElement {
     }
   }
 
-  // プロフィール関連メソッド
+  // Profile-related methods
   async #extractZapInfo(event) {
     const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
     const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
@@ -167,7 +167,7 @@ class ZapDialog extends HTMLElement {
       : colorModeAttr === "true";
   }
 
-  // UI要素生成メソッド
+  // UI element creation methods
   #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at, displayIdentifier }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
@@ -246,7 +246,7 @@ class ZapDialog extends HTMLElement {
     return this.shadowRoot.querySelector(selector);
   }
 
-  // 公開API
+  // Public API
   showDialog() {
     const dialog = this.#getElement(".zap-dialog");
     if (dialog && !dialog.open) {
@@ -272,7 +272,7 @@ class ZapDialog extends HTMLElement {
     if (dialog?.open) dialog.close();
   }
 
-  // Zap表示関連メソッド
+  // Zap display methods
   initializeZapPlaceholders(maxCount) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
@@ -333,12 +333,12 @@ class ZapDialog extends HTMLElement {
     `;
   }
 
-  // プロフィール情報の事前取得用のメソッドを修正
+  // Method to prefetch profile information
   async #prefetchProfiles(sortedZaps) {
     const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
 
     if (pubkeys.length > 0) {
-      // プロフィール情報の取得
+      // Fetch profile information
       const profiles = await profileManager.fetchProfiles(pubkeys);
       this.profileManager = {
         profiles: new Map(profiles.map((profile, index) => [pubkeys[index], profile])),
@@ -347,7 +347,7 @@ class ZapDialog extends HTMLElement {
         },
       };
 
-      // NIP-05の検証と表示更新
+      // Verify NIP-05 and update display
       await Promise.all(pubkeys.map(pubkey => this.#updateDisplayIdentifier(pubkey)));
     }
   }
@@ -366,7 +366,7 @@ class ZapDialog extends HTMLElement {
         });
       }
     } catch (error) {
-      console.debug(`NIP-05検証エラー (${pubkey}):`, error);
+      console.debug(`NIP-05 verification error (${pubkey}):`, error);
     }
   }
 
@@ -388,7 +388,7 @@ class ZapDialog extends HTMLElement {
 
 customElements.define("zap-dialog", ZapDialog);
 
-// 外部APIの簡略化
+// Simplified external API
 export const createDialog = () => {
   if (!document.querySelector("zap-dialog")) {
     document.body.appendChild(document.createElement("zap-dialog"));

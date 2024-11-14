@@ -19,9 +19,8 @@ class ZapSubscriptionManager {
     const cached = this.zapStatsCache.get(identifier);
     const now = Date.now();
 
-    // キャッシュが有効な場合はそれを返す
-    if (cached && now - cached.timestamp < 300000) {
-      // 5分
+    // Return cache if valid
+    if (cached && now - cached.timestamp < 300000) { // 5 minutes
       return cached.stats;
     }
 
@@ -31,7 +30,7 @@ class ZapSubscriptionManager {
         stats,
         timestamp: now,
       });
-      this.currentStats = { ...stats }; // 現在の統計情報を保持
+      this.currentStats = { ...stats }; // Keep current stats
     }
     return stats;
   }
@@ -53,7 +52,7 @@ class ZapSubscriptionManager {
         displayZapStats(this.currentStats);
       }
     } catch (error) {
-      console.error("Zap統計の更新に失敗:", error);
+      console.error("Failed to update Zap stats:", error);
     }
   }
 
@@ -61,26 +60,26 @@ class ZapSubscriptionManager {
     if (!this.zapEventsCache.some((e) => e.id === event.id)) {
       this.zapEventsCache.push(event);
 
-      // 作成日時でソート
+      // Sort by creation date
       this.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
-      // インデックスを取得し、maxCount以内の場合のみ表示
+      // Get index and display if within maxCount
       const index = this.zapEventsCache.findIndex((e) => e.id === event.id);
       if (index < maxCount) {
         try {
           await replacePlaceholderWithZap(event, index);
 
-          // インデックスが変わった可能性があるため、再描画
+          // Re-render if index might have changed
           if (index < maxCount) {
             await renderZapListFromCache(this.zapEventsCache, maxCount);
           }
         } catch (error) {
-          console.error("Zap表示の更新に失敗:", error);
+          console.error("Failed to update Zap display:", error);
         }
       }
 
       if (this.zapEventsCache.length >= maxCount) {
-        poolManager.closeSubscription('zap'); // この行を修正
+        poolManager.closeSubscription('zap'); // Modify this line
       }
     }
   }
@@ -113,7 +112,7 @@ class ZapSubscriptionManager {
 
     poolManager.subscribeToRealTime(config, decoded, {
       onevent: (event) => this.handleRealTimeEvent(event),
-      oneose: () => console.log("リアルタイムZapのEOSEを受信。")
+      oneose: () => console.log("Received EOSE for real-time Zap.")
     });
   }
 }
@@ -137,21 +136,21 @@ export async function fetchLatestZaps() {
     await (hasCache ? handleCachedZaps(config) : initializeNewFetch(config));
 
     if (subscriptionManager.zapEventsCache.length === 0) {
-      showNoZapsMessage(); // 新しい関数を呼び出す
+      showNoZapsMessage(); // Call new function
     }
   } catch (error) {
-    console.error("Zap取得中にエラーが発生しました:", error);
+    console.error("Error occurred while fetching Zaps:", error);
   }
 }
 
 async function handleCachedZaps(config) {
-  // 統計情報の取得を先に開始
+  // Start fetching stats first
   const statsPromise = subscriptionManager.getZapStats(config.identifier);
 
-  // UIの描画を並列で実行
+  // Render UI in parallel
   await renderZapListFromCache(subscriptionManager.zapEventsCache, config.maxCount);
 
-  // 統計情報の取得完了を待つ
+  // Wait for stats to be fetched
   const stats = await statsPromise;
   if (stats) displayZapStats(stats);
 }

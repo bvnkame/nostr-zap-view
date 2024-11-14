@@ -1,7 +1,7 @@
 import { decode as decodeBolt11 } from "light-bolt11-decoder";
 import * as NostrTools from "nostr-tools";
 
-// アプリケーションの設定を集約
+// Aggregate application settings
 export const APP_CONFIG = {
   LIBRARIES: {
     decodeBolt11,
@@ -10,22 +10,22 @@ export const APP_CONFIG = {
   DEFAULT_OPTIONS: {
     theme: "light",
     maxCount: 5,
-    colorMode: true,  // 追加: カラーモードのデフォルト値
+    colorMode: true,  // Added: Default value for color mode
   },
 };
 
-// Zap関連の設定を修正
+// Modify Zap-related settings
 export const ZAP_CONFIG = {
-  SUBSCRIPTION_TIMEOUT: 20000,  // 変更: ネストを解除
-  DEFAULT_LIMIT: 1,            // 変更: ネストを解除
+  SUBSCRIPTION_TIMEOUT: 20000,  // Changed: Unnested
+  DEFAULT_LIMIT: 1,            // Changed: Unnested
   ERRORS: {
-    DIALOG_NOT_FOUND: "Zapダイアログが見つかりません",
-    BUTTON_NOT_FOUND: "取得ボタンが見つかりません",
-    DECODE_FAILED: "識別子のデコードに失敗しました",
+    DIALOG_NOT_FOUND: "Zap dialog not found",
+    BUTTON_NOT_FOUND: "Fetch button not found",
+    DECODE_FAILED: "Failed to decode identifier",
   },
 };
 
-// プロフィール管理の設定
+// Profile management settings
 export const PROFILE_CONFIG = {
   BATCH_SIZE: 20,
   BATCH_DELAY: 100,
@@ -35,7 +35,7 @@ export const PROFILE_CONFIG = {
 export class ZapConfig {
   constructor(identifier, maxCount, relayUrls) {
     this.identifier = identifier;
-    // maxCountが不正な値の場合は初期値を使用
+    // Use default value if maxCount is invalid
     this.maxCount = this.validateMaxCount(maxCount) ? maxCount : APP_CONFIG.DEFAULT_OPTIONS.maxCount;
     this.relayUrls = relayUrls;
   }
@@ -49,7 +49,7 @@ export class ZapConfig {
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
     return new ZapConfig(
       button.getAttribute("data-identifier"),
-      maxCount,  // parseIntの結果がNaNの場合も含めてconstructorで処理
+      maxCount,  // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
   }

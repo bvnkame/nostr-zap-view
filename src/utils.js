@@ -1,13 +1,13 @@
 import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 
-// 定数定義
+// Define constants
 const CONSTANTS = {
   CACHE_MAX_SIZE: 1000,
-  DEFAULT_ERROR_MESSAGE: "処理に失敗しました",
+  DEFAULT_ERROR_MESSAGE: "Processing failed",
   SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent"],
 };
 
-// キャッシュマネージャー
+// Cache manager
 class CacheManager {
   constructor(maxSize = CONSTANTS.CACHE_MAX_SIZE) {
     this.cache = new Map();
@@ -31,11 +31,11 @@ class CacheManager {
   }
 }
 
-// 共有キャッシュインスタンス
+// Shared cache instances
 const decodedCache = new CacheManager();
 const imageCache = new CacheManager();
 
-// バリデーションユーティリティ
+// Validation utilities
 const Validator = {
   isValidIdentifier: (identifier) => typeof identifier === "string" && identifier.length > 0,
   isValidCount: (count) => typeof count === "number" && count > 0,
@@ -52,7 +52,7 @@ const Validator = {
   },
 };
 
-// デコード関連の関数
+// Decoding related functions
 export function decodeIdentifier(identifier, maxCount) {
   const cacheKey = `${identifier}:${maxCount}`;
 
@@ -79,7 +79,7 @@ function safeNip19Decode(identifier) {
   try {
     return window.NostrTools.nip19.decode(identifier);
   } catch (error) {
-    console.error("識別子のデコードに失敗:", error);
+    console.error("Failed to decode identifier:", error);
     return null;
   }
 }
@@ -94,26 +94,26 @@ function createReqFromType(type, data, maxCount) {
 
   const reqCreator = reqMap[type];
   if (!reqCreator) {
-    console.error("未対応の識別子タイプ:", type);
+    console.error("Unsupported identifier type:", type);
     return null;
   }
 
   return { req: reqCreator() };
 }
 
-// 数値フォーマットのヘルパー関数を追加
+// Add helper function for number formatting
 export function formatNumber(num) {
   return new Intl.NumberFormat().format(num);
 }
 
-// 24時間以内かどうかをチェックする関数を追加
+// Add function to check if within 24 hours
 export function isWithin24Hours(timestamp) {
   const now = Math.floor(Date.now() / 1000);
   const hours24 = 24 * 60 * 60;
   return now - timestamp < hours24;
 }
 
-// formatNpub関数を汎用的な関数に変更
+// Change formatNpub function to a generic function
 export function formatIdentifier(identifier) {
   const decoded = safeNip19Decode(identifier);
   if (!decoded) return identifier;
@@ -134,7 +134,7 @@ export async function fetchZapStats(identifier) {
     const stats = await fetchZapStatsFromApi(identifier, decoded);
     return formatZapStats(stats);
   } catch (error) {
-    console.error("Zap統計の取得に失敗:", error);
+    console.error("Failed to fetch Zap stats:", error);
     return null;
   }
 }
@@ -150,13 +150,13 @@ async function fetchZapStatsFromApi(identifier, decoded) {
 
 function formatZapStats(responseData) {
   if (!responseData?.stats) {
-    console.error("無効なAPIレスポース形式:", responseData);
+    console.error("Invalid API response format:", responseData);
     return null;
   }
 
   const stats = Object.values(responseData.stats)[0];
   if (!stats) {
-    console.error("Zap統計が見つかりません");
+    console.error("Zap stats not found");
     return null;
   }
 
@@ -187,7 +187,7 @@ export function parseDescriptionTag(event) {
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
-    // 制御文字を削除
+    // Remove control characters
     const sanitizedDescription = descriptionTag.replace(/[\u0000-\u001F\u007F]/g, "");
     const parsed = JSON.parse(sanitizedDescription);
     return { pubkey: parsed.pubkey, content: parsed.content || "" };
@@ -211,7 +211,7 @@ export async function parseBolt11(event) {
   }
 }
 
-// 画像関連の関数
+// Image related functions
 export async function preloadImage(url) {
   if (!url || !Validator.isValidUrl(url)) return null;
   if (imageCache.has(url)) return imageCache.get(url);
@@ -242,7 +242,7 @@ export function escapeHTML(str) {
   return div.innerHTML;
 }
 
-// NIP-05検証関数を追加
+// Add NIP-05 verification function
 export async function verifyNip05(nip05, pubkey) {
   if (!nip05 || !pubkey) return null;
 
@@ -250,7 +250,7 @@ export async function verifyNip05(nip05, pubkey) {
     const profile = await window.NostrTools.nip05.queryProfile(nip05);
     return profile?.pubkey === pubkey ? nip05 : null;
   } catch (error) {
-    console.error("NIP-05検証エラー:", error);
+    console.error("NIP-05 verification error:", error);
     return null;
   }
 }

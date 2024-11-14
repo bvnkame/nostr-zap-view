@@ -5,25 +5,25 @@ import { createDialog } from "./UIManager.js";
 import { profileManager } from "./ProfileManager.js";
 import { zapPool } from "./ZapPool.js";
 
-// アプリケーションの初期化
+// Initialize the application
 function initializeApp() {
-  // グローバルライブラリの設定
+  // Set global libraries
   Object.entries(APP_CONFIG.LIBRARIES).forEach(([key, value]) => {
     window[key] = value;
   });
 
-  // UIの初期設定
+  // Initial UI setup
   createDialog();
 
-  // イベントリスナーの設定
+  // Set event listeners
   const fetchButton = document.querySelector("button[data-identifier]");
   if (fetchButton) {
     fetchButton.addEventListener("click", fetchLatestZaps);
   }
 }
 
-// アプリケーションの実行
+// Run the application
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-// 公開API
+// Public API
 export { ZAP_CONFIG as CONFIG, profileManager, zapPool, APP_CONFIG };

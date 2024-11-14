@@ -264,20 +264,20 @@
 /* Import colors.css at the beginning */
 @import url("./colors.css");
 
-/* ベーススケルトンスタイル */
+/* Base skeleton style */
 .skeleton {
   color: transparent;
   border-radius: 2px;
 }
 
-/* 統計情報用スケルトン */
+/* Skeleton for stats */
 .stats-skeleton {
   background-color: var(--zap-stats-skeleton-bg);
   height: 23px;
   width: 100px;
 }
 
-/* Zapイベント用スケルトン */
+/* Skeleton for Zap events */
 .zap-list-item .skeleton {
   background-color: var(--hover-bg);
   opacity: 0.8;
