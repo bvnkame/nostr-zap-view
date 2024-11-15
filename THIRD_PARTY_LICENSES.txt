@@ -1,0 +1,33 @@
+Third-Party Licenses
+
+1. light-bolt11-decoder
+   License: MIT
+   URL: https://github.com/fiatjaf/light-bolt11-decoder
+
+2. nostr-tools
+   License: Unlicense
+   URL: https://github.com/nbd-wtf/nostr-tools
+
+3. css-loader
+   License: MIT
+   URL: https://github.com/webpack-contrib/css-loader
+
+3. to-string-loader
+   License: BSD-3-Clause
+   URL: https://github.com/gajus/to-string-loader
+
+4. webpack
+   License: MIT
+   URL: https://github.com/webpack/webpack
+
+5. webpack-cli
+   License: MIT
+   URL: https://github.com/webpack/webpack-cli
+
+6. noble-curves
+   License: MIT
+   URL: https://github.com/paulmillr/noble-curves
+
+7. scure-base
+   License: MIT
+   URL: https://github.com/paulmillr/scure-base

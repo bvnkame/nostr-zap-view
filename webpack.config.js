@@ -1,4 +1,5 @@
 const path = require("path");
+const TerserPlugin = require("terser-webpack-plugin");
 
 module.exports = {
   entry: "./src/index.js",
@@ -13,7 +14,7 @@ module.exports = {
     rules: [
       {
         test: /\.css$/,
-        use: ['to-string-loader', 'css-loader']
+        use: ["to-string-loader", "css-loader"],
       },
       {
         test: /\.svg$/,
@@ -23,5 +24,23 @@ module.exports = {
   },
   resolve: {
     modules: [path.resolve(__dirname, "src"), "node_modules"],
+  },
+  optimization: {
+    minimize: true,
+    minimizer: [
+      new TerserPlugin({
+        terserOptions: {
+          format: {
+            comments: false,
+          },
+          compress: {
+            drop_console: true,
+          },
+        },
+        extractComments: {
+          condition: false,
+        },
+      }),
+    ],
   },
 };

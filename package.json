@@ -1,8 +1,11 @@
 {
   "name": "nostr-zap-view",
   "version": "0.1.0",
-  "description": "A module to manage and display Zaps.",
+  "description": "View any nostr npub or note zaps from anywhere.",
   "main": "dist/index.js",
+  "author": "Lokuyow",
+  "license": "MIT",
+  "homepage": "https://lokuyow.github.io/",
   "scripts": {
     "build": "webpack --config webpack.config.js",
     "test": "jest",
@@ -18,9 +21,6 @@
     "bitcoin",
     "lightning"
   ],
-  "author": "Lokuyow",
-  "license": "MIT",
-  "homepage": "https://lokuyow.github.io/",
   "bugs": {
     "url": "https://github.com/Lokuyow/nostr-zap-view/issues"
   },
@@ -33,10 +33,13 @@
   },
   "devDependencies": {
     "css-loader": "^7.1.2",
-    "style-loader": "^4.0.0",
     "to-string-loader": "^1.2.0",
-    "url-loader": "^4.1.1",
     "webpack": "^5.96.1",
     "webpack-cli": "^5.1.4"
-  }
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.txt"
+  ]
 }
