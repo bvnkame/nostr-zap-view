@@ -1,6 +1,8 @@
+# WIP
+
 # nostr-zap-view
 
-View any nostr zaps from anywhere. Supports npub, nprofile, note, and nevent identifiers.
+View any nostr zaps from anywhere, supporting npub, nprofile, note, and nevent identifiers.
 
 ## Usage
 
@@ -19,7 +21,7 @@ To configure a button for displaying zap information, use the following attribut
   data-max-count="6"
   data-zap-color-mode="true"
   data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">
-  Zap View 👀
+  View Zaps 👀
 </button>
 ```
 
