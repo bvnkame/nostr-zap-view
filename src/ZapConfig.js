@@ -29,7 +29,7 @@ export const ZAP_CONFIG = {
 export const PROFILE_CONFIG = {
   BATCH_SIZE: 20,
   BATCH_DELAY: 100,
-  RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band"],
+  RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band", "wss://nostr.wine"],
 };
 
 export class ZapConfig {

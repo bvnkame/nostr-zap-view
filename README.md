@@ -1,7 +1,5 @@
 # nostr-zap-view
 
-<!-- [![NPM](https://img.shields.io/npm/v/nostr-zap-view.svg)](https://www.npmjs.com/package/nostr-zap-view) -->
-
 View any nostr zaps from anywhere. Supports npub, nprofile, note, and nevent identifiers.
 
 ## Usage
