@@ -234,6 +234,12 @@ class ZapDialog extends HTMLElement {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
+    // Remove "No Zaps" message if it exists
+    const noZapsMessage = list.querySelector('.no-zaps-message');
+    if (noZapsMessage) {
+      list.innerHTML = '';
+    }
+
     await this.#prefetchProfiles([event]);
 
     const zapInfo = await this.#extractZapInfo(event);
