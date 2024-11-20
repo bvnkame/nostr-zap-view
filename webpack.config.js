@@ -1,5 +1,6 @@
 const path = require("path");
 const TerserPlugin = require("terser-webpack-plugin");
+const fs = require("fs");
 
 module.exports = {
   entry: "./src/index.js",
@@ -37,7 +38,12 @@ module.exports = {
             drop_console: true,
           },
         },
-        extractComments: false,
+        extractComments: {
+          condition: "some",
+          banner: () => {
+            return fs.readFileSync(path.resolve(__dirname, "LICENSE"), "utf8");
+          },
+        },
       }),
     ],
   },
