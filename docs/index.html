@@ -174,9 +174,9 @@
           const pre = this.nextElementSibling;
           const code = pre.querySelector("code");
           navigator.clipboard.writeText(code.innerText).then(() => {
-            button.textContent = "コピーしました！";
+            button.textContent = "Copied!";
             setTimeout(() => {
-              button.textContent = "コピー";
+              button.textContent = "Copy";
             }, 2000);
           });
         });
