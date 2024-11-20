@@ -39,7 +39,7 @@
   },
   "files": [
     "dist/",
-    "LICENSE",
+    "/LICENSE",
     "THIRD_PARTY_LICENSES.txt"
   ]
 }
