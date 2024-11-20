@@ -160,7 +160,9 @@ class ZapDialog extends HTMLElement {
   }
 
   #isColorModeEnabled() {
-    const button = document.querySelector("button[data-identifier]");
+    // Fix: Get the correct button for this dialog using viewId
+    const viewId = this.getAttribute("data-view-id");
+    const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
     const colorModeAttr = button?.getAttribute("data-zap-color-mode");
     return !colorModeAttr || !["true", "false"].includes(colorModeAttr) 
       ? APP_CONFIG.DEFAULT_OPTIONS.colorMode 
@@ -250,7 +252,8 @@ class ZapDialog extends HTMLElement {
   showDialog() {
     const dialog = this.#getElement(".zap-dialog");
     if (dialog && !dialog.open) {
-      const fetchButton = document.querySelector("button[data-identifier]");
+      const viewId = this.getAttribute("data-view-id");
+      const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
       if (fetchButton) {
         const title = this.#getElement(".dialog-title");
         const customTitle = fetchButton.getAttribute("data-title");
@@ -389,30 +392,37 @@ class ZapDialog extends HTMLElement {
 customElements.define("zap-dialog", ZapDialog);
 
 // Simplified external API
-export const createDialog = () => {
-  if (!document.querySelector("zap-dialog")) {
-    document.body.appendChild(document.createElement("zap-dialog"));
+export const createDialog = (viewId) => {
+  if (!document.querySelector(`zap-dialog[data-view-id="${viewId}"]`)) {
+    const dialog = document.createElement("zap-dialog");
+    dialog.setAttribute("data-view-id", viewId);
+    document.body.appendChild(dialog);
   }
 };
 
-export const { closeDialog, showDialog, initializeZapPlaceholders, initializeZapStats, replacePlaceholderWithZap, renderZapListFromCache, prependZap, displayZapStats } = (() => {
-  const getDialog = () => document.querySelector("zap-dialog");
+// UIの操作関数を修正してviewIdを使用
+export const {
+  closeDialog,
+  showDialog,
+  initializeZapPlaceholders,
+  initializeZapStats,
+  replacePlaceholderWithZap,
+  renderZapListFromCache,
+  prependZap,
+  displayZapStats,
+  showNoZapsMessage  // ここに統合
+} = (() => {
+  const getDialog = (viewId) => document.querySelector(`zap-dialog[data-view-id="${viewId}"]`);
 
   return {
-    closeDialog: () => getDialog()?.closeDialog(),
-    showDialog: () => getDialog()?.showDialog(),
-    initializeZapPlaceholders: (maxCount) => getDialog()?.initializeZapPlaceholders(maxCount),
-    initializeZapStats: () => getDialog()?.initializeZapStats(),
-    replacePlaceholderWithZap: (event, index) => getDialog()?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: (cache, max) => getDialog()?.renderZapListFromCache(cache, max),
-    prependZap: (event) => getDialog()?.prependZap(event),
-    displayZapStats: (stats) => getDialog()?.displayZapStats(stats),
+    closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),
+    showDialog: (viewId) => getDialog(viewId)?.showDialog(),
+    initializeZapPlaceholders: (maxCount, viewId) => getDialog(viewId)?.initializeZapPlaceholders(maxCount),
+    initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
+    replacePlaceholderWithZap: (event, index, viewId) => getDialog(viewId)?.replacePlaceholderWithZap(event, index),
+    renderZapListFromCache: (cache, max, viewId) => getDialog(viewId)?.renderZapListFromCache(cache, max),
+    prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event),
+    displayZapStats: (stats, viewId) => getDialog(viewId)?.displayZapStats(stats),
+    showNoZapsMessage: (viewId) => getDialog(viewId)?.showNoZapsMessage(),
   };
 })();
-
-export async function showNoZapsMessage() {
-  const dialog = document.querySelector("zap-dialog");
-  if (dialog) {
-    dialog.showNoZapsMessage();
-  }
-}

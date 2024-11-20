@@ -5,37 +5,48 @@ class ZapPoolManager {
   constructor() {
     this.zapPool = new SimplePool();
     this.profilePool = new SimplePool();
-    this.subscriptions = { zap: null, realTime: null };
-    this.state = { isZapClosed: false };
+    this.subscriptions = new Map(); // 複数のビューをサポートするためにMapに変更
+    this.state = new Map(); // 状態も複数管理
   }
 
-  closeSubscription(type = 'zap') {
-    if (this.subscriptions[type] && !this.state.isZapClosed) {
-      this.subscriptions[type].close();
+  closeSubscription(viewId, type = 'zap') {
+    const subs = this.subscriptions.get(viewId);
+    const state = this.state.get(viewId);
+    
+    if (subs?.[type] && !state?.isZapClosed) {
+      subs[type].close();
       if (type === 'zap') {
-        this.state.isZapClosed = true;
+        state.isZapClosed = true;
       }
     }
   }
 
-  subscribeToZaps(config, decoded, handlers) {
-    this.closeSubscription('zap');
-    this.state.isZapClosed = false;
+  subscribeToZaps(viewId, config, decoded, handlers) {
+    this.closeSubscription(viewId, 'zap');
+    
+    if (!this.subscriptions.has(viewId)) {
+      this.subscriptions.set(viewId, { zap: null, realTime: null });
+      this.state.set(viewId, { isZapClosed: false });
+    }
 
-    this.subscriptions.zap = this.zapPool.subscribeMany(
+    const state = this.state.get(viewId);
+    state.isZapClosed = false;
+
+    const subs = this.subscriptions.get(viewId);
+    subs.zap = this.zapPool.subscribeMany(
       config.relayUrls,
-      [{ ...decoded.req }],
+      [{ ...decoded.req }],  // Fix: Make sure decoded.req is an array
       handlers
     );
 
-    // Set timeout to close subscription
-    setTimeout(() => this.closeSubscription('zap'), CONFIG.SUBSCRIPTION_TIMEOUT);
+    setTimeout(() => this.closeSubscription(viewId, 'zap'), CONFIG.SUBSCRIPTION_TIMEOUT);
   }
 
-  subscribeToRealTime(config, decoded, handlers) {
-    if (this.subscriptions.realTime) return;
+  subscribeToRealTime(viewId, config, decoded, handlers) {
+    const subs = this.subscriptions.get(viewId);
+    if (!subs || subs.realTime) return;  // Fix: Check if subs exists
 
-    this.subscriptions.realTime = this.zapPool.subscribeMany(
+    subs.realTime = this.zapPool.subscribeMany(
       config.relayUrls,
       [{
         ...decoded.req,

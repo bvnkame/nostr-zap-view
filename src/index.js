@@ -20,6 +20,14 @@ function initializeApp() {
   if (fetchButton) {
     fetchButton.addEventListener("click", fetchLatestZaps);
   }
+
+  // 各ZapボタンにユニークなビューIDを割り当て
+  document.querySelectorAll("button[data-identifier]").forEach((button, index) => {
+    const viewId = `zap-view-${index}`;
+    button.setAttribute("data-zap-view-id", viewId);
+    createDialog(viewId);
+    button.addEventListener("click", fetchLatestZaps);
+  });
 }
 
 // Run the application
