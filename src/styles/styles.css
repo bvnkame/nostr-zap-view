@@ -189,6 +189,7 @@
   width: 8px;
   height: 8px;
   background-color: var(--new-mark);
+  border: 1px solid #fff;
   border-radius: 50%;
   z-index: 1;
   animation: pulse 2500ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
