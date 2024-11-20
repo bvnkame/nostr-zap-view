@@ -4,22 +4,151 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>nostr zap view</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css" />
+    <style>
+      .code-block {
+        position: relative;
+        margin: 1em 0;
+      }
+      .copy-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 6px 12px;
+        background: #4b5563;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        z-index: 10;
+      }
+      .copy-button:hover {
+        background: #374151;
+        transform: translateY(-1px);
+      }
+      .copy-button:active {
+        transform: translateY(1px);
+      }
+      pre {
+        position: relative;
+        background: #f5f5f5;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e0e0e0;
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      code {
+        font-family: Consolas, Monaco, "Courier New", monospace;
+        font-size: 13px;
+      }
+    </style>
   </head>
   <body>
     <header>
       <h1>nostr zap view</h1>
     </header>
     <main>
+      <h2>Zap any user and view the Zap</h2>
       <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap Me ⚡️</button>
-
       <button data-title="" data-identifier="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View Zaps 👀</button>
 
       <br />
       <br />
+      <br />
 
-      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap to nostr-zap-view ⚡️</button>
+      <h2>Zap any content linked to any note and view the Zap</h2>
+      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap nostr-zap-view ⚡️</button>
 
       <button data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View Zaps 👀</button>
+      <br />
+      <br />
+      <div>note:</div>
+      <div id="nostr-embed-note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg"></div>
+      <script>
+        !(function () {
+          const n = document.createElement("script");
+          n.type = "text/javascript";
+          n.async = !0;
+          n.src = "https://cdn.jsdelivr.net/gh/nostrband/nostr-embed@0.1.16/dist/nostr-embed.js";
+          const options = { showZaps: true, showCopyAddr: false, hideNostrich: false, showFollowing: true };
+          n.onload = function () {
+            nostrEmbed.init("note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg", "#nostr-embed-note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg", "", options);
+          };
+          const a = document.getElementsByTagName("script")[0];
+          a.parentNode.insertBefore(n, a);
+        })();
+      </script>
+
+      <br />
+      <br />
+
+      <h2>Button design example</h2>
+
+      <div style="display: inline-flex; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1)">
+        <button style="background: #374151; border: none; border-right: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#4B5563'" onmouseout="this.style.background='#374151'" onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'" data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap</button>
+        <button style="background: #374151; border: none; color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#4B5563'" onmouseout="this.style.background='#374151'" onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'" data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View</button>
+      </div>
+
+      <div class="code-block">
+        <button class="copy-button">コピー</button>
+        <pre><code class="language-html">&lt;div style="display: inline-flex; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);"&gt;
+  &lt;button style="
+    background: #374151;
+    border: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    color: #FFFFFF;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    min-width: 60px;
+    height: 32px;
+    transition: all 0.15s ease;"
+    onmouseover="this.style.background='#4B5563'"
+    onmouseout="this.style.background='#374151'"
+    onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'"
+    onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'"
+    data-npub="npub1..." 
+    data-note-id="nevent1..." 
+    data-relays="wss://relay.nostr.band,...">Zap&lt;/button&gt;
+  &lt;button style="
+    background: #374151;
+    border: none;
+    color: #FFFFFF;
+    padding: 8px 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    min-width: 60px;
+    height: 32px;
+    transition: all 0.15s ease;"
+    onmouseover="this.style.background='#4B5563'"
+    onmouseout="this.style.background='#374151'"
+    onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'"
+    onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'"
+    data-title="To nostr-zap-view" 
+    data-identifier="nevent1..." 
+    data-max-count="6" 
+    data-zap-color-mode="true" 
+    data-relay-urls="wss://relay.nostr.band,...">View&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+      </div>
     </main>
 
     <br />
@@ -30,6 +159,23 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/nostr-zap@1.1.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.1.2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.2.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script>
+      hljs.highlightAll();
+
+      document.querySelectorAll(".copy-button").forEach((button) => {
+        button.addEventListener("click", function () {
+          const pre = this.nextElementSibling;
+          const code = pre.querySelector("code");
+          navigator.clipboard.writeText(code.innerText).then(() => {
+            button.textContent = "コピーしました！";
+            setTimeout(() => {
+              button.textContent = "コピー";
+            }, 2000);
+          });
+        });
+      });
+    </script>
   </body>
 </html>
