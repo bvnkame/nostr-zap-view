@@ -6,6 +6,9 @@
     <title>nostr zap view</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/default.min.css" />
     <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      }
       .code-block {
         position: relative;
         margin: 1em 0;
@@ -50,22 +53,24 @@
   <body>
     <header>
       <h1>nostr zap view</h1>
+      <p>Example page</p>
     </header>
     <main>
-      <h2>Zap any user and view the Zap</h2>
-      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap Me ⚡️</button>
-      <button data-title="" data-identifier="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View Zaps 👀</button>
+      <h2>Zap any user and view the zap</h2>
+      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap Me ⚡️</button>
+      <button data-title="" data-identifier="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-max-count="8" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View zaps 👀</button>
 
       <br />
       <br />
-      <br />
 
-      <h2>Zap any content linked to any note and view the Zap</h2>
-      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap nostr-zap-view ⚡️</button>
+      <h2>Zap any note and view the zap</h2>
+      <button data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap nostr-zap-view ⚡️</button>
 
-      <button data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View Zaps 👀</button>
+      <button data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="8" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View zaps 👀</button>
+
       <br />
       <br />
+      
       <div>note:</div>
       <div id="nostr-embed-note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg"></div>
       <script>
@@ -89,15 +94,15 @@
       <h2>Button design example</h2>
 
       <div style="display: inline-flex; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1)">
-        <button style="background: #374151; border: none; border-right: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#4B5563'" onmouseout="this.style.background='#374151'" onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'" data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap</button>
-        <button style="background: #374151; border: none; color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#4B5563'" onmouseout="this.style.background='#374151'" onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'" data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="6" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View</button>
+        <button style="background: #4B5563; border: none; border-right: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#6B7280'" onmouseout="this.style.background='#4B5563'" onmousedown="this.style.background='#374151';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#6B7280';this.style.transform='translateY(0)'" data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3" data-note-id="note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg" data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">Zap</button>
+        <button style="background: #4B5563; border: none; color: #ffffff; padding: 8px 16px; text-align: center; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; cursor: pointer; letter-spacing: 0.5px; min-width: 60px; height: 32px; transition: all 0.15s ease" onmouseover="this.style.background='#6B7280'" onmouseout="this.style.background='#4B5563'" onmousedown="this.style.background='#374151';this.style.transform='translateY(1px)'" onmouseup="this.style.background='#6B7280';this.style.transform='translateY(0)'" data-title="To nostr-zap-view" data-identifier="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv" data-max-count="8" data-zap-color-mode="true" data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">View</button>
       </div>
 
       <div class="code-block">
-        <button class="copy-button">コピー</button>
+        <button class="copy-button">Copy</button>
         <pre><code class="language-html">&lt;div style="display: inline-flex; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);"&gt;
   &lt;button style="
-    background: #374151;
+    background: #4B5563;
     border: none;
     border-right: 1px solid rgba(255, 255, 255, 0.15);
     color: #FFFFFF;
@@ -114,15 +119,15 @@
     min-width: 60px;
     height: 32px;
     transition: all 0.15s ease;"
-    onmouseover="this.style.background='#4B5563'"
-    onmouseout="this.style.background='#374151'"
-    onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'"
-    onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'"
+    onmouseover="this.style.background='#6B7280'"
+    onmouseout="this.style.background='#4B5563'"
+    onmousedown="this.style.background='#374151';this.style.transform='translateY(1px)'"
+    onmouseup="this.style.background='#6B7280';this.style.transform='translateY(0)'"
     data-npub="npub1..." 
-    data-note-id="nevent1..." 
+    data-note-id="note1..." 
     data-relays="wss://relay.nostr.band,...">Zap&lt;/button&gt;
   &lt;button style="
-    background: #374151;
+    background: #4B5563;
     border: none;
     color: #FFFFFF;
     padding: 8px 16px;
@@ -138,13 +143,13 @@
     min-width: 60px;
     height: 32px;
     transition: all 0.15s ease;"
-    onmouseover="this.style.background='#4B5563'"
-    onmouseout="this.style.background='#374151'"
-    onmousedown="this.style.background='#1F2937';this.style.transform='translateY(1px)'"
-    onmouseup="this.style.background='#4B5563';this.style.transform='translateY(0)'"
+    onmouseover="this.style.background='#6B7280'"
+    onmouseout="this.style.background='#4B5563'"
+    onmousedown="this.style.background='#374151';this.style.transform='translateY(1px)'"
+    onmouseup="this.style.background='#6B7280';this.style.transform='translateY(0)'"
     data-title="To nostr-zap-view" 
     data-identifier="nevent1..." 
-    data-max-count="6" 
+    data-max-count="8" 
     data-zap-color-mode="true" 
     data-relay-urls="wss://relay.nostr.band,...">View&lt;/button&gt;
 &lt;/div&gt;</code></pre>
@@ -159,7 +164,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/nostr-zap@1.1.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.2.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.2.1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script>
       hljs.highlightAll();

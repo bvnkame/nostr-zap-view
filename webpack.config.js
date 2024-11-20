@@ -31,15 +31,13 @@ module.exports = {
       new TerserPlugin({
         terserOptions: {
           format: {
-            comments: false,
+            comments: /@license/i,
           },
           compress: {
             drop_console: true,
           },
         },
-        extractComments: {
-          condition: false,
-        },
+        extractComments: false,
       }),
     ],
   },
