@@ -28,3 +28,5 @@ Add this script tag right before the bottom closing body tag.
 ```js
 <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.1.2"></script>
 ```
+
+Example page: https://lokuyow.github.io/nostr-zap-view/
