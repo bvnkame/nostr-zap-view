@@ -1,6 +1,5 @@
-# WIP
-
 # nostr-zap-view
+[![NPM](https://img.shields.io/npm/v/nostr-zap-view.svg)](https://www.npmjs.com/package/nostr-zap-view)
 
 View any nostr zaps from anywhere, supporting npub, nprofile, note, and nevent identifiers.
 
@@ -17,7 +16,7 @@ To configure a button for displaying zap information, use the following attribut
 ```html
 <button
   data-title=""
-  data-identifier="npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m"
+  data-identifier="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
   data-max-count="6"
   data-zap-color-mode="true"
   data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.wine,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">
@@ -27,5 +26,5 @@ To configure a button for displaying zap information, use the following attribut
 
 Add this script tag right before the bottom closing body tag.
 ```js
-<script src="xxx"></script>
+<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.1.0"></script>
 ```
