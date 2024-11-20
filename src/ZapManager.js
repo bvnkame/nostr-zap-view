@@ -48,20 +48,26 @@ class ZapSubscriptionManager {
 
   async updateStatsFromZapEvent(event, viewId) {
     const state = this.getOrCreateViewState(viewId);
-    if (!state.currentStats) return;
+    if (!state.currentStats) {
+      state.currentStats = { count: 0, msats: 0, maxMsats: 0 };
+    }
 
     try {
       const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
       if (!bolt11Tag) return;
 
       const decoded = window.decodeBolt11(bolt11Tag);
-      const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
+      const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
 
-      if (amountMsat) {
-        state.currentStats.count++;
-        state.currentStats.msats += Math.floor(amountMsat / 1000) * 1000;
-        state.currentStats.maxMsats = Math.max(state.currentStats.maxMsats, amountMsat);
-        displayZapStats(state.currentStats);
+      if (amountMsats > 0) {
+        // Update current stats
+        state.currentStats = {
+          count: (state.currentStats.count || 0) + 1,
+          msats: (state.currentStats.msats || 0) + amountMsats,
+          maxMsats: Math.max(state.currentStats.maxMsats || 0, amountMsats)
+        };
+
+        displayZapStats(state.currentStats, viewId);
       }
     } catch (error) {
       console.error("Failed to update Zap stats:", error);
