@@ -329,6 +329,21 @@ class ZapDialog extends HTMLElement {
     const statsDiv = this.#getElement(".zap-stats");
     if (!statsDiv) return;
 
+    if (stats.timeout) {
+      statsDiv.innerHTML = `
+        <div class="stats-item">Total Count</div>
+        <div class="stats-item"><span class="number text-muted">nostr.band</span></div>
+        <div class="stats-item">times</div>
+        <div class="stats-item">Total Amount</div>
+        <div class="stats-item"><span class="number text-muted">Stats</span></div>
+        <div class="stats-item">sats</div>
+        <div class="stats-item">Max Amount</div>
+        <div class="stats-item"><span class="number text-muted">Unavailable</span></div>
+        <div class="stats-item">sats</div>
+      `;
+      return;
+    }
+
     statsDiv.innerHTML = `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number">${formatNumber(stats.count)}</span></div>

@@ -135,12 +135,12 @@ export async function fetchZapStats(identifier) {
     return formatZapStats(stats);
   } catch (error) {
     console.error("Failed to fetch Zap stats:", error);
-    return null;
+    return error.message === 'TIMEOUT' ? { timeout: true } : null;
   }
 }
 
 async function fetchZapStatsFromApi(identifier, decoded) {
-  const { type, data } = decoded;
+  const { type } = decoded;
   const isProfile = type === "npub" || type === "nprofile";
   const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
 
@@ -152,6 +152,11 @@ async function fetchZapStatsFromApi(identifier, decoded) {
       signal: controller.signal 
     });
     return response.json();
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('TIMEOUT');
+    }
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -180,7 +185,7 @@ export function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.displayName || profile?.name || "nameless";
 }
 
-export async function parseZapEvent(event, defaultIcon) {
+export async function parseZapEvent(event) {
   const { pubkey, content } = await parseDescriptionTag(event);
   const satsText = await parseBolt11(event);
 
