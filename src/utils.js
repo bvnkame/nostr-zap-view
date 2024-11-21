@@ -144,8 +144,17 @@ async function fetchZapStatsFromApi(identifier, decoded) {
   const isProfile = type === "npub" || type === "nprofile";
   const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
 
-  const response = await fetch(endpoint);
-  return response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const response = await fetch(endpoint, { 
+      signal: controller.signal 
+    });
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function formatZapStats(responseData) {
