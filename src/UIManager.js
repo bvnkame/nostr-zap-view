@@ -197,38 +197,81 @@ class ZapDialog extends HTMLElement {
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!placeholder) return;
-
-    await this.#prefetchProfiles([event]);
-
-    const zapInfo = await this.#extractZapInfo(event);
-    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-    placeholder.innerHTML = this.#createZapHTML(zapInfo);
-    placeholder.removeAttribute("data-index");
+  
+    try {
+      // プレースホルダーを保持したまま新しい要素を準備
+      await this.#prefetchProfiles([event]);
+      const zapInfo = await this.#extractZapInfo(event);
+      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      
+      // 新しい要素を作成
+      const tempContainer = document.createElement('div');
+      tempContainer.innerHTML = this.#createZapHTML(zapInfo);
+      const newContent = tempContainer.firstElementChild;
+      
+      // クラスを設定
+      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+      
+      // 内容を置き換え
+      placeholder.innerHTML = newContent.outerHTML;
+      placeholder.removeAttribute("data-index");
+    } catch (error) {
+      console.error("Failed to replace placeholder:", error);
+    }
   }
-
+  
   async renderZapListFromCache(zapEventsCache, maxCount) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
-
-    const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at).slice(0, maxCount);
-    await this.#prefetchProfiles(sortedZaps);
-
-    const fragment = document.createDocumentFragment();
-    const zapInfoPromises = sortedZaps.map((event) => this.#extractZapInfo(event));
-    const zapInfos = await Promise.all(zapInfoPromises);
-
-    zapInfos.forEach((zapInfo) => {
-      const li = document.createElement("li");
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-      li.innerHTML = this.#createZapHTML(zapInfo);
-      fragment.appendChild(li);
-    });
-
-    list.innerHTML = "";
-    list.appendChild(fragment);
+  
+    try {
+      const sortedZaps = [...zapEventsCache]
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, maxCount);
+  
+      // プロファイル情報を先に取得
+      await this.#prefetchProfiles(sortedZaps);
+  
+      // 既存のプレースホルダーの状態を保存
+      const existingPlaceholders = new Map(
+        Array.from(list.querySelectorAll('[data-index]'))
+          .map(el => [el.getAttribute('data-index'), el])
+      );
+  
+      // すべてのZap情報を並行して準備
+      const zapInfos = await Promise.all(
+        sortedZaps.map(async (event, index) => {
+          const zapInfo = await this.#extractZapInfo(event);
+          return { zapInfo, index };
+        })
+      );
+  
+      // DOMの更新を一括で行う
+      const fragment = document.createDocumentFragment();
+      zapInfos.forEach(({ zapInfo, index }) => {
+        const existingPlaceholder = existingPlaceholders.get(String(index));
+        const li = existingPlaceholder || document.createElement("li");
+        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+        
+        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+        li.innerHTML = this.#createZapHTML(zapInfo);
+        
+        if (existingPlaceholder) {
+          li.removeAttribute("data-index");
+        }
+        
+        fragment.appendChild(li);
+      });
+  
+      // リストを一括更新
+      list.innerHTML = '';
+      list.appendChild(fragment);
+  
+    } catch (error) {
+      console.error("Failed to render zap list:", error);
+    }
   }
+  
 
   async prependZap(event) {
     const list = this.#getElement(".dialog-zap-list");

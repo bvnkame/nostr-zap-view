@@ -91,30 +91,34 @@ class ZapSubscriptionManager {
   async handleZapEvent(event, maxCount, viewId) {
     const state = this.getOrCreateViewState(viewId);
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
-      // 履歴データはisRealTimeEventをfalseに設定
       event.isRealTimeEvent = false;
       state.zapEventsCache.push(event);
 
-      // Sort by creation date
+      // ソートを確実に行う
       state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
-      // Get index and display if within maxCount
-      const index = state.zapEventsCache.findIndex((e) => e.id === event.id);
-      if (index < maxCount) {
-        try {
-          await replacePlaceholderWithZap(event, index, viewId); // Add viewId parameter
-
-          // Re-render if index might have changed
-          if (index < maxCount) {
-            await renderZapListFromCache(state.zapEventsCache, maxCount, viewId); // Add viewId parameter
-          }
-        } catch (error) {
-          console.error("Failed to update Zap display:", error);
+      try {
+        // インデックスを取得
+        const index = state.zapEventsCache.findIndex((e) => e.id === event.id);
+        
+        if (index < maxCount) {
+          // まずプレースホルダーを置き換え
+          await replacePlaceholderWithZap(event, index, viewId);
+          
+          // 少し待ってからリストを完全に更新
+          await new Promise(resolve => setTimeout(resolve, 50));
+          await renderZapListFromCache(state.zapEventsCache, maxCount, viewId);
         }
+
+        // 統計情報を更新
+        await this.updateStatsFromZapEvent(event, viewId);
+        
+      } catch (error) {
+        console.error("Failed to update Zap display:", error);
       }
 
       if (state.zapEventsCache.length >= maxCount) {
-        poolManager.closeSubscription(viewId, 'zap'); // Add viewId parameter
+        poolManager.closeSubscription(viewId, 'zap');
       }
     }
   }
@@ -165,13 +169,21 @@ class ZapSubscriptionManager {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    poolManager.subscribeToZaps(viewId, config, decoded, {
-      onevent: (event) => this.handleZapEvent(event, config.maxCount, viewId),
-      oneose: () => {
-        const state = this.getOrCreateViewState(viewId);
-        state.isInitialFetchComplete = true;
-        this.initializeRealTimeSubscription(config, viewId);
-      }
+    // 初期化時にキャッシュをクリア
+    const state = this.getOrCreateViewState(viewId);
+    state.isInitialFetchComplete = false;
+
+    return new Promise((resolve) => {
+      poolManager.subscribeToZaps(viewId, config, decoded, {
+        onevent: async (event) => {
+          await this.handleZapEvent(event, config.maxCount, viewId);
+        },
+        oneose: () => {
+          state.isInitialFetchComplete = true;
+          this.initializeRealTimeSubscription(config, viewId);
+          resolve();
+        }
+      });
     });
   }
 
