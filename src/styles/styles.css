@@ -255,7 +255,8 @@
 }
 
 .no-zaps-message {
-  padding: 30px;
+  margin-top: 20px;
+  margin-bottom: 35px;
   text-align: center;
   color: var(--pubkey-text);
   font-size: 1.4rem;
