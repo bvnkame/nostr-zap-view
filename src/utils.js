@@ -135,7 +135,7 @@ export async function fetchZapStats(identifier) {
     return formatZapStats(stats);
   } catch (error) {
     console.error("Failed to fetch Zap stats:", error);
-    return error.message === 'TIMEOUT' ? { timeout: true } : null;
+    return { error: true, timeout: error.message === 'TIMEOUT' };
   }
 }
 

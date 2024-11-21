@@ -243,7 +243,8 @@ export async function fetchLatestZaps(event) {
 
     await (hasCache ? handleCachedZaps(viewId, config) : initializeNewFetch(viewId, config));
 
-    if (viewState.zapEventsCache.length === 0) {
+    // Only show "No Zaps" message if there are actually no zaps in the cache
+    if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
       showNoZapsMessage(viewId);
     }
   } catch (error) {
@@ -255,23 +256,32 @@ async function handleCachedZaps(viewId, config) {
   const viewState = subscriptionManager.getOrCreateViewState(viewId);
   const stats = await subscriptionManager.getZapStats(config.identifier, viewId);
   
-  // キャッシュされたZapイベントの統計を更新
-  const updatedStats = await subscriptionManager.updateStatsFromCachedEvents(viewState, stats);
+  // 統計情報の表示とイベントの表示を分離
+  if (!stats?.error) {
+    const updatedStats = await subscriptionManager.updateStatsFromCachedEvents(viewState, stats);
+    displayZapStats(updatedStats, viewId);
+  } else {
+    displayZapStats({ timeout: stats.timeout }, viewId); // タイムアウト表示用
+  }
 
-  await Promise.all([
-    renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId),
-    displayZapStats(updatedStats, viewId)
-  ]);
+  // Zapイベントのレンダリングは統計情報のエラーに関係なく実行
+  await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
 }
 
 async function initializeNewFetch(viewId, config) {
   initializeZapPlaceholders(config.maxCount, viewId); // Fix: Add viewId
   initializeZapStats(viewId); // Fix: Add viewId
 
-  const [zapStats] = await Promise.all([
+  // 統計情報の取得とサブスクリプションの初期化を並行実行
+  const [zapStats, ] = await Promise.all([
     subscriptionManager.getZapStats(config.identifier, viewId),
     subscriptionManager.initializeSubscriptions(config, viewId)
   ]);
 
-  if (zapStats) displayZapStats(zapStats, viewId); // Fix: Add viewId
+  // 統計情報の表示（エラー時は代替表示）
+  if (!zapStats?.error) {
+    displayZapStats(zapStats, viewId);
+  } else {
+    displayZapStats({ timeout: zapStats.timeout }, viewId);
+  }
 }
