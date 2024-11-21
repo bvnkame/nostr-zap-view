@@ -10,14 +10,14 @@ export const APP_CONFIG = {
   DEFAULT_OPTIONS: {
     theme: "light",
     maxCount: 5,
-    colorMode: true,  // Added: Default value for color mode
+    colorMode: true, // Added: Default value for color mode
   },
 };
 
 // Modify Zap-related settings
 export const ZAP_CONFIG = {
-  SUBSCRIPTION_TIMEOUT: 20000,  // Changed: Unnested
-  DEFAULT_LIMIT: 1,            // Changed: Unnested
+  SUBSCRIPTION_TIMEOUT: 20000, // Changed: Unnested
+  DEFAULT_LIMIT: 1, // Changed: Unnested
   ERRORS: {
     DIALOG_NOT_FOUND: "Zap dialog not found",
     BUTTON_NOT_FOUND: "Fetch button not found",
@@ -29,19 +29,27 @@ export const ZAP_CONFIG = {
 export const PROFILE_CONFIG = {
   BATCH_SIZE: 20,
   BATCH_DELAY: 100,
-  RELAYS: ["wss://purplepag.es", "wss://directory.yabu.me", "wss://relay.nostr.band", "wss://nostr.wine"],
+  RELAYS: [
+    "wss://relay.nostr.band",
+    "wss://purplepag.es",
+    "wss://relay.damus.io",
+    "wss://nostr.wine",
+    "wss://directory.yabu.me",
+  ],
 };
 
 export class ZapConfig {
   constructor(identifier, maxCount, relayUrls) {
     this.identifier = identifier;
     // Use default value if maxCount is invalid
-    this.maxCount = this.validateMaxCount(maxCount) ? maxCount : APP_CONFIG.DEFAULT_OPTIONS.maxCount;
+    this.maxCount = this.validateMaxCount(maxCount)
+      ? maxCount
+      : APP_CONFIG.DEFAULT_OPTIONS.maxCount;
     this.relayUrls = relayUrls;
   }
 
   validateMaxCount(count) {
-    return typeof count === 'number' && !isNaN(count) && count > 0;
+    return typeof count === "number" && !isNaN(count) && count > 0;
   }
 
   static fromButton(button) {
@@ -49,7 +57,7 @@ export class ZapConfig {
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
     return new ZapConfig(
       button.getAttribute("data-identifier"),
-      maxCount,  // Handle parseInt result in constructor even if NaN
+      maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
   }
