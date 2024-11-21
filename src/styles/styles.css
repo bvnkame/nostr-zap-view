@@ -277,7 +277,7 @@
 .stats-skeleton {
   background-color: var(--zap-stats-skeleton-bg);
   height: 23px;
-  width: 100px;
+  width: 110px;
 }
 
 /* Skeleton for Zap events */
