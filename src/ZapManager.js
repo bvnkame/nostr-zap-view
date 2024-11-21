@@ -31,27 +31,29 @@ class ZapSubscriptionManager {
     const cached = state.zapStatsCache.get(identifier);
     const now = Date.now();
 
-    // Return cache if valid
-    if (cached && now - cached.timestamp < 300000) { // 5 minutes
+    // キャッシュが有��な場合はそれを使用
+    if (cached && now - cached.timestamp < 300000) { // 5分間
       state.currentStats = {
-        count: cached.stats.count || 0,
-        msats: cached.stats.msats || 0,
-        maxMsats: cached.stats.maxMsats || 0
+        count: cached.stats.count ?? 0,
+        msats: cached.stats.msats ?? 0,
+        maxMsats: cached.stats.maxMsats ?? 0
       };
       return cached.stats;
     }
 
     const stats = await fetchZapStats(identifier);
+    // 統計値が`0`の場合でも正しく初期化
+    state.currentStats = {
+      count: stats?.count ?? 0,
+      msats: stats?.msats ?? 0,
+      maxMsats: stats?.maxMsats ?? 0
+    };
+
     if (stats) {
       state.zapStatsCache.set(identifier, {
         stats,
         timestamp: now,
       });
-      state.currentStats = {
-        count: stats.count || 0,
-        msats: stats.msats || 0,
-        maxMsats: stats.maxMsats || 0
-      };
     }
     return stats;
   }
@@ -93,26 +95,15 @@ class ZapSubscriptionManager {
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = false;
       state.zapEventsCache.push(event);
-
-      // ソートを確実に行う
       state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
       try {
-        // インデックスを取得
         const index = state.zapEventsCache.findIndex((e) => e.id === event.id);
-        
         if (index < maxCount) {
-          // まずプレースホルダーを置き換え
           await replacePlaceholderWithZap(event, index, viewId);
-          
-          // 少し待ってからリストを完全に更新
           await new Promise(resolve => setTimeout(resolve, 50));
           await renderZapListFromCache(state.zapEventsCache, maxCount, viewId);
         }
-
-        // 統計情報を更新
-        await this.updateStatsFromZapEvent(event, viewId);
-        
       } catch (error) {
         console.error("Failed to update Zap display:", error);
       }
@@ -135,10 +126,10 @@ class ZapSubscriptionManager {
         const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
         if (bolt11Tag) {
           const decoded = window.decodeBolt11(bolt11Tag);
-          const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
+          const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
 
           if (amountMsats > 0) {
-            // currentStatsの初期化を確認
+            // currentStatsが未定義の場合は初期化
             if (!state.currentStats) {
               state.currentStats = {
                 count: 0,
@@ -147,12 +138,10 @@ class ZapSubscriptionManager {
               };
             }
 
-            // 統計情報を更新
-            state.currentStats = {
-              count: state.currentStats.count + 1,
-              msats: state.currentStats.msats + amountMsats,
-              maxMsats: Math.max(state.currentStats.maxMsats, amountMsats)
-            };
+            // 統計情報を更新（`||`を使用せず直接加算）
+            state.currentStats.count += 1;
+            state.currentStats.msats += amountMsats;
+            state.currentStats.maxMsats = Math.max(state.currentStats.maxMsats, amountMsats);
 
             displayZapStats(state.currentStats, viewId);
           }
@@ -199,9 +188,9 @@ class ZapSubscriptionManager {
 
   async updateStatsFromCachedEvents(viewState, stats) {
     viewState.currentStats = {
-      count: stats?.count || 0,
-      msats: stats?.msats || 0,
-      maxMsats: stats?.maxMsats || 0
+      count: stats?.count ?? 0,
+      msats: stats?.msats ?? 0,
+      maxMsats: stats?.maxMsats ?? 0
     };
 
     // リアルタイムフラグが付いているイベントのみを処理
@@ -213,7 +202,7 @@ class ZapSubscriptionManager {
         if (!bolt11Tag) continue;
 
         const decoded = window.decodeBolt11(bolt11Tag);
-        const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
+        const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
 
         if (amountMsats > 0) {
           viewState.currentStats = {
@@ -268,16 +257,50 @@ async function handleCachedZaps(viewId, config) {
   const viewState = subscriptionManager.getOrCreateViewState(viewId);
   const stats = await subscriptionManager.getZapStats(config.identifier, viewId);
   
-  // 統計情報の表示とイベントの表示を分離
   if (!stats?.error) {
-    const updatedStats = await subscriptionManager.updateStatsFromCachedEvents(viewState, stats);
+    // リアルタイムイベントを含むすべてのZapイベントから統計を再計算
+    const updatedStats = await recalculateStatsFromAllEvents(viewState, stats);
     displayZapStats(updatedStats, viewId);
   } else {
-    displayZapStats({ timeout: stats.timeout }, viewId); // タイムアウト表示用
+    displayZapStats({ timeout: stats.timeout }, viewId);
   }
 
-  // Zapイベントのレンダリングは統計情報のエラーに関係なく実行
   await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+}
+
+// 新しい関数: すべてのZapイベントから統計を再計算
+async function recalculateStatsFromAllEvents(viewState, baseStats) {
+  // 基本の統計情報を初期化（nostr.bandからの統計）
+  let currentStats = {
+    count: baseStats?.count || 0,
+    msats: baseStats?.msats || 0,
+    maxMsats: baseStats?.maxMsats || 0
+  };
+
+  // リアルタイムイベントのみを処理
+  const realtimeEvents = viewState.zapEventsCache.filter(event => event.isRealTimeEvent === true);
+
+  for (const event of realtimeEvents) {
+    try {
+      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+      if (!bolt11Tag) continue;
+
+      const decoded = window.decodeBolt11(bolt11Tag);
+      const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
+
+      if (amountMsats > 0) {
+        currentStats.count++;
+        currentStats.msats += amountMsats;
+        currentStats.maxMsats = Math.max(currentStats.maxMsats, amountMsats);
+      }
+    } catch (error) {
+      console.error("Failed to process Zap event for stats:", error);
+    }
+  }
+
+  // 更新された統計情報をキャッシュに保存
+  viewState.currentStats = currentStats;
+  return currentStats;
 }
 
 async function initializeNewFetch(viewId, config) {
