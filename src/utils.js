@@ -145,7 +145,7 @@ async function fetchZapStatsFromApi(identifier, decoded) {
   const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 2000);
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
 
   try {
     const response = await fetch(endpoint, { 
