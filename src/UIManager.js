@@ -234,10 +234,10 @@ class ZapDialog extends HTMLElement {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    // Remove "No Zaps" message if it exists
+    // "No Zaps" メッセージが存在する場合、メッセージのみを削除
     const noZapsMessage = list.querySelector('.no-zaps-message');
     if (noZapsMessage) {
-      list.innerHTML = '';
+      noZapsMessage.remove();
     }
 
     await this.#prefetchProfiles([event]);
