@@ -228,7 +228,7 @@ export async function fetchLatestZaps(event) {
     const viewId = button.getAttribute("data-zap-view-id");
     if (!viewId) throw new Error("Missing view ID");
 
-    const zapDialog = document.querySelector(`zap-dialog[data-view-id="${viewId}"]`);
+    const zapDialog = document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
     if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
     const config = ZapConfig.fromButton(button);

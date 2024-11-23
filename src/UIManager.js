@@ -4,7 +4,7 @@ import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
 import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage, escapeHTML } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 
-class ZapDialog extends HTMLElement {
+class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
     return ["data-theme", "data-max-count"];
   }
@@ -73,7 +73,7 @@ class ZapDialog extends HTMLElement {
   #setupTemplate() {
     const template = document.createElement("template");
     template.innerHTML = `
-      <dialog class="zap-dialog">
+      <dialog class="dialog">
         <h2 class="dialog-title"></h2>
         <button class="close-dialog-button">X</button>
         <div class="zap-stats"></div>
@@ -84,7 +84,7 @@ class ZapDialog extends HTMLElement {
   }
 
   #setupEventListeners() {
-    const dialog = this.#getElement(".zap-dialog");
+    const dialog = this.#getElement(".dialog");
     const closeButton = this.#getElement(".close-dialog-button");
 
     closeButton.addEventListener("click", () => this.closeDialog());
@@ -92,7 +92,7 @@ class ZapDialog extends HTMLElement {
   }
 
   #onDialogClick(event) {
-    if (event.target === this.#getElement(".zap-dialog")) {
+    if (event.target === this.#getElement(".dialog")) {
       this.closeDialog();
     }
   }
@@ -299,7 +299,7 @@ class ZapDialog extends HTMLElement {
 
   // Public API
   showDialog() {
-    const dialog = this.#getElement(".zap-dialog");
+    const dialog = this.#getElement(".dialog");
     if (dialog && !dialog.open) {
       const viewId = this.getAttribute("data-view-id");
       const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
@@ -320,7 +320,7 @@ class ZapDialog extends HTMLElement {
   }
 
   closeDialog() {
-    const dialog = this.#getElement(".zap-dialog");
+    const dialog = this.#getElement(".dialog");
     if (dialog?.open) dialog.close();
   }
 
@@ -351,7 +351,7 @@ class ZapDialog extends HTMLElement {
   }
 
   initializeZapStats() {
-    const dialog = this.#getElement(".zap-dialog");
+    const dialog = this.#getElement(".dialog");
     const statsDiv = this.#getElement(".zap-stats");
     if (!dialog || !statsDiv) return;
 
@@ -453,12 +453,12 @@ class ZapDialog extends HTMLElement {
   }
 }
 
-customElements.define("zap-dialog", ZapDialog);
+customElements.define("nostr-zap-view-dialog", NostrZapViewDialog);
 
 // Simplified external API
 export const createDialog = (viewId) => {
-  if (!document.querySelector(`zap-dialog[data-view-id="${viewId}"]`)) {
-    const dialog = document.createElement("zap-dialog");
+  if (!document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`)) {
+    const dialog = document.createElement("nostr-zap-view-dialog");
     dialog.setAttribute("data-view-id", viewId);
     document.body.appendChild(dialog);
   }
@@ -476,7 +476,7 @@ export const {
   displayZapStats,
   showNoZapsMessage  // ここに統合
 } = (() => {
-  const getDialog = (viewId) => document.querySelector(`zap-dialog[data-view-id="${viewId}"]`);
+  const getDialog = (viewId) => document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
 
   return {
     closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),

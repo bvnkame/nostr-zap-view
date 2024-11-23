@@ -45,7 +45,7 @@
   box-sizing: border-box;
 }
 
-.zap-dialog {
+.dialog {
   font-family: var(--main-font);
   color: var(--main-text);
   font-size: medium;

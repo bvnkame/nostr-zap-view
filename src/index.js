@@ -23,7 +23,7 @@ function initializeApp() {
 
   // 各ZapボタンにユニークなビューIDを割り当て
   document.querySelectorAll("button[data-identifier]").forEach((button, index) => {
-    const viewId = `zap-view-${index}`;
+    const viewId = `nostr-zap-view-${index}`;  // オプション: より一貫性のある名前に変更
     button.setAttribute("data-zap-view-id", viewId);
     createDialog(viewId);
     button.addEventListener("click", fetchLatestZaps);
