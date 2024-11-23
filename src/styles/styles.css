@@ -271,6 +271,23 @@
 .skeleton {
   color: transparent;
   border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--zap-stats-skeleton-bg) 0%,
+    var(--hover-bg) 50%,
+    var(--zap-stats-skeleton-bg) 100%
+  );
+  background-size: 200% 100%;
+  animation: loading-animation 1.5s infinite;
+}
+
+@keyframes loading-animation {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Skeleton for stats */
