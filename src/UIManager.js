@@ -295,7 +295,14 @@ class NostrZapViewDialog extends HTMLElement {
     const referenceHTML = reference ? `
       <div class="zap-reference">
         <div class="reference-icon">↪</div>
-        <div class="reference-content">${escapeHTML(reference.content)}</div>
+        <div class="reference-content">
+          <div class="reference-text">${escapeHTML(reference.content)}</div>
+          <a href="https://njump.me/${window.NostrTools.nip19.neventEncode({
+            id: reference.id,
+            kind: reference.kind,
+            pubkey: reference.pubkey,
+          })}" target="_blank" class="reference-link">Link</a>
+        </div>
       </div>
     ` : '';
 

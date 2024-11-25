@@ -373,11 +373,30 @@ button {
 }
 
 .reference-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.reference-text {
+  font-size: 0.8125rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
   margin: 4px 0;
+}
+
+.reference-link {
+  flex-shrink: 0;
+  margin-left: 8px;
+  padding-left: 8px;
+  color: var(--pubkey-text);
+  text-decoration: none;
+  border-left: 1px solid var(--border);
+}
+
+.reference-link:hover {
+  text-decoration: underline;
 }
