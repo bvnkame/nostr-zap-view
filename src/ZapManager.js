@@ -57,6 +57,7 @@ class ZapSubscriptionManager {
 
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = true;
+      event.isStatsCalculated = false; // 初期状態は未計算
       state.zapEventsCache.unshift(event);
 
       try {
@@ -66,21 +67,10 @@ class ZapSubscriptionManager {
           const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
 
           if (amountMsats > 0) {
-            // currentStatsが未定義の場合は初期化
-            if (!state.currentStats) {
-              state.currentStats = {
-                count: 0,
-                msats: 0,
-                maxMsats: 0
-              };
-            }
-
-            // 統計情報を更新（`||`を使用せず直接加算）
-            state.currentStats.count += 1;
-            state.currentStats.msats += amountMsats;
-            state.currentStats.maxMsats = Math.max(state.currentStats.maxMsats, amountMsats);
-
-            displayZapStats(state.currentStats, viewId);
+            const updatedStats = await statsManager.incrementStats(state.currentStats, amountMsats, viewId);
+            state.currentStats = updatedStats;
+            displayZapStats(updatedStats, viewId);
+            event.isStatsCalculated = true; // 計算済みフラグを設定
           }
         }
 
@@ -95,9 +85,14 @@ class ZapSubscriptionManager {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    // 初期化時にキャッシュをクリア
     const state = this.getOrCreateViewState(viewId);
     state.isInitialFetchComplete = false;
+
+    // 統計情報の初期化
+    state.currentStats = await statsManager.getZapStats(config.identifier, viewId);
+    if (!state.currentStats?.error) {
+      displayZapStats(state.currentStats, viewId);
+    }
 
     return new Promise((resolve) => {
       poolManager.subscribeToZaps(viewId, config, decoded, {

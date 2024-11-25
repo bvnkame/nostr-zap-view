@@ -70,11 +70,42 @@ export class StatsManager {
     const stats = Object.values(responseData.stats)[0];
     if (!stats) return null;
 
+    // 数値が未定義の場合は0として扱う
     return {
-      count: stats.zaps_received?.count || stats.zaps?.count || 0,
-      msats: stats.zaps_received?.msats || stats.zaps?.msats || 0,
-      maxMsats: stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0,
+      count: parseInt(stats.zaps_received?.count || stats.zaps?.count || 0, 10),
+      msats: parseInt(stats.zaps_received?.msats || stats.zaps?.msats || 0, 10),
+      maxMsats: parseInt(stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0, 10)
     };
+  }
+
+  async incrementStats(currentStats, amountMsats, viewId) {
+    // 現在の統計情報がない場合は新規作成
+    if (!currentStats) {
+      return {
+        count: 1,
+        msats: amountMsats,
+        maxMsats: amountMsats
+      };
+    }
+
+    // 既存の統計情報に加算
+    const updatedStats = {
+      count: currentStats.count + 1,
+      msats: currentStats.msats + amountMsats,
+      maxMsats: Math.max(currentStats.maxMsats, amountMsats)
+    };
+
+    // キャッシュを更新
+    const viewCache = this.getOrCreateViewCache(viewId);
+    const identifier = Array.from(viewCache.keys())[0]; // 現在のidentifierを取得
+    if (identifier) {
+      viewCache.set(identifier, {
+        stats: updatedStats,
+        timestamp: Date.now()
+      });
+    }
+
+    return updatedStats;
   }
 
   updateStats(currentStats, amountMsats) {
@@ -94,15 +125,16 @@ export class StatsManager {
   }
 
   recalculateStats(baseStats, events) {
-    // 基本の統計情報を初期化
     let stats = {
       count: baseStats?.count || 0,
       msats: baseStats?.msats || 0,
       maxMsats: baseStats?.maxMsats || 0
     };
 
-    // リアルタイムイベントのみを処理
-    const realtimeEvents = events.filter(event => event.isRealTimeEvent === true);
+    // リアルタイムイベントのみを処理し、未計算のものだけを加算
+    const realtimeEvents = events.filter(event => 
+      event.isRealTimeEvent === true && !event.isStatsCalculated
+    );
 
     for (const event of realtimeEvents) {
       const amountMsats = this.extractAmountFromEvent(event);
@@ -110,6 +142,7 @@ export class StatsManager {
         stats.count++;
         stats.msats += amountMsats;
         stats.maxMsats = Math.max(stats.maxMsats, amountMsats);
+        event.isStatsCalculated = true; // 計算済みフラグを設定
       }
     }
 
