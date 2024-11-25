@@ -175,6 +175,9 @@ class NostrZapViewDialog extends HTMLElement {
     try {
       // 基本情報を即時表示
       const zapInfo = await this.#extractZapInfo(event);
+      // イベントから参照情報を取得
+      zapInfo.reference = event.reference;  // この行を追加
+      
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
       placeholder.className = `zap-list-item ${colorClass}${
@@ -205,6 +208,9 @@ class NostrZapViewDialog extends HTMLElement {
       const fragment = document.createDocumentFragment();
       const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
+        // イベントから参照情報を取得
+        zapInfo.reference = event.reference;  // この行を追加
+        
         const li = document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
@@ -275,6 +281,7 @@ class NostrZapViewDialog extends HTMLElement {
     pubkey,
     created_at,
     displayIdentifier,
+    reference,  // Add reference parameter
   }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
@@ -283,6 +290,14 @@ class NostrZapViewDialog extends HTMLElement {
 
     // 常にimg要素を使用
     const iconHTML = `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
+
+    // Add reference content if available
+    const referenceHTML = reference ? `
+      <div class="zap-reference">
+        <div class="reference-icon">↪</div>
+        <div class="reference-content">${escapeHTML(reference.content)}</div>
+      </div>
+    ` : '';
 
     return `
       <div class="zap-sender${comment ? " with-comment" : ""}">
@@ -300,6 +315,7 @@ class NostrZapViewDialog extends HTMLElement {
           ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>`
           : ""
       }
+      ${referenceHTML}
     `;
   }
 

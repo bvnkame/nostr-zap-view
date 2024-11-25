@@ -356,3 +356,28 @@ button {
   margin-right: 16px;
   opacity: 0.4;
 }
+
+.zap-reference {
+  display: flex;
+  align-items: flex-start;
+  padding: 0 0 2px 48px;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--pubkey-text);
+}
+
+.reference-icon {
+  flex-shrink: 0;
+  margin-right: 8px;
+  opacity: 0.6;
+}
+
+.reference-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  margin: 4px 0;
+}

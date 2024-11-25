@@ -7,6 +7,7 @@ class ZapPoolManager {
     this.profilePool = new SimplePool();
     this.subscriptions = new Map(); // 複数のビューをサポートするためにMapに変更
     this.state = new Map(); // 状態も複数管理
+    // referencePoolを削除
   }
 
   closeSubscription(viewId, type = 'zap') {
@@ -55,6 +56,43 @@ class ZapPoolManager {
       }],
       handlers
     );
+  }
+
+  async fetchReference(relayUrls, eventId) {
+    return new Promise((resolve) => {
+      let resolved = false;
+      
+      const sub = this.zapPool.subscribeMany(
+        relayUrls,
+        [{
+          ids: [eventId]  // #eタグではなくidsで検索
+        }],
+        {
+          onevent: (event) => {
+            if (!resolved) {
+              resolved = true;
+              sub.close();
+              resolve(event);
+            }
+          },
+          oneose: () => {
+            if (!resolved) {
+              resolved = true;
+              resolve(null);
+            }
+          }
+        }
+      );
+
+      // タイムアウト設定
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          sub.close();
+          resolve(null);
+        }
+      }, CONFIG.SUBSCRIPTION_TIMEOUT);
+    });
   }
 }
 

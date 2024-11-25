@@ -7,6 +7,7 @@ import { statsManager } from "./StatsManager.js";
 class ZapSubscriptionManager {
   constructor() {
     this.viewStates = new Map(); // 各ビューの状態を管理
+    this.configStore = new Map(); // 設定を保存するためのMap
   }
 
   getOrCreateViewState(viewId) {
@@ -21,6 +22,16 @@ class ZapSubscriptionManager {
     return this.viewStates.get(viewId);
   }
 
+  // 新しいメソッド: configを保存
+  setViewConfig(viewId, config) {
+    this.configStore.set(viewId, config);
+  }
+
+  // 新しいメソッド: configを取得
+  getViewConfig(viewId) {
+    return this.configStore.get(viewId);
+  }
+
   clearCache(viewId) {
     const state = this.getOrCreateViewState(viewId);
     state.zapEventsCache = [];
@@ -31,6 +42,21 @@ class ZapSubscriptionManager {
     const state = this.getOrCreateViewState(viewId);
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = false;
+      
+      // Add reference handling
+      const eTag = event.tags.find(tag => tag[0] === 'e');
+      const config = this.getViewConfig(viewId);
+
+      if (eTag && this.shouldShowReference(config?.identifier)) {
+        const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+
+        console.log("Reference:", reference);
+        
+        if (reference) {
+          event.reference = reference;
+        }
+      }
+
       state.zapEventsCache.push(event);
       state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
@@ -49,6 +75,11 @@ class ZapSubscriptionManager {
         poolManager.closeSubscription(viewId, 'zap');
       }
     }
+  }
+
+  shouldShowReference(identifier) {
+    if (!identifier) return false;
+    return identifier.startsWith('npub1') || identifier.startsWith('nprofile1');
   }
 
   async handleRealTimeEvent(event, viewId) {
@@ -87,6 +118,9 @@ class ZapSubscriptionManager {
   async initializeSubscriptions(config, viewId) {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+
+    // configを保存
+    this.setViewConfig(viewId, config);
 
     const state = this.getOrCreateViewState(viewId);
     state.isInitialFetchComplete = false;
@@ -150,6 +184,7 @@ export async function fetchLatestZaps(event) {
     if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
     const config = ZapConfig.fromButton(button);
+    subscriptionManager.setViewConfig(viewId, config); // configを保存
     const viewState = subscriptionManager.getOrCreateViewState(viewId);
     const hasCache = viewState.zapEventsCache.length > 0;
 
