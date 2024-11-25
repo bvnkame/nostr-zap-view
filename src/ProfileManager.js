@@ -174,8 +174,10 @@ export class ProfileManager {
 
         if (nip05Result) {
           const formattedNip05 = nip05Result.startsWith("_@") ? nip05Result.slice(1) : nip05Result;
-          this.nip05Cache.set(pubkey, formattedNip05);
-          return formattedNip05;
+          // エスケープしてからキャッシュに保存
+          const escapedNip05 = this._escapeHTML(formattedNip05);
+          this.nip05Cache.set(pubkey, escapedNip05);
+          return escapedNip05;
         } else {
           this.nip05Cache.set(pubkey, null);
           return null;
@@ -191,6 +193,12 @@ export class ProfileManager {
 
     this.nip05PendingFetches.set(pubkey, fetchPromise);
     return fetchPromise;
+  }
+
+  _escapeHTML(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   _resolvePromise(pubkey, profile) {
@@ -227,16 +235,16 @@ export class ProfileManager {
 
   /**
    * Get NIP-05 address
-   * Returns cached verified NIP-05 address
+   * Returns cached verified and escaped NIP-05 address
    * @param {string} pubkey - Public key
-   * @returns {string|null} Verified NIP-05 address
+   * @returns {string|null} Verified and escaped NIP-05 address
    */
   getNip05(pubkey) {
     const nip05 = this.nip05Cache.get(pubkey);
     if (!nip05) return null;
 
-    // Remove _ if it starts with _@
-    return nip05.startsWith("_@") ? nip05.slice(1) : nip05;
+    // キャッシュに保存時点でエスケープ済みなので、そのまま返す
+    return nip05;
   }
 }
 
