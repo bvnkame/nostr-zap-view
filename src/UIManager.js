@@ -2,7 +2,6 @@ import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
 import {
-  formatNumber,
   formatIdentifier,
   parseZapEvent,
   getProfileDisplayName,
