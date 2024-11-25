@@ -122,65 +122,6 @@ export function formatIdentifier(identifier) {
   return `${type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
 }
 
-export async function fetchZapStats(identifier) {
-  if (!Validator.isValidIdentifier(identifier)) {
-    throw new Error(CONFIG.ERRORS.DECODE_FAILED);
-  }
-
-  const decoded = safeNip19Decode(identifier);
-  if (!decoded) return null;
-
-  try {
-    const stats = await fetchZapStatsFromApi(identifier, decoded);
-    return formatZapStats(stats);
-  } catch (error) {
-    console.error("Failed to fetch Zap stats:", error);
-    return { error: true, timeout: error.message === 'TIMEOUT' };
-  }
-}
-
-async function fetchZapStatsFromApi(identifier, decoded) {
-  const { type } = decoded;
-  const isProfile = type === "npub" || type === "nprofile";
-  const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
-
-  try {
-    const response = await fetch(endpoint, { 
-      signal: controller.signal 
-    });
-    return response.json();
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      throw new Error('TIMEOUT');
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-function formatZapStats(responseData) {
-  if (!responseData?.stats) {
-    console.error("Invalid API response format:", responseData);
-    return null;
-  }
-
-  const stats = Object.values(responseData.stats)[0];
-  if (!stats) {
-    console.error("Zap stats not found");
-    return null;
-  }
-
-  return {
-    count: stats.zaps_received?.count || stats.zaps?.count || 0,
-    msats: stats.zaps_received?.msats || stats.zaps?.msats || 0,
-    maxMsats: stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0,
-  };
-}
-
 export function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.displayName || profile?.name || "nameless";
 }

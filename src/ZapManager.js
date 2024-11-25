@@ -2,6 +2,7 @@ import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
 import { decodeIdentifier, fetchZapStats } from "./utils.js";
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { statsManager } from "./StatsManager.js";
 
 class ZapSubscriptionManager {
   constructor() {
@@ -31,23 +32,13 @@ class ZapSubscriptionManager {
     const cached = state.zapStatsCache.get(identifier);
     const now = Date.now();
 
-    // キャッシュが有��な場合はそれを使用
-    if (cached && now - cached.timestamp < 300000) { // 5分間
-      state.currentStats = {
-        count: cached.stats.count ?? 0,
-        msats: cached.stats.msats ?? 0,
-        maxMsats: cached.stats.maxMsats ?? 0
-      };
+    if (cached && now - cached.timestamp < 300000) {
+      state.currentStats = cached.stats;
       return cached.stats;
     }
 
-    const stats = await fetchZapStats(identifier);
-    // 統計値が`0`の場合でも正しく初期化
-    state.currentStats = {
-      count: stats?.count ?? 0,
-      msats: stats?.msats ?? 0,
-      maxMsats: stats?.maxMsats ?? 0
-    };
+    const stats = await statsManager.fetchStats(identifier);
+    state.currentStats = stats;
 
     if (stats) {
       state.zapStatsCache.set(identifier, {
@@ -60,33 +51,14 @@ class ZapSubscriptionManager {
 
   async updateStatsFromZapEvent(event, viewId) {
     const state = this.getOrCreateViewState(viewId);
-    // statsの初期化を確実に行う
     if (!state.currentStats) {
-      state.currentStats = {
-        count: 0,
-        msats: 0,
-        maxMsats: 0
-      };
+      state.currentStats = { count: 0, msats: 0, maxMsats: 0 };
     }
 
-    try {
-      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-      if (!bolt11Tag) return;
-
-      const decoded = window.decodeBolt11(bolt11Tag);
-      const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
-
-      if (amountMsats > 0) {
-        state.currentStats = {
-          count: state.currentStats.count + 1,
-          msats: state.currentStats.msats + amountMsats,
-          maxMsats: Math.max(state.currentStats.maxMsats, amountMsats)
-        };
-
-        displayZapStats(state.currentStats, viewId);
-      }
-    } catch (error) {
-      console.error("Failed to update Zap stats:", error);
+    const amountMsats = statsManager.extractAmountFromEvent(event);
+    if (amountMsats > 0) {
+      state.currentStats = statsManager.updateStats(state.currentStats, amountMsats);
+      displayZapStats(state.currentStats, viewId);
     }
   }
 
