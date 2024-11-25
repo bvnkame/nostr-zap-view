@@ -79,25 +79,15 @@ export class StatsManager {
   }
 
   async incrementStats(currentStats, amountMsats, viewId) {
-    // 現在の統計情報がない場合は新規作成
-    if (!currentStats) {
-      return {
-        count: 1,
-        msats: amountMsats,
-        maxMsats: amountMsats
-      };
-    }
-
-    // 既存の統計情報に加算
     const updatedStats = {
-      count: currentStats.count + 1,
-      msats: currentStats.msats + amountMsats,
-      maxMsats: Math.max(currentStats.maxMsats, amountMsats)
+      count: (currentStats?.count || 0) + 1,
+      msats: (currentStats?.msats || 0) + amountMsats,
+      maxMsats: Math.max(currentStats?.maxMsats || 0, amountMsats)
     };
 
     // キャッシュを更新
     const viewCache = this.getOrCreateViewCache(viewId);
-    const identifier = Array.from(viewCache.keys())[0]; // 現在のidentifierを取得
+    const identifier = Array.from(viewCache.keys())[0];
     if (identifier) {
       viewCache.set(identifier, {
         stats: updatedStats,
@@ -131,20 +121,15 @@ export class StatsManager {
       maxMsats: baseStats?.maxMsats || 0
     };
 
-    // リアルタイムイベントのみを処理し、未計算のものだけを加算
-    const realtimeEvents = events.filter(event => 
-      event.isRealTimeEvent === true && !event.isStatsCalculated
-    );
-
-    for (const event of realtimeEvents) {
-      const amountMsats = this.extractAmountFromEvent(event);
-      if (amountMsats > 0) {
+    // 未計算のリアルタイムイベントのみを処理
+    events.forEach(event => {
+      if (event.isRealTimeEvent && !event.isStatsCalculated && event.amountMsats > 0) {
         stats.count++;
-        stats.msats += amountMsats;
-        stats.maxMsats = Math.max(stats.maxMsats, amountMsats);
-        event.isStatsCalculated = true; // 計算済みフラグを設定
+        stats.msats += event.amountMsats;
+        stats.maxMsats = Math.max(stats.maxMsats, event.amountMsats);
+        event.isStatsCalculated = true;
       }
-    }
+    });
 
     return stats;
   }

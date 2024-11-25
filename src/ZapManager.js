@@ -57,7 +57,7 @@ class ZapSubscriptionManager {
 
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = true;
-      event.isStatsCalculated = false; // 初期状態は未計算
+      event.isStatsCalculated = false;
       state.zapEventsCache.unshift(event);
 
       try {
@@ -67,10 +67,13 @@ class ZapSubscriptionManager {
           const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
 
           if (amountMsats > 0) {
+            // 統計情報の更新処理を改善
+            state.currentStats = state.currentStats || { count: 0, msats: 0, maxMsats: 0 };
             const updatedStats = await statsManager.incrementStats(state.currentStats, amountMsats, viewId);
             state.currentStats = updatedStats;
             displayZapStats(updatedStats, viewId);
-            event.isStatsCalculated = true; // 計算済みフラグを設定
+            event.isStatsCalculated = true;
+            event.amountMsats = amountMsats; // 金額を保存
           }
         }
 
