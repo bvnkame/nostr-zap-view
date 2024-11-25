@@ -1,6 +1,6 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
-import defaultIcon from "./assets/nostr-icon-purple-on-white.svg";
+import defaultIcon from "./assets/nostr-icon.svg";
 import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage, escapeHTML } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 
