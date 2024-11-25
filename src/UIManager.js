@@ -110,23 +110,13 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  // Profile-related methods
-  async #updateZapDisplay(pubkey, zapInfo) {
-    const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-    elements.forEach(el => {
-      const zapItem = el.closest('.zap-list-item');
-      if (zapItem) {
-        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-        zapItem.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-        zapItem.innerHTML = this.#createZapHTML(zapInfo);
-      }
-    });
-  }
-
   async #extractZapInfo(event) {
-    const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
+    const { pubkey, content, satsText } = await parseZapEvent(
+      event,
+      defaultIcon
+    );
     const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-    
+
     // 基本情報のみを含む初期データ
     return {
       satsText,
@@ -134,7 +124,9 @@ class NostrZapViewDialog extends HTMLElement {
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
-      displayIdentifier: formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)),
+      displayIdentifier: formatIdentifier(
+        window.NostrTools.nip19.npubEncode(pubkey)
+      ),
       senderName: "anonymous",
       senderIcon: defaultIcon,
     };
@@ -149,17 +141,21 @@ class NostrZapViewDialog extends HTMLElement {
 
       const senderName = getProfileDisplayName(profile) || "nameless";
       // アイコン画像のプリロードを待つ
-      const senderIcon = profile.picture ? await preloadImage(profile.picture) : defaultIcon;
-      
+      const senderIcon = profile.picture
+        ? await preloadImage(profile.picture)
+        : defaultIcon;
+
       // プロフィール情報を更新
-      const nameElement = element.querySelector('.sender-name');
-      const iconContainer = element.querySelector('.sender-icon');
-      const pubkeyElement = element.querySelector('.sender-pubkey');
-      
+      const nameElement = element.querySelector(".sender-name");
+      const iconContainer = element.querySelector(".sender-icon");
+      const pubkeyElement = element.querySelector(".sender-pubkey");
+
       if (nameElement) nameElement.textContent = senderName;
       if (iconContainer) {
         // 常にimg要素を使用し、デフォルトアイコンをフォールバックとして設定
-        iconContainer.innerHTML = `<img src="${senderIcon}" alt="${escapeHTML(senderName)}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
+        iconContainer.innerHTML = `<img src="${senderIcon}" alt="${escapeHTML(
+          senderName
+        )}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
       }
 
       // NIP-05の取得と更新
@@ -181,8 +177,10 @@ class NostrZapViewDialog extends HTMLElement {
       // 基本情報を即時表示
       const zapInfo = await this.#extractZapInfo(event);
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      
-      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+
+      placeholder.className = `zap-list-item ${colorClass}${
+        zapInfo.comment ? " with-comment" : ""
+      }`;
       placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
       placeholder.innerHTML = this.#createZapHTML(zapInfo);
 
@@ -206,15 +204,17 @@ class NostrZapViewDialog extends HTMLElement {
 
       // 基本情報のみで表示を即時更新
       const fragment = document.createDocumentFragment();
-      const zapInfoPromises = sortedZaps.map(async event => {
+      const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
         const li = document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-        
-        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+
+        li.className = `zap-list-item ${colorClass}${
+          zapInfo.comment ? " with-comment" : ""
+        }`;
         li.setAttribute("data-pubkey", zapInfo.pubkey);
         li.innerHTML = this.#createZapHTML(zapInfo);
-        
+
         fragment.appendChild(li);
         return { li, pubkey: zapInfo.pubkey };
       });
@@ -233,18 +233,6 @@ class NostrZapViewDialog extends HTMLElement {
     } catch (error) {
       console.error("Failed to render zap list:", error);
     }
-  }
-
-  async #getDisplayIdentifier(pubkey) {
-    if (pubkey && profileManager) {
-      const nip05 = await profileManager.verifyNip05Async(pubkey);
-      if (nip05) {
-        return nip05;
-      } else {
-        return formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey));
-      }
-    }
-    return "unknown";
   }
 
   #getAmountColorClass(amount) {
@@ -293,7 +281,6 @@ class NostrZapViewDialog extends HTMLElement {
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
-    const colorClass = this.#getAmountColorClass(satsAmount);
 
     // 常にimg要素を使用
     const iconHTML = `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
@@ -477,85 +464,6 @@ class NostrZapViewDialog extends HTMLElement {
     if (list) {
       list.innerHTML = this.#createNoZapsMessage();
     }
-  }
-
-  // Profileロジックを分離
-  #profileManager = {
-    profiles: new Map(),
-    async init(pubkeys) {
-      const profiles = await profileManager.fetchProfiles(pubkeys);
-      this.profiles = new Map(
-        profiles.map((profile, index) => [pubkeys[index], profile])
-      );
-    },
-    getProfile(pubkey) {
-      return this.profiles.get(pubkey);
-    },
-    async verifyNip05(pubkey) {
-      return await profileManager.verifyNip05Async(pubkey);
-    },
-  };
-
-  // UI Components
-  #UIComponents = {
-    createNoZapsMessage: () => `
-      <div class="no-zaps-message">
-        No Zaps yet!<br>Send the first Zap!
-      </div>
-    `,
-
-    createPlaceholder: (index) => `
-      <li class="zap-list-item" data-index="${index}">
-        <div class="zap-sender">
-          <div class="zap-placeholder-icon skeleton"></div>
-          <div class="zap-placeholder-content">
-            <div class="zap-placeholder-name skeleton"></div>
-          </div>
-          <div class="zap-placeholder-amount skeleton"></div>
-        </div>
-        <div class="zap-placeholder-details">
-          <div class="zap-placeholder-comment skeleton"></div>
-        </div>
-      </li>
-    `,
-  };
-
-  // Style Management
-  #styleManager = {
-    getAmountColorClass: (amount, isColorModeEnabled) => {
-      if (!isColorModeEnabled) return "";
-
-      const thresholds = [
-        [10000, "zap-amount-10k"],
-        [5000, "zap-amount-5k"],
-        [2000, "zap-amount-2k"],
-        [1000, "zap-amount-1k"],
-        [500, "zap-amount-500"],
-        [200, "zap-amount-200"],
-        [100, "zap-amount-100"],
-      ];
-
-      for (const [threshold, className] of thresholds) {
-        if (amount >= threshold) return className;
-      }
-      return "";
-    },
-
-    applyTheme: (root, theme) => {
-      const themeClass = theme === "dark" ? "dark-theme" : "light-theme";
-      root.classList.add(themeClass);
-    },
-  };
-
-  // Event Handlers
-  #setupEventHandlers() {
-    const dialog = this.#getElement(".dialog");
-    const closeButton = this.#getElement(".close-dialog-button");
-
-    closeButton.addEventListener("click", () => this.closeDialog());
-    dialog.addEventListener("click", (e) => {
-      if (e.target === dialog) this.closeDialog();
-    });
   }
 }
 
