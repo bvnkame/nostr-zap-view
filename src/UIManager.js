@@ -12,6 +12,7 @@ import {
   escapeHTML,
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
+import { UIStatus } from "./UIStatus.js";
 
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
@@ -27,6 +28,7 @@ class NostrZapViewDialog extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this.uiStatus = null;
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -72,6 +74,7 @@ class NostrZapViewDialog extends HTMLElement {
     this.#setupStyles();
     this.#setupTemplate();
     this.#setupEventListeners();
+    this.uiStatus = new UIStatus(this.shadowRoot);
   }
 
   #setupStyles() {
@@ -396,28 +399,15 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   initializeZapStats() {
-    const dialog = this.#getElement(".dialog");
-    const statsDiv = this.#getElement(".zap-stats");
-    if (!dialog || !statsDiv) return;
-
-    statsDiv.innerHTML = `
-      <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">times</div>
-      <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">sats</div>
-      <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">sats</div>
-    `;
+    this.uiStatus.initializeStats();
   }
 
   displayZapStats(stats) {
-    const statsDiv = this.#getElement(".zap-stats");
-    if (!statsDiv) return;
+    this.uiStatus.displayStats(stats);
+  }
 
-    statsDiv.innerHTML = this.#UIComponents.createZapStats(stats);
+  showNoZapsMessage() {
+    this.uiStatus.showNoZaps();
   }
 
   // Method to prefetch profile information
@@ -528,48 +518,7 @@ class NostrZapViewDialog extends HTMLElement {
         </div>
       </li>
     `,
-
-    createZapStats: (stats) => {
-      if (stats.timeout) {
-        return this.#createTimeoutStats();
-      }
-      return this.#createNormalStats(stats);
-    },
   };
-
-  #createTimeoutStats() {
-    return `
-      <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number text-muted">nostr.band</span></div>
-      <div class="stats-item">times</div>
-      <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number text-muted">Stats</span></div>
-      <div class="stats-item">sats</div>
-      <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number text-muted">Unavailable</span></div>
-      <div class="stats-item">sats</div>
-    `;
-  }
-
-  #createNormalStats(stats) {
-    return `
-      <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number">${formatNumber(
-        stats.count
-      )}</span></div>
-      <div class="stats-item">times</div>
-      <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(
-        Math.floor(stats.msats / 1000)
-      )}</span></div>
-      <div class="stats-item">sats</div>
-      <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(
-        Math.floor(stats.maxMsats / 1000)
-      )}</span></div>
-      <div class="stats-item">sats</div>
-    `;
-  }
 
   // Style Management
   #styleManager = {
