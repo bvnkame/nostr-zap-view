@@ -1,7 +1,16 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
-import { formatNumber, formatIdentifier, parseZapEvent, getProfileDisplayName, parseDescriptionTag, isWithin24Hours, preloadImage, escapeHTML } from "./utils.js";
+import {
+  formatNumber,
+  formatIdentifier,
+  parseZapEvent,
+  getProfileDisplayName,
+  parseDescriptionTag,
+  isWithin24Hours,
+  preloadImage,
+  escapeHTML,
+} from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 
 class NostrZapViewDialog extends HTMLElement {
@@ -48,7 +57,8 @@ class NostrZapViewDialog extends HTMLElement {
 
   #applyTheme() {
     // Implement the theme application logic here
-    const themeClass = this.#state.theme === "dark" ? "dark-theme" : "light-theme";
+    const themeClass =
+      this.#state.theme === "dark" ? "dark-theme" : "light-theme";
     this.shadowRoot.host.classList.add(themeClass);
   }
 
@@ -99,11 +109,17 @@ class NostrZapViewDialog extends HTMLElement {
 
   // Profile-related methods
   async #extractZapInfo(event) {
-    const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
+    const { pubkey, content, satsText } = await parseZapEvent(
+      event,
+      defaultIcon
+    );
     const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
 
     const senderProfile = await this.#getSenderProfile(pubkey);
-    const displayIdentifier = await this.#getDisplayIdentifier(pubkey, senderProfile);
+    const displayIdentifier = await this.#getDisplayIdentifier(
+      pubkey,
+      senderProfile
+    );
 
     return {
       ...senderProfile,
@@ -131,7 +147,7 @@ class NostrZapViewDialog extends HTMLElement {
     return { senderName, senderIcon };
   }
 
-  async #getDisplayIdentifier(pubkey, profile) {
+  async #getDisplayIdentifier(pubkey) {
     if (pubkey && profileManager) {
       const nip05 = await profileManager.verifyNip05Async(pubkey);
       if (nip05) {
@@ -144,40 +160,56 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #getAmountColorClass(amount) {
-    const isColorModeEnabled = this.#isColorModeEnabled();
-    if (!isColorModeEnabled) {
-      return "";
-    }
+    if (!this.#isColorModeEnabled()) return "";
 
-    if (amount >= 10000) return "zap-amount-10k";
-    if (amount >= 5000) return "zap-amount-5k";
-    if (amount >= 2000) return "zap-amount-2k";
-    if (amount >= 1000) return "zap-amount-1k";
-    if (amount >= 500) return "zap-amount-500";
-    if (amount >= 200) return "zap-amount-200";
-    if (amount >= 100) return "zap-amount-100";
+    const thresholds = [
+      { value: 10000, className: "zap-amount-10k" },
+      { value: 5000, className: "zap-amount-5k" },
+      { value: 2000, className: "zap-amount-2k" },
+      { value: 1000, className: "zap-amount-1k" },
+      { value: 500, className: "zap-amount-500" },
+      { value: 200, className: "zap-amount-200" },
+      { value: 100, className: "zap-amount-100" },
+    ];
+
+    for (const threshold of thresholds) {
+      if (amount >= threshold.value) return threshold.className;
+    }
     return "";
   }
 
   #isColorModeEnabled() {
     // Fix: Get the correct button for this dialog using viewId
     const viewId = this.getAttribute("data-view-id");
-    const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+    const button = document.querySelector(
+      `button[data-zap-view-id="${viewId}"]`
+    );
     const colorModeAttr = button?.getAttribute("data-zap-color-mode");
-    return !colorModeAttr || !["true", "false"].includes(colorModeAttr) 
-      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode 
+    return !colorModeAttr || !["true", "false"].includes(colorModeAttr)
+      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
       : colorModeAttr === "true";
   }
 
   // UI element creation methods
-  #createZapHTML({ senderName, senderIcon, satsText, satsAmount, comment, pubkey, created_at, displayIdentifier }) {
+  #createZapHTML({
+    senderName,
+    senderIcon,
+    satsText,
+    satsAmount,
+    comment,
+    pubkey,
+    created_at,
+    displayIdentifier,
+  }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
     const colorClass = this.#getAmountColorClass(satsAmount);
 
-    const iconHTML = senderIcon ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">` : `<div class="zap-placeholder-icon"></div>`;
+    const iconHTML = senderIcon
+      ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
+      : `<div class="zap-placeholder-icon"></div>`;
 
     return `
       <div class="zap-sender${comment ? " with-comment" : ""}">
@@ -190,28 +222,34 @@ class NostrZapViewDialog extends HTMLElement {
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
-      ${comment ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>` : ""}
+      ${
+        comment
+          ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>`
+          : ""
+      }
     `;
   }
 
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!placeholder) return;
-  
+
     try {
       // プレースホルダーを保持したまま新しい要素を準備
       await this.#prefetchProfiles([event]);
       const zapInfo = await this.#extractZapInfo(event);
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      
+
       // 新しい要素を作成
-      const tempContainer = document.createElement('div');
+      const tempContainer = document.createElement("div");
       tempContainer.innerHTML = this.#createZapHTML(zapInfo);
       const newContent = tempContainer.firstElementChild;
-      
+
       // クラスを設定
-      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-      
+      placeholder.className = `zap-list-item ${colorClass}${
+        zapInfo.comment ? " with-comment" : ""
+      }`;
+
       // 内容を置き換え
       placeholder.innerHTML = newContent.outerHTML;
       placeholder.removeAttribute("data-index");
@@ -219,25 +257,27 @@ class NostrZapViewDialog extends HTMLElement {
       console.error("Failed to replace placeholder:", error);
     }
   }
-  
+
   async renderZapListFromCache(zapEventsCache, maxCount) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
-  
+
     try {
       const sortedZaps = [...zapEventsCache]
         .sort((a, b) => b.created_at - a.created_at)
         .slice(0, maxCount);
-  
+
       // プロファイル情報を先に取得
       await this.#prefetchProfiles(sortedZaps);
-  
+
       // 既存のプレースホルダーの状態を保存
       const existingPlaceholders = new Map(
-        Array.from(list.querySelectorAll('[data-index]'))
-          .map(el => [el.getAttribute('data-index'), el])
+        Array.from(list.querySelectorAll("[data-index]")).map((el) => [
+          el.getAttribute("data-index"),
+          el,
+        ])
       );
-  
+
       // すべてのZap情報を並行して準備
       const zapInfos = await Promise.all(
         sortedZaps.map(async (event, index) => {
@@ -245,40 +285,40 @@ class NostrZapViewDialog extends HTMLElement {
           return { zapInfo, index };
         })
       );
-  
+
       // DOMの更新を一括で行う
       const fragment = document.createDocumentFragment();
       zapInfos.forEach(({ zapInfo, index }) => {
         const existingPlaceholder = existingPlaceholders.get(String(index));
         const li = existingPlaceholder || document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-        
-        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+
+        li.className = `zap-list-item ${colorClass}${
+          zapInfo.comment ? " with-comment" : ""
+        }`;
         li.innerHTML = this.#createZapHTML(zapInfo);
-        
+
         if (existingPlaceholder) {
           li.removeAttribute("data-index");
         }
-        
+
         fragment.appendChild(li);
       });
-  
+
       // リストを一括更新
-      list.innerHTML = '';
+      list.innerHTML = "";
       list.appendChild(fragment);
-  
     } catch (error) {
       console.error("Failed to render zap list:", error);
     }
   }
-  
 
   async prependZap(event) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     // "No Zaps" メッセージが存在する場合、メッセージのみを削除
-    const noZapsMessage = list.querySelector('.no-zaps-message');
+    const noZapsMessage = list.querySelector(".no-zaps-message");
     if (noZapsMessage) {
       noZapsMessage.remove();
     }
@@ -288,7 +328,9 @@ class NostrZapViewDialog extends HTMLElement {
     const zapInfo = await this.#extractZapInfo(event);
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     const li = document.createElement("li");
-    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    li.className = `zap-list-item ${colorClass}${
+      zapInfo.comment ? " with-comment" : ""
+    }`;
     li.innerHTML = this.#createZapHTML(zapInfo);
     list.prepend(li);
   }
@@ -302,7 +344,9 @@ class NostrZapViewDialog extends HTMLElement {
     const dialog = this.#getElement(".dialog");
     if (dialog && !dialog.open) {
       const viewId = this.getAttribute("data-view-id");
-      const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+      const fetchButton = document.querySelector(
+        `button[data-zap-view-id="${viewId}"]`
+      );
       if (fetchButton) {
         const title = this.#getElement(".dialog-title");
         const customTitle = fetchButton.getAttribute("data-title");
@@ -377,20 +421,35 @@ class NostrZapViewDialog extends HTMLElement {
 
   // Method to prefetch profile information
   async #prefetchProfiles(sortedZaps) {
-    const pubkeys = [...new Set(sortedZaps.map((event) => parseDescriptionTag(event).pubkey).filter(Boolean))];
+    const pubkeys = [
+      ...new Set(
+        sortedZaps
+          .map((event) => parseDescriptionTag(event).pubkey)
+          .filter(Boolean)
+      ),
+    ];
 
     if (pubkeys.length > 0) {
       // Fetch profile information
-      const profiles = await profileManager.fetchProfiles(pubkeys);
       this.profileManager = {
-        profiles: new Map(profiles.map((profile, index) => [pubkeys[index], profile])),
-        getProfile: function (pubkey) {
+        profiles: new Map(),
+        async init(pubkeys) {
+          const profiles = await profileManager.fetchProfiles(pubkeys);
+          profiles.forEach((profile, index) => {
+            this.profiles.set(pubkeys[index], profile);
+          });
+        },
+        getProfile(pubkey) {
           return this.profiles.get(pubkey);
         },
+        async verifyNip05(pubkey) {
+          return await profileManager.verifyNip05Async(pubkey);
+        },
       };
-
-      // Verify NIP-05 and update display
-      await Promise.all(pubkeys.map(pubkey => this.#updateDisplayIdentifier(pubkey)));
+      await this.profileManager.init(pubkeys);
+      await Promise.all(
+        pubkeys.map((pubkey) => this.#updateDisplayIdentifier(pubkey))
+      );
     }
   }
 
@@ -399,11 +458,13 @@ class NostrZapViewDialog extends HTMLElement {
     try {
       const nip05 = await profileManager.verifyNip05Async(pubkey);
       if (nip05) {
-        const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-        elements.forEach(el => {
-          if (!el.hasAttribute('data-nip05-updated')) {
+        const elements = this.shadowRoot.querySelectorAll(
+          `[data-pubkey="${pubkey}"]`
+        );
+        elements.forEach((el) => {
+          if (!el.hasAttribute("data-nip05-updated")) {
             el.textContent = nip05;
-            el.setAttribute('data-nip05-updated', 'true');
+            el.setAttribute("data-nip05-updated", "true");
           }
         });
       }
@@ -432,14 +493,16 @@ class NostrZapViewDialog extends HTMLElement {
     profiles: new Map(),
     async init(pubkeys) {
       const profiles = await profileManager.fetchProfiles(pubkeys);
-      this.profiles = new Map(profiles.map((profile, index) => [pubkeys[index], profile]));
+      this.profiles = new Map(
+        profiles.map((profile, index) => [pubkeys[index], profile])
+      );
     },
     getProfile(pubkey) {
       return this.profiles.get(pubkey);
     },
     async verifyNip05(pubkey) {
       return await profileManager.verifyNip05Async(pubkey);
-    }
+    },
   };
 
   // UI Components
@@ -470,7 +533,7 @@ class NostrZapViewDialog extends HTMLElement {
         return this.#createTimeoutStats();
       }
       return this.#createNormalStats(stats);
-    }
+    },
   };
 
   #createTimeoutStats() {
@@ -490,13 +553,19 @@ class NostrZapViewDialog extends HTMLElement {
   #createNormalStats(stats) {
     return `
       <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number">${formatNumber(stats.count)}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        stats.count
+      )}</span></div>
       <div class="stats-item">times</div>
       <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.msats / 1000))}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        Math.floor(stats.msats / 1000)
+      )}</span></div>
       <div class="stats-item">sats</div>
       <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.maxMsats / 1000))}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        Math.floor(stats.maxMsats / 1000)
+      )}</span></div>
       <div class="stats-item">sats</div>
     `;
   }
@@ -505,7 +574,7 @@ class NostrZapViewDialog extends HTMLElement {
   #styleManager = {
     getAmountColorClass: (amount, isColorModeEnabled) => {
       if (!isColorModeEnabled) return "";
-      
+
       const thresholds = [
         [10000, "zap-amount-10k"],
         [5000, "zap-amount-5k"],
@@ -513,7 +582,7 @@ class NostrZapViewDialog extends HTMLElement {
         [1000, "zap-amount-1k"],
         [500, "zap-amount-500"],
         [200, "zap-amount-200"],
-        [100, "zap-amount-100"]
+        [100, "zap-amount-100"],
       ];
 
       for (const [threshold, className] of thresholds) {
@@ -525,7 +594,7 @@ class NostrZapViewDialog extends HTMLElement {
     applyTheme: (root, theme) => {
       const themeClass = theme === "dark" ? "dark-theme" : "light-theme";
       root.classList.add(themeClass);
-    }
+    },
   };
 
   // Event Handlers
@@ -544,7 +613,9 @@ customElements.define("nostr-zap-view-dialog", NostrZapViewDialog);
 
 // Simplified external API
 export const createDialog = (viewId) => {
-  if (!document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`)) {
+  if (
+    !document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`)
+  ) {
     const dialog = document.createElement("nostr-zap-view-dialog");
     dialog.setAttribute("data-view-id", viewId);
     document.body.appendChild(dialog);
@@ -561,19 +632,24 @@ export const {
   renderZapListFromCache,
   prependZap,
   displayZapStats,
-  showNoZapsMessage  // ここに統合
+  showNoZapsMessage, // ここに統合
 } = (() => {
-  const getDialog = (viewId) => document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
+  const getDialog = (viewId) =>
+    document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
 
   return {
     closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),
     showDialog: (viewId) => getDialog(viewId)?.showDialog(),
-    initializeZapPlaceholders: (maxCount, viewId) => getDialog(viewId)?.initializeZapPlaceholders(maxCount),
+    initializeZapPlaceholders: (maxCount, viewId) =>
+      getDialog(viewId)?.initializeZapPlaceholders(maxCount),
     initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
-    replacePlaceholderWithZap: (event, index, viewId) => getDialog(viewId)?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: (cache, max, viewId) => getDialog(viewId)?.renderZapListFromCache(cache, max),
+    replacePlaceholderWithZap: (event, index, viewId) =>
+      getDialog(viewId)?.replacePlaceholderWithZap(event, index),
+    renderZapListFromCache: (cache, max, viewId) =>
+      getDialog(viewId)?.renderZapListFromCache(cache, max),
     prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event),
-    displayZapStats: (stats, viewId) => getDialog(viewId)?.displayZapStats(stats),
+    displayZapStats: (stats, viewId) =>
+      getDialog(viewId)?.displayZapStats(stats),
     showNoZapsMessage: (viewId) => getDialog(viewId)?.showNoZapsMessage(),
   };
 })();
