@@ -182,19 +182,22 @@ async function handleCachedZaps(viewId, config) {
 
 // 新しい関数: すべてのZapイベントから統計を再計算
 async function initializeNewFetch(viewId, config) {
-  initializeZapPlaceholders(config.maxCount, viewId); // Fix: Add viewId
-  initializeZapStats(viewId); // Fix: Add viewId
+  // プレースホルダーの初期化
+  initializeZapPlaceholders(config.maxCount, viewId);
+  initializeZapStats(viewId);
 
-  // 統計情報の取得とサブスクリプションの初期化を並行実行
-  const [zapStats, ] = await Promise.all([
-    statsManager.getZapStats(config.identifier, viewId),
-    subscriptionManager.initializeSubscriptions(config, viewId)
-  ]);
-
-  // 統計情報の表示（エラー時は代替表示）
-  if (!zapStats?.error) {
-    displayZapStats(zapStats, viewId);
-  } else {
-    displayZapStats({ timeout: zapStats.timeout }, viewId);
+  // サブスクリプションをすぐに開始
+  const subscriptionPromise = subscriptionManager.initializeSubscriptions(config, viewId);
+  
+  try {
+    // 統計情報の取得を並行して実行
+    const stats = await statsManager.getZapStats(config.identifier, viewId);
+    displayZapStats(stats?.error ? { timeout: stats.timeout } : stats, viewId);
+  } catch (error) {
+    console.error("Failed to fetch stats:", error);
+    displayZapStats({ timeout: true }, viewId);
   }
+
+  // サブスクリプションの���了を待機
+  await subscriptionPromise;
 }
