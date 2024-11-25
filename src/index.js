@@ -16,13 +16,13 @@ function initializeApp() {
   createDialog();
 
   // Set event listeners
-  const fetchButton = document.querySelector("button[data-identifier]");
+  const fetchButton = document.querySelector("button[data-nzv-identifier]");
   if (fetchButton) {
     fetchButton.addEventListener("click", fetchLatestZaps);
   }
 
   // 各ZapボタンにユニークなビューIDを割り当て
-  document.querySelectorAll("button[data-identifier]").forEach((button, index) => {
+  document.querySelectorAll("button[data-nzv-identifier]").forEach((button, index) => {
     const viewId = `nostr-zap-view-${index}`;  // オプション: より一貫性のある名前に変更
     button.setAttribute("data-zap-view-id", viewId);
     createDialog(viewId);

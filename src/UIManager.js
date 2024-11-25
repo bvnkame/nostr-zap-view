@@ -310,7 +310,7 @@ class NostrZapViewDialog extends HTMLElement {
           title.textContent = customTitle;
           title.classList.add("custom-title");
         } else {
-          const identifier = fetchButton.getAttribute("data-identifier");
+          const identifier = fetchButton.getAttribute("data-nzv-identifier");
           title.textContent = "To " + formatIdentifier(identifier);
           title.classList.remove("custom-title");
         }

@@ -57,7 +57,7 @@ export class ZapConfig {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
     return new ZapConfig(
-      button.getAttribute("data-identifier"),
+      button.getAttribute("data-nzv-identifier"),
       maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
