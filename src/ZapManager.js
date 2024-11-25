@@ -27,19 +27,6 @@ class ZapSubscriptionManager {
     state.currentStats = null;  // Fix: currentStatsもクリア
   }
 
-  async updateStatsFromZapEvent(event, viewId) {
-    const state = this.getOrCreateViewState(viewId);
-    if (!state.currentStats) {
-      state.currentStats = { count: 0, msats: 0, maxMsats: 0 };
-    }
-
-    const amountMsats = statsManager.extractAmountFromEvent(event);
-    if (amountMsats > 0) {
-      state.currentStats = statsManager.updateStats(state.currentStats, amountMsats);
-      displayZapStats(state.currentStats, viewId);
-    }
-  }
-
   async handleZapEvent(event, maxCount, viewId) {
     const state = this.getOrCreateViewState(viewId);
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
@@ -136,46 +123,12 @@ class ZapSubscriptionManager {
     });
   }
 
-  async updateStatsFromCachedEvents(viewState, stats) {
-    viewState.currentStats = {
-      count: stats?.count ?? 0,
-      msats: stats?.msats ?? 0,
-      maxMsats: stats?.maxMsats ?? 0
-    };
-
-    // リアルタイムフラグが付いているイベントのみを処理
-    const realtimeEvents = viewState.zapEventsCache.filter(event => event.isRealTimeEvent);
-
-    for (const event of realtimeEvents) {
-      try {
-        const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-        if (!bolt11Tag) continue;
-
-        const decoded = window.decodeBolt11(bolt11Tag);
-        const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
-
-        if (amountMsats > 0) {
-          viewState.currentStats = {
-            count: viewState.currentStats.count + 1,
-            msats: viewState.currentStats.msats + amountMsats,
-            maxMsats: Math.max(viewState.currentStats.maxMsats, amountMsats)
-          };
-        }
-      } catch (error) {
-        console.error("Failed to process cached Zap event:", error);
-      }
-    }
-
-    return viewState.currentStats;
-  }
-
   async handleCachedZaps(viewId, config) {
     const viewState = subscriptionManager.getOrCreateViewState(viewId);
     const stats = await statsManager.getZapStats(config.identifier, viewId); // statsManagerを使用するように変更
     
     if (!stats?.error) {
-      // リアルタイムイベントを含むすべてのZapイベントから統計を再計算
-      const updatedStats = await recalculateStatsFromAllEvents(viewState, stats);
+      const updatedStats = await statsManager.recalculateStats(stats, viewState.zapEventsCache);
       displayZapStats(updatedStats, viewId);
     } else {
       displayZapStats({ timeout: stats.timeout }, viewId);
@@ -220,11 +173,10 @@ export async function fetchLatestZaps(event) {
 
 async function handleCachedZaps(viewId, config) {
   const viewState = subscriptionManager.getOrCreateViewState(viewId);
-  const stats = await statsManager.getZapStats(config.identifier, viewId); // statsManagerを使用するように変更
+  const stats = await statsManager.getZapStats(config.identifier, viewId);
   
   if (!stats?.error) {
-    // リアルタイムイベントを含むすべてのZapイベントから統計を再計算
-    const updatedStats = await recalculateStatsFromAllEvents(viewState, stats);
+    const updatedStats = await statsManager.recalculateStats(stats, viewState.zapEventsCache);
     displayZapStats(updatedStats, viewId);
   } else {
     displayZapStats({ timeout: stats.timeout }, viewId);
@@ -234,40 +186,6 @@ async function handleCachedZaps(viewId, config) {
 }
 
 // 新しい関数: すべてのZapイベントから統計を再計算
-async function recalculateStatsFromAllEvents(viewState, baseStats) {
-  // 基本の統計情報を初期化（nostr.bandからの統計）
-  let currentStats = {
-    count: baseStats?.count || 0,
-    msats: baseStats?.msats || 0,
-    maxMsats: baseStats?.maxMsats || 0
-  };
-
-  // リアルタイムイベントのみを処理
-  const realtimeEvents = viewState.zapEventsCache.filter(event => event.isRealTimeEvent === true);
-
-  for (const event of realtimeEvents) {
-    try {
-      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-      if (!bolt11Tag) continue;
-
-      const decoded = window.decodeBolt11(bolt11Tag);
-      const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
-
-      if (amountMsats > 0) {
-        currentStats.count++;
-        currentStats.msats += amountMsats;
-        currentStats.maxMsats = Math.max(currentStats.maxMsats, amountMsats);
-      }
-    } catch (error) {
-      console.error("Failed to process Zap event for stats:", error);
-    }
-  }
-
-  // 更新された統計情報をキャッシュに保存
-  viewState.currentStats = currentStats;
-  return currentStats;
-}
-
 async function initializeNewFetch(viewId, config) {
   initializeZapPlaceholders(config.maxCount, viewId); // Fix: Add viewId
   initializeZapStats(viewId); // Fix: Add viewId

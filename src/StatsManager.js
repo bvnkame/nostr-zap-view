@@ -94,17 +94,22 @@ export class StatsManager {
   }
 
   recalculateStats(baseStats, events) {
+    // 基本の統計情報を初期化
     let stats = {
       count: baseStats?.count || 0,
       msats: baseStats?.msats || 0,
       maxMsats: baseStats?.maxMsats || 0
     };
 
+    // リアルタイムイベントのみを処理
     const realtimeEvents = events.filter(event => event.isRealTimeEvent === true);
+
     for (const event of realtimeEvents) {
       const amountMsats = this.extractAmountFromEvent(event);
       if (amountMsats > 0) {
-        stats = this.updateStats(stats, amountMsats);
+        stats.count++;
+        stats.msats += amountMsats;
+        stats.maxMsats = Math.max(stats.maxMsats, amountMsats);
       }
     }
 
