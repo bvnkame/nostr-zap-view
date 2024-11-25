@@ -108,43 +108,128 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // Profile-related methods
+  async #updateZapDisplay(pubkey, zapInfo) {
+    const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+    elements.forEach(el => {
+      const zapItem = el.closest('.zap-list-item');
+      if (zapItem) {
+        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+        zapItem.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+        zapItem.innerHTML = this.#createZapHTML(zapInfo);
+      }
+    });
+  }
+
   async #extractZapInfo(event) {
-    const { pubkey, content, satsText } = await parseZapEvent(
-      event,
-      defaultIcon
-    );
+    const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
     const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-
-    const senderProfile = await this.#getSenderProfile(pubkey);
-    const displayIdentifier = await this.#getDisplayIdentifier(
-      pubkey,
-      senderProfile
-    );
-
+    
+    // 基本情報のみを含む初期データ
     return {
-      ...senderProfile,
       satsText,
       satsAmount,
       comment: content || "",
       pubkey: pubkey || "",
       created_at: event.created_at,
-      displayIdentifier,
+      displayIdentifier: formatIdentifier(window.NostrTools.nip19.npubEncode(pubkey)),
+      senderName: "anonymous",
+      senderIcon: defaultIcon,
     };
   }
 
-  async #getSenderProfile(pubkey) {
-    let senderName = "anonymous";
-    let senderIcon = defaultIcon;
+  async #loadProfileAndUpdate(pubkey, element) {
+    if (!pubkey) return;
 
-    if (pubkey && this.profileManager) {
-      const profile = this.profileManager.getProfile(pubkey);
-      if (profile) {
-        senderName = getProfileDisplayName(profile) || "nameless";
-        senderIcon = (await preloadImage(profile.picture)) || defaultIcon;
+    try {
+      const [profile] = await profileManager.fetchProfiles([pubkey]);
+      if (!profile) return;
+
+      const senderName = getProfileDisplayName(profile) || "nameless";
+      // アイコン画像のプリロードを待つ
+      const senderIcon = profile.picture ? await preloadImage(profile.picture) : defaultIcon;
+      
+      // プロフィール情報を更新
+      const nameElement = element.querySelector('.sender-name');
+      const iconContainer = element.querySelector('.sender-icon');
+      const pubkeyElement = element.querySelector('.sender-pubkey');
+      
+      if (nameElement) nameElement.textContent = senderName;
+      if (iconContainer) {
+        // 常にimg要素を使用し、デフォルトアイコンをフォールバックとして設定
+        iconContainer.innerHTML = `<img src="${senderIcon}" alt="${escapeHTML(senderName)}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
       }
-    }
 
-    return { senderName, senderIcon };
+      // NIP-05の取得と更新
+      const nip05 = await profileManager.verifyNip05Async(pubkey);
+      if (nip05 && pubkeyElement) {
+        pubkeyElement.textContent = nip05;
+        pubkeyElement.setAttribute("data-nip05-updated", "true");
+      }
+    } catch (error) {
+      console.debug("Failed to load profile:", error);
+    }
+  }
+
+  async replacePlaceholderWithZap(event, index) {
+    const placeholder = this.#getElement(`[data-index="${index}"]`);
+    if (!placeholder) return;
+
+    try {
+      // 基本情報を即時表示
+      const zapInfo = await this.#extractZapInfo(event);
+      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      
+      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+      placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
+      placeholder.innerHTML = this.#createZapHTML(zapInfo);
+
+      // プロフィール情報を非同期で更新
+      if (zapInfo.pubkey) {
+        this.#loadProfileAndUpdate(zapInfo.pubkey, placeholder);
+      }
+    } catch (error) {
+      console.error("Failed to replace placeholder:", error);
+    }
+  }
+
+  async renderZapListFromCache(zapEventsCache, maxCount) {
+    const list = this.#getElement(".dialog-zap-list");
+    if (!list) return;
+
+    try {
+      const sortedZaps = [...zapEventsCache]
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, maxCount);
+
+      // 基本情報のみで表示を即時更新
+      const fragment = document.createDocumentFragment();
+      const zapInfoPromises = sortedZaps.map(async event => {
+        const zapInfo = await this.#extractZapInfo(event);
+        const li = document.createElement("li");
+        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+        
+        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+        li.setAttribute("data-pubkey", zapInfo.pubkey);
+        li.innerHTML = this.#createZapHTML(zapInfo);
+        
+        fragment.appendChild(li);
+        return { li, pubkey: zapInfo.pubkey };
+      });
+
+      // DOMを一括更新
+      const zapElements = await Promise.all(zapInfoPromises);
+      list.innerHTML = "";
+      list.appendChild(fragment);
+
+      // プロフィール情報を非同期で更新
+      zapElements.forEach(({ li, pubkey }) => {
+        if (pubkey) {
+          this.#loadProfileAndUpdate(pubkey, li);
+        }
+      });
+    } catch (error) {
+      console.error("Failed to render zap list:", error);
+    }
   }
 
   async #getDisplayIdentifier(pubkey) {
@@ -207,9 +292,8 @@ class NostrZapViewDialog extends HTMLElement {
     const escapedComment = escapeHTML(comment);
     const colorClass = this.#getAmountColorClass(satsAmount);
 
-    const iconHTML = senderIcon
-      ? `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
-      : `<div class="zap-placeholder-icon"></div>`;
+    // 常にimg要素を使用
+    const iconHTML = `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
 
     return `
       <div class="zap-sender${comment ? " with-comment" : ""}">
@@ -228,89 +312,6 @@ class NostrZapViewDialog extends HTMLElement {
           : ""
       }
     `;
-  }
-
-  async replacePlaceholderWithZap(event, index) {
-    const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!placeholder) return;
-
-    try {
-      // プレースホルダーを保持したまま新しい要素を準備
-      await this.#prefetchProfiles([event]);
-      const zapInfo = await this.#extractZapInfo(event);
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-
-      // 新しい要素を作成
-      const tempContainer = document.createElement("div");
-      tempContainer.innerHTML = this.#createZapHTML(zapInfo);
-      const newContent = tempContainer.firstElementChild;
-
-      // クラスを設定
-      placeholder.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
-
-      // 内容を置き換え
-      placeholder.innerHTML = newContent.outerHTML;
-      placeholder.removeAttribute("data-index");
-    } catch (error) {
-      console.error("Failed to replace placeholder:", error);
-    }
-  }
-
-  async renderZapListFromCache(zapEventsCache, maxCount) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    try {
-      const sortedZaps = [...zapEventsCache]
-        .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, maxCount);
-
-      // プロファイル情報を先に取得
-      await this.#prefetchProfiles(sortedZaps);
-
-      // 既存のプレースホルダーの状態を保存
-      const existingPlaceholders = new Map(
-        Array.from(list.querySelectorAll("[data-index]")).map((el) => [
-          el.getAttribute("data-index"),
-          el,
-        ])
-      );
-
-      // すべてのZap情報を並行して準備
-      const zapInfos = await Promise.all(
-        sortedZaps.map(async (event, index) => {
-          const zapInfo = await this.#extractZapInfo(event);
-          return { zapInfo, index };
-        })
-      );
-
-      // DOMの更新を一括で行う
-      const fragment = document.createDocumentFragment();
-      zapInfos.forEach(({ zapInfo, index }) => {
-        const existingPlaceholder = existingPlaceholders.get(String(index));
-        const li = existingPlaceholder || document.createElement("li");
-        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-
-        li.className = `zap-list-item ${colorClass}${
-          zapInfo.comment ? " with-comment" : ""
-        }`;
-        li.innerHTML = this.#createZapHTML(zapInfo);
-
-        if (existingPlaceholder) {
-          li.removeAttribute("data-index");
-        }
-
-        fragment.appendChild(li);
-      });
-
-      // リストを一括更新
-      list.innerHTML = "";
-      list.appendChild(fragment);
-    } catch (error) {
-      console.error("Failed to render zap list:", error);
-    }
   }
 
   async prependZap(event) {
