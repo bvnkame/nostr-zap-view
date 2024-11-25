@@ -123,7 +123,7 @@ export function formatIdentifier(identifier) {
 }
 
 export function getProfileDisplayName(profile) {
-  return profile?.display_name || profile?.displayName || profile?.name || "nameless";
+  return profile?.display_name || profile?.name || "nameless";
 }
 
 export async function parseZapEvent(event) {
