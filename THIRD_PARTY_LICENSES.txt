@@ -31,3 +31,7 @@ Third-Party Licenses
 7. scure-base
    License: MIT
    URL: https://github.com/paulmillr/scure-base
+
+8. nostr-logo
+   License: CC0 1.0 Universal
+   URL: https://github.com/mbarulli/nostr-logo
