@@ -1,6 +1,6 @@
 import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
-import { decodeIdentifier, fetchZapStats } from "./utils.js";
+import { decodeIdentifier } from "./utils.js";
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
 
@@ -119,28 +119,30 @@ class ZapSubscriptionManager {
   }
 
   async handleCachedZaps(viewId, config) {
-    const viewState = subscriptionManager.getOrCreateViewState(viewId);
-    const stats = await statsManager.getZapStats(config.identifier, viewId); // statsManagerを使用するように変更
-    
-    if (!stats?.error) {
-      const updatedStats = await statsManager.recalculateStats(stats, viewState.zapEventsCache);
+    const viewState = this.getOrCreateViewState(viewId);
+    try {
+      const stats = await statsManager.getZapStats(config.identifier, viewId);
+      const updatedStats = !stats?.error 
+        ? await statsManager.recalculateStats(stats, viewState.zapEventsCache)
+        : { timeout: stats.timeout };
+      
       displayZapStats(updatedStats, viewId);
-    } else {
-      displayZapStats({ timeout: stats.timeout }, viewId);
+      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+    } catch (error) {
+      console.error("Failed to handle cached zaps:", error);
+      displayZapStats({ timeout: true }, viewId);
     }
-  
-    await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
   }
 }
 
 const subscriptionManager = new ZapSubscriptionManager();
 
 export async function fetchLatestZaps(event) {
+  const button = event.currentTarget;
+  const viewId = button.getAttribute("data-zap-view-id");
+  
   try {
-    const button = event.currentTarget;
-    const viewId = button.getAttribute("data-zap-view-id");
     if (!viewId) throw new Error("Missing view ID");
-
     const zapDialog = document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
     if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
@@ -148,56 +150,36 @@ export async function fetchLatestZaps(event) {
     const viewState = subscriptionManager.getOrCreateViewState(viewId);
     const hasCache = viewState.zapEventsCache.length > 0;
 
-    // Fix: キャッシュがある場合はクリアしない
-    if (!hasCache) {
-      subscriptionManager.clearCache(viewId);
-    }
-
     showDialog(viewId);
 
-    await (hasCache ? handleCachedZaps(viewId, config) : initializeNewFetch(viewId, config));
+    if (hasCache) {
+      await subscriptionManager.handleCachedZaps(viewId, config);
+    } else {
+      subscriptionManager.clearCache(viewId);
+      await initializeNewFetch(viewId, config);
+    }
 
-    // Only show "No Zaps" message if there are actually no zaps in the cache
     if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
       showNoZapsMessage(viewId);
     }
   } catch (error) {
     console.error("Error occurred while fetching Zaps:", error);
+    displayZapStats({ timeout: true }, viewId);
   }
 }
 
-async function handleCachedZaps(viewId, config) {
-  const viewState = subscriptionManager.getOrCreateViewState(viewId);
-  const stats = await statsManager.getZapStats(config.identifier, viewId);
-  
-  if (!stats?.error) {
-    const updatedStats = await statsManager.recalculateStats(stats, viewState.zapEventsCache);
-    displayZapStats(updatedStats, viewId);
-  } else {
-    displayZapStats({ timeout: stats.timeout }, viewId);
-  }
-
-  await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
-}
-
-// 新しい関数: すべてのZapイベントから統計を再計算
 async function initializeNewFetch(viewId, config) {
-  // プレースホルダーの初期化
   initializeZapPlaceholders(config.maxCount, viewId);
   initializeZapStats(viewId);
 
-  // サブスクリプションをすぐに開始
-  const subscriptionPromise = subscriptionManager.initializeSubscriptions(config, viewId);
-  
-  try {
-    // 統計情報の取得を並行して実行
-    const stats = await statsManager.getZapStats(config.identifier, viewId);
-    displayZapStats(stats?.error ? { timeout: stats.timeout } : stats, viewId);
-  } catch (error) {
-    console.error("Failed to fetch stats:", error);
-    displayZapStats({ timeout: true }, viewId);
-  }
+  const [stats] = await Promise.allSettled([
+    statsManager.getZapStats(config.identifier, viewId),
+    subscriptionManager.initializeSubscriptions(config, viewId)
+  ]);
 
-  // サブスクリプションの���了を待機
-  await subscriptionPromise;
+  displayZapStats(
+    stats.status === 'fulfilled' && !stats.value?.error 
+      ? stats.value 
+      : { timeout: true }
+  , viewId);
 }
