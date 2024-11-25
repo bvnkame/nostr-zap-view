@@ -27,28 +27,6 @@ class ZapSubscriptionManager {
     state.currentStats = null;  // Fix: currentStatsもクリア
   }
 
-  async getZapStats(identifier, viewId) {
-    const state = this.getOrCreateViewState(viewId);
-    const cached = state.zapStatsCache.get(identifier);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < 300000) {
-      state.currentStats = cached.stats;
-      return cached.stats;
-    }
-
-    const stats = await statsManager.fetchStats(identifier);
-    state.currentStats = stats;
-
-    if (stats) {
-      state.zapStatsCache.set(identifier, {
-        stats,
-        timestamp: now,
-      });
-    }
-    return stats;
-  }
-
   async updateStatsFromZapEvent(event, viewId) {
     const state = this.getOrCreateViewState(viewId);
     if (!state.currentStats) {
@@ -190,6 +168,21 @@ class ZapSubscriptionManager {
 
     return viewState.currentStats;
   }
+
+  async handleCachedZaps(viewId, config) {
+    const viewState = subscriptionManager.getOrCreateViewState(viewId);
+    const stats = await statsManager.getZapStats(config.identifier, viewId); // statsManagerを使用するように変更
+    
+    if (!stats?.error) {
+      // リアルタイムイベントを含むすべてのZapイベントから統計を再計算
+      const updatedStats = await recalculateStatsFromAllEvents(viewState, stats);
+      displayZapStats(updatedStats, viewId);
+    } else {
+      displayZapStats({ timeout: stats.timeout }, viewId);
+    }
+  
+    await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+  }
 }
 
 const subscriptionManager = new ZapSubscriptionManager();
@@ -227,7 +220,7 @@ export async function fetchLatestZaps(event) {
 
 async function handleCachedZaps(viewId, config) {
   const viewState = subscriptionManager.getOrCreateViewState(viewId);
-  const stats = await subscriptionManager.getZapStats(config.identifier, viewId);
+  const stats = await statsManager.getZapStats(config.identifier, viewId); // statsManagerを使用するように変更
   
   if (!stats?.error) {
     // リアルタイムイベントを含むすべてのZapイベントから統計を再計算
@@ -281,7 +274,7 @@ async function initializeNewFetch(viewId, config) {
 
   // 統計情報の取得とサブスクリプションの初期化を並行実行
   const [zapStats, ] = await Promise.all([
-    subscriptionManager.getZapStats(config.identifier, viewId),
+    statsManager.getZapStats(config.identifier, viewId),
     subscriptionManager.initializeSubscriptions(config, viewId)
   ]);
 
