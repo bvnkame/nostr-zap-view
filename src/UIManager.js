@@ -372,32 +372,7 @@ class NostrZapViewDialog extends HTMLElement {
     const statsDiv = this.#getElement(".zap-stats");
     if (!statsDiv) return;
 
-    if (stats.timeout) {
-      statsDiv.innerHTML = `
-        <div class="stats-item">Total Count</div>
-        <div class="stats-item"><span class="number text-muted">nostr.band</span></div>
-        <div class="stats-item">times</div>
-        <div class="stats-item">Total Amount</div>
-        <div class="stats-item"><span class="number text-muted">Stats</span></div>
-        <div class="stats-item">sats</div>
-        <div class="stats-item">Max Amount</div>
-        <div class="stats-item"><span class="number text-muted">Unavailable</span></div>
-        <div class="stats-item">sats</div>
-      `;
-      return;
-    }
-
-    statsDiv.innerHTML = `
-      <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number">${formatNumber(stats.count)}</span></div>
-      <div class="stats-item">times</div>
-      <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.msats / 1000))}</span></div>
-      <div class="stats-item">sats</div>
-      <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.maxMsats / 1000))}</span></div>
-      <div class="stats-item">sats</div>
-    `;
+    statsDiv.innerHTML = this.#UIComponents.createZapStats(stats);
   }
 
   // Method to prefetch profile information
@@ -450,6 +425,118 @@ class NostrZapViewDialog extends HTMLElement {
     if (list) {
       list.innerHTML = this.#createNoZapsMessage();
     }
+  }
+
+  // Profileロジックを分離
+  #profileManager = {
+    profiles: new Map(),
+    async init(pubkeys) {
+      const profiles = await profileManager.fetchProfiles(pubkeys);
+      this.profiles = new Map(profiles.map((profile, index) => [pubkeys[index], profile]));
+    },
+    getProfile(pubkey) {
+      return this.profiles.get(pubkey);
+    },
+    async verifyNip05(pubkey) {
+      return await profileManager.verifyNip05Async(pubkey);
+    }
+  };
+
+  // UI Components
+  #UIComponents = {
+    createNoZapsMessage: () => `
+      <div class="no-zaps-message">
+        No Zaps yet!<br>Send the first Zap!
+      </div>
+    `,
+
+    createPlaceholder: (index) => `
+      <li class="zap-list-item" data-index="${index}">
+        <div class="zap-sender">
+          <div class="zap-placeholder-icon skeleton"></div>
+          <div class="zap-placeholder-content">
+            <div class="zap-placeholder-name skeleton"></div>
+          </div>
+          <div class="zap-placeholder-amount skeleton"></div>
+        </div>
+        <div class="zap-placeholder-details">
+          <div class="zap-placeholder-comment skeleton"></div>
+        </div>
+      </li>
+    `,
+
+    createZapStats: (stats) => {
+      if (stats.timeout) {
+        return this.#createTimeoutStats();
+      }
+      return this.#createNormalStats(stats);
+    }
+  };
+
+  #createTimeoutStats() {
+    return `
+      <div class="stats-item">Total Count</div>
+      <div class="stats-item"><span class="number text-muted">nostr.band</span></div>
+      <div class="stats-item">times</div>
+      <div class="stats-item">Total Amount</div>
+      <div class="stats-item"><span class="number text-muted">Stats</span></div>
+      <div class="stats-item">sats</div>
+      <div class="stats-item">Max Amount</div>
+      <div class="stats-item"><span class="number text-muted">Unavailable</span></div>
+      <div class="stats-item">sats</div>
+    `;
+  }
+
+  #createNormalStats(stats) {
+    return `
+      <div class="stats-item">Total Count</div>
+      <div class="stats-item"><span class="number">${formatNumber(stats.count)}</span></div>
+      <div class="stats-item">times</div>
+      <div class="stats-item">Total Amount</div>
+      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.msats / 1000))}</span></div>
+      <div class="stats-item">sats</div>
+      <div class="stats-item">Max Amount</div>
+      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.maxMsats / 1000))}</span></div>
+      <div class="stats-item">sats</div>
+    `;
+  }
+
+  // Style Management
+  #styleManager = {
+    getAmountColorClass: (amount, isColorModeEnabled) => {
+      if (!isColorModeEnabled) return "";
+      
+      const thresholds = [
+        [10000, "zap-amount-10k"],
+        [5000, "zap-amount-5k"],
+        [2000, "zap-amount-2k"],
+        [1000, "zap-amount-1k"],
+        [500, "zap-amount-500"],
+        [200, "zap-amount-200"],
+        [100, "zap-amount-100"]
+      ];
+
+      for (const [threshold, className] of thresholds) {
+        if (amount >= threshold) return className;
+      }
+      return "";
+    },
+
+    applyTheme: (root, theme) => {
+      const themeClass = theme === "dark" ? "dark-theme" : "light-theme";
+      root.classList.add(themeClass);
+    }
+  };
+
+  // Event Handlers
+  #setupEventHandlers() {
+    const dialog = this.#getElement(".dialog");
+    const closeButton = this.#getElement(".close-dialog-button");
+
+    closeButton.addEventListener("click", () => this.closeDialog());
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) this.closeDialog();
+    });
   }
 }
 
