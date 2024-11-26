@@ -1,6 +1,7 @@
 import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName, verifyNip05 } from "./utils.js";
 import { PROFILE_CONFIG } from "./ZapConfig.js";
+import { BatchProcessor } from "./BatchProcessor.js";
 
 /**
  * @typedef {Object} ProfileResult
@@ -14,101 +15,18 @@ import { PROFILE_CONFIG } from "./ZapConfig.js";
  * Class to manage Nostr profile information
  * Singleton pattern is adopted to share one instance throughout the application
  */
-export class ProfileManager {
-  static instance = null;
-
-  constructor() {
-    if (!ProfileManager.instance) {
-      this._config = PROFILE_CONFIG;
-      this._initialize();
-      ProfileManager.instance = this;
-    }
-    return ProfileManager.instance;
-  }
-
-  _initialize() {
-    // Initialize cache and queue
-    this.profileCache = new Map();
-    this.nip05Cache = new Map();
-    this.pendingFetches = new Map();
-    this.nip05PendingFetches = new Map();
-    this.fetchingPubkeys = new Set();
-    this.batchQueue = new Set();
-    this.resolvers = new Map();
-    this.batchTimer = null;
-  }
-
-  async fetchProfiles(pubkeys) {
-    // Filter uncached public keys
-    const uncachedPubkeys = pubkeys.filter(pubkey => !this.profileCache.has(pubkey));
-
-    if (uncachedPubkeys.length === 0) {
-      return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
-    }
-
-    // Schedule fetch for uncached public keys
-    const fetchPromises = uncachedPubkeys.map(pubkey => this._getOrCreateFetchPromise(pubkey));
-
-    // Schedule batch processing
-    this._scheduleBatchProcess();
-
-    // Wait for fetch to complete
-    await Promise.all(fetchPromises);
-
-    // Return results
-    return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
-  }
-
-  _getOrCreateFetchPromise(pubkey) {
-    if (this.pendingFetches.has(pubkey)) {
-      return this.pendingFetches.get(pubkey);
-    }
-
-    const promise = new Promise(resolve => {
-      this.resolvers.set(pubkey, resolve);
+class ProfileBatchProcessor extends BatchProcessor {
+  constructor(profileManager, config) {
+    super({
+      batchSize: config.BATCH_SIZE,
+      batchDelay: config.BATCH_DELAY
     });
-    this.pendingFetches.set(pubkey, promise);
-    this.batchQueue.add(pubkey);
-    return promise;
+    this.profileManager = profileManager;
+    this.config = config;
   }
 
-  _scheduleBatchProcess() {
-    if (this.batchTimer) return;
-
-    this.batchTimer = setTimeout(() => {
-      this.batchTimer = null;
-      this._processBatchQueue();
-    }, this._config.BATCH_DELAY);
-  }
-
-  async _processBatchQueue() {
-    if (this.batchQueue.size === 0) return;
-
-    const batchPubkeys = Array.from(this.batchQueue).splice(0, this._config.BATCH_SIZE);
-    this.batchQueue = new Set(Array.from(this.batchQueue).filter(pubkey => !batchPubkeys.includes(pubkey)));
-
-    batchPubkeys.forEach(pubkey => this.fetchingPubkeys.add(pubkey));
-
-    try {
-      await this._fetchProfileFromRelay(batchPubkeys);
-    } catch (error) {
-      console.error("Failed to fetch profile:", error);
-      this._handleFetchError(batchPubkeys);
-    } finally {
-      batchPubkeys.forEach(pubkey => {
-        this.fetchingPubkeys.delete(pubkey);
-        this.pendingFetches.delete(pubkey);
-        this.resolvers.delete(pubkey);
-      });
-
-      if (this.batchQueue.size > 0) {
-        this._scheduleBatchProcess();
-      }
-    }
-  }
-
-  async _fetchProfileFromRelay(pubkeys) {
-    const profiles = await profilePool.querySync(this._config.RELAYS, {
+  async onBatchProcess(pubkeys) {
+    const profiles = await profilePool.querySync(this.config.RELAYS, {
       kinds: [0],
       authors: pubkeys,
     });
@@ -131,21 +49,68 @@ export class ProfileManager {
             ...parsedContent,
             name: getProfileDisplayName(parsedContent) || "nameless",
           };
-          this.profileCache.set(profile.pubkey, parsedProfile);
-          this._resolvePromise(profile.pubkey, parsedProfile);
+          this.profileManager.profileCache.set(profile.pubkey, parsedProfile);
+          this.resolveItem(profile.pubkey, parsedProfile);
         } catch (error) {
           console.error(`Failed to parse profile: ${profile.pubkey}`, error);
-          this._resolvePromise(profile.pubkey, this._createDefaultProfile());
+          this.resolveItem(profile.pubkey, this.profileManager._createDefaultProfile());
         }
       })
     );
 
     pubkeys.forEach(pubkey => {
-      if (!this.profileCache.has(pubkey)) {
-        this.profileCache.set(pubkey, null);
-        this._resolvePromise(pubkey, null);
+      if (!this.profileManager.profileCache.has(pubkey)) {
+        this.profileManager.profileCache.set(pubkey, null);
+        this.resolveItem(pubkey, null);
       }
     });
+  }
+
+  onBatchError(pubkeys, error) {
+    pubkeys.forEach(pubkey => {
+      const defaultProfile = this.profileManager._createDefaultProfile();
+      this.profileManager.profileCache.set(pubkey, defaultProfile);
+      this.resolveItem(pubkey, defaultProfile);
+    });
+  }
+}
+
+export class ProfileManager {
+  static instance = null;
+
+  constructor() {
+    if (!ProfileManager.instance) {
+      this._config = PROFILE_CONFIG;
+      this._initialize();
+      ProfileManager.instance = this;
+    }
+    return ProfileManager.instance;
+  }
+
+  _initialize() {
+    // Initialize cache and queue
+    this.profileCache = new Map();
+    this.nip05Cache = new Map();
+    this.nip05PendingFetches = new Map();
+    this.batchProcessor = new ProfileBatchProcessor(this, this._config);
+  }
+
+  async fetchProfiles(pubkeys) {
+    // Filter uncached public keys
+    const uncachedPubkeys = pubkeys.filter(pubkey => !this.profileCache.has(pubkey));
+
+    if (uncachedPubkeys.length === 0) {
+      return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+    }
+
+    // Schedule fetch for uncached public keys
+    const fetchPromises = uncachedPubkeys.map(pubkey => this.batchProcessor.getOrCreateFetchPromise(pubkey));
+
+    // Wait for fetch to complete
+    await Promise.all(fetchPromises);
+
+    // Return results
+    return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
   }
 
   async verifyNip05Async(pubkey) {
