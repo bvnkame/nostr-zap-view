@@ -1,6 +1,8 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
+import arrowRightIcon from "./assets/arrow_right.svg";  // 追加
+import quickReferenceIcon from "./assets/link.svg";  // 追加
 import {
   formatIdentifier,
   parseZapEvent,
@@ -294,14 +296,18 @@ class NostrZapViewDialog extends HTMLElement {
     // Add reference content if available
     const referenceHTML = reference ? `
       <div class="zap-reference">
-        <div class="reference-icon">↪</div>
+        <div class="reference-icon">
+          <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
+        </div>
         <div class="reference-content">
           <div class="reference-text">${escapeHTML(reference.content)}</div>
           <a href="https://njump.me/${window.NostrTools.nip19.neventEncode({
             id: reference.id,
             kind: reference.kind,
             pubkey: reference.pubkey,
-          })}" target="_blank" class="reference-link">Link</a>
+          })}" target="_blank" class="reference-link">
+            <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
+          </a>
         </div>
       </div>
     ` : '';
