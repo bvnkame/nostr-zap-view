@@ -49,8 +49,6 @@ class ZapSubscriptionManager {
 
       if (eTag && this.shouldShowReference(config?.identifier)) {
         const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
-
-        console.log("Reference:", reference);
         
         if (reference) {
           event.reference = reference;

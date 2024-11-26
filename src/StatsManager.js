@@ -49,13 +49,11 @@ export class StatsManager {
     const decoded = window.NostrTools.nip19.decode(identifier);
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
     const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
-    console.log("Fetching stats from:", endpoint);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.REQUEST_TIMEOUT);
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
-      console.log("Response status:", response.status);
       return response.json();
     } catch (error) {
       if (error.name === 'AbortError') {
