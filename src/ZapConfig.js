@@ -28,7 +28,7 @@ export const ZAP_CONFIG = {
 
 // Profile management settings
 export const PROFILE_CONFIG = {
-  BATCH_SIZE: 20,
+  BATCH_SIZE: 10,
   BATCH_DELAY: 100,
   RELAYS: [
     "wss://relay.nostr.band",
