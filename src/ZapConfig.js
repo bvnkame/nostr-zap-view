@@ -18,7 +18,8 @@ export const APP_CONFIG = {
 export const ZAP_CONFIG = {
   SUBSCRIPTION_TIMEOUT: 20000, // Changed: Unnested
   DEFAULT_LIMIT: 1, // Changed: Unnested
-  API_TIMEOUT: 3000, // Added: API timeout setting
+  STATS_TIMEOUT: 4000,  // Changed: 統一されたタイムアウト値
+  STATS_CACHE_DURATION: 300000, // Added: 5分のキャッシュ期間
   ERRORS: {
     DIALOG_NOT_FOUND: "Zap dialog not found",
     BUTTON_NOT_FOUND: "Fetch button not found",

@@ -18,7 +18,7 @@ export class StatsManager {
     const cached = viewCache.get(identifier);
     const now = Date.now();
 
-    if (cached && now - cached.timestamp < 300000) {
+    if (cached && now - cached.timestamp < CONFIG.STATS_CACHE_DURATION) {
       return cached.stats;
     }
 
@@ -41,7 +41,7 @@ export class StatsManager {
       return stats || { error: true, timeout: true };
     } catch (error) {
       console.error("Failed to fetch Zap stats:", error);
-      return { error: true, timeout: error.message === 'TIMEOUT' };
+      return { error: true, timeout: error.message === 'STATS_TIMEOUT' };
     }
   }
 
@@ -51,14 +51,14 @@ export class StatsManager {
     const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
     console.log("Fetching stats from:", endpoint);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), CONFIG.STATS_TIMEOUT);
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
       return response.json();
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error('TIMEOUT');
+        throw new Error('STATS_TIMEOUT');
       }
       throw error;
     } finally {
