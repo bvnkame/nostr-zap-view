@@ -26,7 +26,12 @@ export class UIStatus {
     const statsDiv = this.root.querySelector(".zap-stats");
     if (!statsDiv) return;
 
-    statsDiv.innerHTML = stats.timeout 
+    // エラー状態とタイムアウト状態の判定を厳密に行う
+    const isTimeout = !stats || 
+                     (stats.error === true && stats.timeout === true) || 
+                     (!stats.hasOwnProperty('count') && !stats.hasOwnProperty('msats'));
+
+    statsDiv.innerHTML = isTimeout
       ? this.#createTimeoutStats()
       : this.#createNormalStats(stats);
   }

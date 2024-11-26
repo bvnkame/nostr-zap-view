@@ -36,7 +36,9 @@ export class StatsManager {
   async fetchStats(identifier) {
     try {
       const response = await this._fetchFromApi(identifier);
-      return this._formatStats(response);
+      const stats = this._formatStats(response);
+      // statsがnullの場合はタイムアウトエラーを返す
+      return stats || { error: true, timeout: true };
     } catch (error) {
       console.error("Failed to fetch Zap stats:", error);
       return { error: true, timeout: error.message === 'TIMEOUT' };
@@ -47,7 +49,7 @@ export class StatsManager {
     const decoded = window.NostrTools.nip19.decode(identifier);
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
     const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
-
+    console.log("Fetching stats from:", endpoint);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), CONFIG.API_TIMEOUT);
 
@@ -79,6 +81,11 @@ export class StatsManager {
   }
 
   async incrementStats(currentStats, amountMsats, viewId) {
+    // タイムアウト状態の場合は統計を更新しない
+    if (currentStats?.error && currentStats?.timeout) {
+      return currentStats;
+    }
+
     const updatedStats = {
       count: (currentStats?.count || 0) + 1,
       msats: (currentStats?.msats || 0) + amountMsats,
