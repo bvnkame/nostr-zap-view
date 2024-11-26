@@ -95,7 +95,7 @@ button {
   font-weight: normal;
   color: var(--pubkey-text);
   text-align: center;
-  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
+  line-height: 42px;
 }
 
 .dialog-title.custom-title {
@@ -161,13 +161,11 @@ button {
   height: 46px;
   justify-content: space-between;
   padding: 4px;
-  /* display, align-items は共通スタイルへ移動 */
 }
 
 .zap-placeholder-icon,
 .sender-icon {
   background: var(--hover-bg);
-  /* width, height, border-radius, position は共通スタイルへ移動 */
 }
 
 .sender-icon {
@@ -214,13 +212,11 @@ button {
   font-size: 0.9375rem;
   font-weight: bold;
   color: var(--name-text);
-  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .sender-pubkey {
   font-size: 0.625rem;
   color: var(--pubkey-text);
-  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .zap-amount {
@@ -240,13 +236,11 @@ button {
   padding: 0 0 2px 48px;
   border-radius: 0 0 6px 6px;
   margin: 0;
-  /* display, align-items は共通スタイルへ移動 */
 }
 
 .zap-comment {
   font-size: 0.9375rem;
   margin: 4px 0;
-  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .no-zaps-message {
@@ -258,7 +252,75 @@ button {
   font-weight: 700;
 }
 
-/* Base skeleton style */
+.text-muted {
+  margin-right: 16px;
+  opacity: 0.4;
+}
+
+.zap-reference {
+  padding: 0 0 2px 48px;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--pubkey-text);
+}
+
+.reference-icon {
+  margin-right: 4px;
+}
+
+.reference-content {
+  justify-content: space-between;
+  flex: 1;
+  min-width: 0;
+}
+
+.reference-text {
+  font-size: 0.75rem;
+  margin: 2px 0;
+}
+
+.reference-link {
+  color: var(--pubkey-text);
+  margin-left: 6px;
+  padding-left: 6px;
+  text-decoration: none;
+  border-left: 1px solid var(--border);
+}
+
+.stats-skeleton {
+  background-color: var(--zap-stats-skeleton-bg);
+  height: 23px;
+  width: 110px;
+}
+
+.zap-placeholder-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.zap-placeholder-name {
+  height: 32px;
+  width: 140px;
+}
+
+.zap-placeholder-amount {
+  height: 32px;
+  width: 60px;
+}
+
+.zap-placeholder-comment {
+  height: 22px;
+  width: 180px;
+  margin: 4px 0;
+}
+
+.zap-list-item .skeleton {
+  background-color: var(--hover-bg);
+  opacity: 0.8;
+}
+
 .skeleton {
   color: transparent;
   border-radius: 2px;
@@ -280,95 +342,6 @@ button {
     background-position: -200% 0;
   }
 }
-
-/* Skeleton for stats */
-.stats-skeleton {
-  background-color: var(--zap-stats-skeleton-bg);
-  height: 23px;
-  width: 110px;
-}
-
-/* Skeleton for Zap events */
-.zap-list-item .skeleton {
-  background-color: var(--hover-bg);
-  opacity: 0.8;
-}
-
-.zap-placeholder-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.zap-placeholder-name,
-.zap-placeholder-amount,
-.zap-placeholder-comment,
-.sender-pubkey.skeleton,
-.zap-amount.skeleton,
-.reference-icon.skeleton,
-.reference-text.skeleton,
-.reference-link.skeleton {
-  border-radius: 2px;
-}
-
-.zap-placeholder-name {
-  height: 32px;
-  width: 140px;
-}
-
-.zap-placeholder-amount {
-  height: 32px;
-  width: 60px;
-}
-
-.zap-placeholder-comment {
-  height: 22px;
-  width: 180px;
-  margin: 4px 0;
-}
-
-.text-muted {
-  margin-right: 16px;
-  opacity: 0.4;
-}
-
-.zap-reference {
-  padding: 0 0 2px 48px;
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--pubkey-text);
-  /* display, align-items は共通スタイルへ移動 */
-}
-
-.reference-icon {
-  margin-right: 4px;
-  /* img のスタイルは共通スタイルへ移動 */
-}
-
-.reference-content {
-  justify-content: space-between;
-  flex: 1;
-  min-width: 0;
-  /* display, align-items は共通スタイルへ移動 */
-}
-
-.reference-text {
-  font-size: 0.75rem;
-  margin: 2px 0;
-  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
-}
-
-.reference-link {
-  color: var(--pubkey-text);
-  margin-left: 6px;
-  padding-left: 6px;
-  text-decoration: none;
-  border-left: 1px solid var(--border);
-  /* display, align-items は共通スタイルへ移動 */
-}
-
-/* Skeleton styles */
 
 .zap-placeholder-name.skeleton {
   width: 120px;
@@ -406,6 +379,17 @@ button {
   width: 16px;
   height: 16px;
   margin-left: 6px;
+}
+
+.zap-placeholder-name,
+.zap-placeholder-amount,
+.zap-placeholder-comment,
+.sender-pubkey.skeleton,
+.zap-amount.skeleton,
+.reference-icon.skeleton,
+.reference-text.skeleton,
+.reference-link.skeleton {
+  border-radius: 2px;
 }
 
 /* 共通のテキストオーバーフロー処理 */
