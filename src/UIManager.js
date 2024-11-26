@@ -457,7 +457,7 @@ class NostrZapViewDialog extends HTMLElement {
           title.textContent = customTitle;
           title.classList.add("custom-title");
         } else {
-          const identifier = fetchButton.getAttribute("data-nzv-identifier");
+          const identifier = fetchButton.getAttribute("data-nzv-id");
           title.textContent = "To " + formatIdentifier(identifier);
           title.classList.remove("custom-title");
         }
@@ -479,7 +479,7 @@ class NostrZapViewDialog extends HTMLElement {
     // viewIdからidentifierを取得
     const viewId = this.getAttribute("data-view-id");
     const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
-    const identifier = fetchButton?.getAttribute("data-nzv-identifier") || "";
+    const identifier = fetchButton?.getAttribute("data-nzv-id") || "";
     const shouldShowReference = !isEventIdentifier(identifier);
 
     list.innerHTML = Array(maxCount)
