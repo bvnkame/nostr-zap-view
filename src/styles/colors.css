@@ -11,10 +11,6 @@
   border-radius: 6px 6px 0 0;
 }
 
-li[class*="zap-amount-"] {
-  border: none;
-}
-
 /* Amount-based Styles */
 .zap-amount-100 .zap-sender { background-color: var(--zap-100); }
 .zap-amount-200 .zap-sender { background-color: var(--zap-200); }
