@@ -105,14 +105,6 @@ button {
   background-color: var(--hover-bg);
 }
 
-.zap-placeholder-icon {
-  width: 32px;
-  height: 32px;
-  margin: 7px 0;
-  background: var(--hover-bg);
-  border-radius: 4px;
-}
-
 .zap-placeholder-comment {
   color: var(--pubkey-text);
   font-size: 0.9375rem;
@@ -175,11 +167,25 @@ button {
   padding: 4px;
 }
 
+.zap-placeholder-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--hover-bg);
+  border-radius: 4px;
+  position: relative;
+}
+
 .sender-icon {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
   position: relative;
+}
+
+.zap-placeholder-icon.skeleton {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
 }
 
 .sender-icon img {
@@ -311,13 +317,6 @@ button {
   opacity: 0.8;
 }
 
-.zap-placeholder-icon {
-  width: 32px;
-  height: 32px;
-  margin: 7px 0;
-  border-radius: 4px;
-}
-
 .zap-placeholder-content {
   flex: 1;
   display: flex;
@@ -407,11 +406,6 @@ button {
 }
 
 /* Skeleton styles */
-.zap-placeholder-icon.skeleton {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-}
 
 .zap-placeholder-name.skeleton {
   width: 120px;

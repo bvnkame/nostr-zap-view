@@ -155,10 +155,7 @@ class NostrZapViewDialog extends HTMLElement {
       if (!profile) return;
 
       const senderName = getProfileDisplayName(profile) || "nameless";
-      // アイコン画像のプリロードを待つ
-      const senderIcon = profile.picture
-        ? await preloadImage(profile.picture)
-        : defaultIcon;
+      const senderIcon = profile.picture || defaultIcon;
 
       // プロフィール情報を更新
       const nameElement = element.querySelector(".sender-name");
@@ -167,10 +164,17 @@ class NostrZapViewDialog extends HTMLElement {
 
       if (nameElement) nameElement.textContent = senderName;
       if (iconContainer) {
-        // 常にimg要素を使用し、デフォルトアイコンをフォールバックとして設定
-        iconContainer.innerHTML = `<img src="${senderIcon}" alt="${escapeHTML(
-          senderName
-        )}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
+        // スケルトンを削除して画像を追加
+        const skeleton = iconContainer.querySelector('.zap-placeholder-icon');
+        if (skeleton) {
+          skeleton.remove();
+          const img = document.createElement('img');
+          img.src = senderIcon;
+          img.alt = `${escapeHTML(senderName)}'s icon`;
+          img.loading = "lazy";
+          img.onerror = () => { img.src = defaultIcon; };
+          iconContainer.appendChild(img);
+        }
       }
 
       // NIP-05の取得と更新
@@ -303,8 +307,8 @@ class NostrZapViewDialog extends HTMLElement {
     const escapedName = escapeHTML(senderName);
     const escapedComment = escapeHTML(comment);
 
-    // 常にimg要素を使用
-    const iconHTML = `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
+    // 初期表示時はスケルトンを表示
+    const iconHTML = `<div class="zap-placeholder-icon skeleton"></div>`;
 
     // リンクURLを取得する関数を追加
     const getLinkUrl = (reference) => {
