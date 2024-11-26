@@ -61,7 +61,7 @@ button {
   font-weight: normal;
   width: 340px;
   margin: auto;
-  padding: 0 12px;
+  padding: 0 8px;
   border: none;
   border-radius: 10px;
   background: var(--dialog-bg);
@@ -126,7 +126,6 @@ button {
   height: 23px;
   color: var(--stats-item-text);
   font-size: 0.9rem;
-  /* display, align-items は共通スタイルへ移動 */
 }
 
 .stats-item:nth-child(3n + 1) {
@@ -160,7 +159,7 @@ button {
   gap: 12px;
   height: 46px;
   justify-content: space-between;
-  padding: 4px;
+  padding: 6px;
 }
 
 .zap-placeholder-icon,
@@ -234,15 +233,17 @@ button {
 }
 
 .zap-details {
-  min-height: 34px;
-  padding: 0 0 2px 48px;
+  padding: 2px 0 4px 50px;
   border-radius: 0 0 6px 6px;
   margin: 0;
 }
 
 .zap-comment {
   font-size: 0.9375rem;
-  margin: 4px 0;
+  margin: 2px 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .no-zaps-message {
@@ -260,7 +261,7 @@ button {
 }
 
 .zap-reference {
-  padding: 0 0 2px 48px;
+  padding: 0 0 2px 50px;
   margin: 0;
   font-size: 0.875rem;
   color: var(--pubkey-text);
@@ -303,7 +304,7 @@ button {
 }
 
 .zap-placeholder-name {
-  height: 32px;
+  height: 30px;
   width: 140px;
 }
 
@@ -395,8 +396,7 @@ button {
 .dialog-title,
 .sender-name,
 .sender-pubkey,
-.reference-text,
-.zap-comment {
+.reference-text{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
