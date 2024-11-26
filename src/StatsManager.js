@@ -153,6 +153,24 @@ export class StatsManager {
       return 0;
     }
   }
+
+  async handleCachedZaps(viewId, config) {
+    const viewState = this.getOrCreateViewState(viewId);
+    try {
+      if (!viewState.currentStats) {
+        const stats = await this.getZapStats(config.identifier, viewId);
+        viewState.currentStats = !stats?.error 
+          ? await this.recalculateStats(stats, viewState.zapEventsCache)
+          : { timeout: stats.timeout };
+      }
+      
+      displayZapStats(viewState.currentStats, viewId);
+      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+    } catch (error) {
+      console.error("Failed to handle cached zaps:", error);
+      displayZapStats({ timeout: true }, viewId);
+    }
+  }
 }
 
 export const statsManager = new StatsManager();

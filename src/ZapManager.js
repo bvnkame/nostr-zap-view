@@ -132,17 +132,18 @@ class ZapSubscriptionManager {
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    // configを保存
     this.setViewConfig(viewId, config);
-
     const state = this.getOrCreateViewState(viewId);
     state.isInitialFetchComplete = false;
 
-    // 統計情報の初期化
-    state.currentStats = await statsManager.getZapStats(config.identifier, viewId);
-    if (!state.currentStats?.error) {
-      displayZapStats(state.currentStats, viewId);
-    }
+    // 統計情報の取得を非同期で開始
+    statsManager.getZapStats(config.identifier, viewId)
+      .then(stats => {
+        state.currentStats = stats;
+        if (!stats?.error) {
+          displayZapStats(stats, viewId);
+        }
+      });
 
     return new Promise((resolve) => {
       poolManager.subscribeToZaps(viewId, config, decoded, {
@@ -197,14 +198,17 @@ export async function fetchLatestZaps(event) {
     if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
     const config = ZapConfig.fromButton(button);
-    subscriptionManager.setViewConfig(viewId, config); // configを保存
+    subscriptionManager.setViewConfig(viewId, config);
     const viewState = subscriptionManager.getOrCreateViewState(viewId);
     const hasCache = viewState.zapEventsCache.length > 0;
 
     showDialog(viewId);
 
     if (hasCache) {
-      await subscriptionManager.handleCachedZaps(viewId, config);
+      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+      if (viewState.currentStats) {
+        displayZapStats(viewState.currentStats, viewId);
+      }
     } else {
       subscriptionManager.clearCache(viewId);
       await initializeNewFetch(viewId, config);
@@ -221,16 +225,7 @@ export async function fetchLatestZaps(event) {
 
 async function initializeNewFetch(viewId, config) {
   initializeZapPlaceholders(config.maxCount, viewId);
-  initializeZapStats(viewId);
+  initializeZapStats(viewId);  // スケルトン表示を即時実行
 
-  const [stats] = await Promise.allSettled([
-    statsManager.getZapStats(config.identifier, viewId),
-    subscriptionManager.initializeSubscriptions(config, viewId)
-  ]);
-
-  displayZapStats(
-    stats.status === 'fulfilled' && !stats.value?.error 
-      ? stats.value 
-      : { timeout: true }
-  , viewId);
+  await subscriptionManager.initializeSubscriptions(config, viewId);
 }
