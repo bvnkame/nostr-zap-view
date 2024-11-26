@@ -293,19 +293,36 @@ class NostrZapViewDialog extends HTMLElement {
     // 常にimg要素を使用
     const iconHTML = `<img src="${senderIcon}" alt="${escapedName}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'" />`;
 
-    // Add reference content if available
+    // リンクURLを取得する関数を追加
+    const getLinkUrl = (reference) => {
+      if (reference.kind === 31990) {
+        const rTags = reference.tags.filter(t => t[0] === 'r');
+        const nonSourceTag = rTags.find(t => !t.includes('source')) || rTags[0];
+        return nonSourceTag?.[1];
+      }
+      return `https://njump.me/${window.NostrTools.nip19.neventEncode({
+        id: reference.id,
+        kind: reference.kind,
+        pubkey: reference.pubkey,
+      })}`;
+    };
+
     const referenceHTML = reference ? `
       <div class="zap-reference">
         <div class="reference-icon">
           <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
         </div>
         <div class="reference-content">
-          <div class="reference-text">${escapeHTML(reference.content)}</div>
-          <a href="https://njump.me/${window.NostrTools.nip19.neventEncode({
-            id: reference.id,
-            kind: reference.kind,
-            pubkey: reference.pubkey,
-          })}" target="_blank" class="reference-link">
+          <div class="reference-text">${
+            reference.kind === 30023 || reference.kind === 30030
+              ? escapeHTML(reference.tags.find(t => t[0] === 'title')?.[1] || reference.content)
+              : reference.kind === 30009 || reference.kind === 40 || reference.kind === 41
+              ? escapeHTML(reference.tags.find(t => t[0] === 'name')?.[1] || reference.content)
+              : reference.kind === 31990
+              ? escapeHTML(reference.tags.find(t => t[0] === 'alt')?.[1] || reference.content)
+              : escapeHTML(reference.content)
+          }</div>
+          <a href="${getLinkUrl(reference)}" target="_blank" class="reference-link">
             <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
           </a>
         </div>
