@@ -1,4 +1,6 @@
 /* styles.css */
+@import url("./colors.css");
+
 :host {
   --main-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
@@ -81,6 +83,10 @@ button {
   text-align: center;
 }
 
+.close-dialog-button:hover {
+  background-color: var(--hover-bg);
+}
+
 .dialog-title {
   height: 42px;
   margin: 0;
@@ -89,20 +95,13 @@ button {
   font-weight: normal;
   color: var(--pubkey-text);
   text-align: center;
-  line-height: 42px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .dialog-title.custom-title {
   color: var(--tite-text);
   font-weight: 600;
   font-size: 1rem;
-}
-
-.close-dialog-button:hover {
-  background-color: var(--hover-bg);
 }
 
 .zap-placeholder-comment {
@@ -124,11 +123,10 @@ button {
 }
 
 .stats-item {
-  display: flex;
-  align-items: center;
   height: 23px;
   color: var(--stats-item-text);
   font-size: 0.9rem;
+  /* display, align-items は共通スタイルへ移動 */
 }
 
 .stats-item:nth-child(3n + 1) {
@@ -159,33 +157,21 @@ button {
 }
 
 .zap-sender {
-  display: flex;
-  align-items: center;
   gap: 12px;
   height: 46px;
   justify-content: space-between;
   padding: 4px;
+  /* display, align-items は共通スタイルへ移動 */
 }
 
-.zap-placeholder-icon {
-  width: 32px;
-  height: 32px;
+.zap-placeholder-icon,
+.sender-icon {
   background: var(--hover-bg);
-  border-radius: 4px;
-  position: relative;
+  /* width, height, border-radius, position は共通スタイルへ移動 */
 }
 
 .sender-icon {
-  width: 32px;
-  height: 32px;
   flex-shrink: 0;
-  position: relative;
-}
-
-.zap-placeholder-icon.skeleton {
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
 }
 
 .sender-icon img {
@@ -227,18 +213,14 @@ button {
 .sender-name {
   font-size: 0.9375rem;
   font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   color: var(--name-text);
+  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .sender-pubkey {
   font-size: 0.625rem;
   color: var(--pubkey-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .zap-amount {
@@ -254,19 +236,17 @@ button {
 }
 
 .zap-details {
-  display: flex;
-  align-items: center;
   min-height: 34px;
   padding: 0 0 2px 48px;
   border-radius: 0 0 6px 6px;
   margin: 0;
+  /* display, align-items は共通スタイルへ移動 */
 }
 
 .zap-comment {
-  overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 0.9375rem;
   margin: 4px 0;
+  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .no-zaps-message {
@@ -277,9 +257,6 @@ button {
   font-size: 1.4rem;
   font-weight: 700;
 }
-
-/* Import colors.css at the beginning */
-@import url("./colors.css");
 
 /* Base skeleton style */
 .skeleton {
@@ -324,30 +301,30 @@ button {
   justify-content: center;
 }
 
+.zap-placeholder-name,
+.zap-placeholder-amount,
+.zap-placeholder-comment,
+.sender-pubkey.skeleton,
+.zap-amount.skeleton,
+.reference-icon.skeleton,
+.reference-text.skeleton,
+.reference-link.skeleton {
+  border-radius: 2px;
+}
+
 .zap-placeholder-name {
   height: 32px;
   width: 140px;
-  border-radius: 2px;
 }
 
 .zap-placeholder-amount {
   height: 32px;
   width: 60px;
-  border-radius: 2px;
-}
-
-.zap-placeholder-details {
-  display: flex;
-  align-items: center;
-  min-height: 34px;
-  padding: 0 0 2px 48px;
-  margin: 0;
 }
 
 .zap-placeholder-comment {
   height: 22px;
   width: 180px;
-  border-radius: 2px;
   margin: 4px 0;
 }
 
@@ -357,52 +334,38 @@ button {
 }
 
 .zap-reference {
-  display: flex;
-  align-items: center;
   padding: 0 0 2px 48px;
   margin: 0;
   font-size: 0.875rem;
   color: var(--pubkey-text);
+  /* display, align-items は共通スタイルへ移動 */
 }
 
 .reference-icon {
   margin-right: 4px;
-
-  img {
-    height: 16px;
-    width: auto;
-  }
+  /* img のスタイルは共通スタイルへ移動 */
 }
 
 .reference-content {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
   flex: 1;
   min-width: 0;
+  /* display, align-items は共通スタイルへ移動 */
 }
 
 .reference-text {
   font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   margin: 2px 0;
+  /* overflow, text-overflow, white-space は共通スタイルへ移動 */
 }
 
 .reference-link {
-  display: flex;
-  align-items: center;
   color: var(--pubkey-text);
   margin-left: 6px;
   padding-left: 6px;
   text-decoration: none;
   border-left: 1px solid var(--border);
-
-  img {
-    height: 16px;
-    width: auto;
-  }
+  /* display, align-items は共通スタイルへ移動 */
 }
 
 /* Skeleton styles */
@@ -443,4 +406,55 @@ button {
   width: 16px;
   height: 16px;
   margin-left: 6px;
+}
+
+/* 共通のテキストオーバーフロー処理 */
+.dialog-title,
+.sender-name,
+.sender-pubkey,
+.reference-text,
+.zap-comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 共通のフレックスボックス設定 */
+.zap-sender,
+.stats-item,
+.zap-details,
+.reference-content,
+.reference-link,
+.zap-reference {
+  display: flex;
+  align-items: center;
+}
+
+/* 共通のアイコンサイズ */
+.zap-placeholder-icon,
+.sender-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  position: relative;
+}
+
+/* 共通のリファレンス画像サイズ */
+.reference-icon img,
+.reference-link img {
+  height: 16px;
+  width: auto;
+}
+
+/* スケルトン要素の共通スタイル */
+.zap-placeholder-name.skeleton,
+.sender-pubkey.skeleton,
+.zap-amount.skeleton,
+.reference-icon.skeleton,
+.reference-text.skeleton,
+.reference-link.skeleton,
+.zap-placeholder-comment.skeleton {
+  border-radius: 2px;
+  background-color: var(--hover-bg);
+  opacity: 0.8;
 }
