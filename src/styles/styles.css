@@ -316,13 +316,9 @@ button {
   margin: 4px 0;
 }
 
-.zap-list-item .skeleton {
-  background-color: var(--hover-bg);
-  opacity: 0.8;
-}
-
 .skeleton {
   color: transparent;
+  background-color: var(--hover-bg);
   border-radius: 2px;
   background: linear-gradient(
     90deg,
@@ -332,6 +328,7 @@ button {
   );
   background-size: 200% 100%;
   animation: loading-animation 1.5s infinite;
+  opacity: 0.6;
 }
 
 @keyframes loading-animation {
@@ -345,8 +342,8 @@ button {
 
 .zap-placeholder-name.skeleton {
   width: 120px;
-  height: 16px;
-  margin-bottom: 4px;
+  height: 19px;
+  margin: 2px 0;
 }
 
 .sender-pubkey.skeleton {
@@ -428,17 +425,4 @@ button {
 .reference-link img {
   height: 16px;
   width: auto;
-}
-
-/* スケルトン要素の共通スタイル */
-.zap-placeholder-name.skeleton,
-.sender-pubkey.skeleton,
-.zap-amount.skeleton,
-.reference-icon.skeleton,
-.reference-text.skeleton,
-.reference-link.skeleton,
-.zap-placeholder-comment.skeleton {
-  border-radius: 2px;
-  background-color: var(--hover-bg);
-  opacity: 0.8;
 }

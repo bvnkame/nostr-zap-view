@@ -129,8 +129,8 @@ class NostrZapViewDialog extends HTMLElement {
         pubkey: normalizedPubkey || "",
         created_at: event.created_at,
         displayIdentifier,
-        senderName: "anonymous",
-        senderIcon: defaultIcon,
+        senderName: null, // nullに変更: 初期表示時はスケルトンを表示
+        senderIcon: null, // nullに変更: 初期表示時はスケルトンを表示
       };
     } catch (error) {
       console.error("Failed to extract zap info:", error);
@@ -159,10 +159,20 @@ class NostrZapViewDialog extends HTMLElement {
 
       // プロフィール情報を更新
       const nameElement = element.querySelector(".sender-name");
+      const nameContainer = element.querySelector(".zap-placeholder-name");
       const iconContainer = element.querySelector(".sender-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
 
-      if (nameElement) nameElement.textContent = senderName;
+      // 名前の更新: スケルトンがある場合は置き換え、ない場合は直接更新
+      if (nameContainer) {
+        nameContainer.replaceWith(Object.assign(document.createElement("span"), {
+          className: "sender-name",
+          textContent: senderName
+        }));
+      } else if (nameElement) {
+        nameElement.textContent = senderName;
+      }
+
       if (iconContainer) {
         // スケルトンを削除して画像を追加
         const skeleton = iconContainer.querySelector('.zap-placeholder-icon');
@@ -304,11 +314,18 @@ class NostrZapViewDialog extends HTMLElement {
   }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
-    const escapedName = escapeHTML(senderName);
+    const escapedName = senderName ? escapeHTML(senderName) : null;
     const escapedComment = escapeHTML(comment);
 
-    // 初期表示時はスケルトンを表示
-    const iconHTML = `<div class="zap-placeholder-icon skeleton"></div>`;
+    // アイコンの表示: senderIconがnullの場合はスケルトンを表示
+    const iconHTML = senderIcon
+      ? `<img src="${senderIcon}" alt="${escapedName || 'anonymous'}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
+      : `<div class="zap-placeholder-icon skeleton"></div>`;
+
+    // 名前の表示: senderNameがnullの場合はスケルトンを表示
+    const nameHTML = senderName
+      ? `<span class="sender-name">${escapedName}</span>`
+      : `<div class="zap-placeholder-name skeleton"></div>`;
 
     // リンクURLを取得する関数を追加
     const getLinkUrl = (reference) => {
@@ -373,7 +390,7 @@ class NostrZapViewDialog extends HTMLElement {
           ${iconHTML}
         </div>
         <div class="sender-info">
-          <span class="sender-name">${escapedName}</span>
+          ${nameHTML}
           ${pubkeyDisplay}
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
