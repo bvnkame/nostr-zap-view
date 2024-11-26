@@ -55,6 +55,7 @@ export class StatsManager {
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
+      console.log("Response status:", response.status);
       return response.json();
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -72,24 +73,28 @@ export class StatsManager {
     const stats = Object.values(responseData.stats)[0];
     if (!stats) return null;
 
-    // 数値が未定義の場合は0として扱う
-    return {
+    // 数値が未定義の場合やすべての値が0の場合でも有効な統計として扱う
+    const formattedStats = {
       count: parseInt(stats.zaps_received?.count || stats.zaps?.count || 0, 10),
       msats: parseInt(stats.zaps_received?.msats || stats.zaps?.msats || 0, 10),
       maxMsats: parseInt(stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0, 10)
     };
+
+    // すべての値が0でもnullを返さずに有効な統計として扱う
+    return formattedStats;
   }
 
   async incrementStats(currentStats, amountMsats, viewId) {
-    // タイムアウト状態の場合は統計を更新しない
+    // タイムアウト状態以外は常に統計を更新する
     if (currentStats?.error && currentStats?.timeout) {
       return currentStats;
     }
 
+    // 初期値が0でも有効な統計として扱う
     const updatedStats = {
-      count: (currentStats?.count || 0) + 1,
-      msats: (currentStats?.msats || 0) + amountMsats,
-      maxMsats: Math.max(currentStats?.maxMsats || 0, amountMsats)
+      count: (currentStats?.count ?? 0) + 1,
+      msats: (currentStats?.msats ?? 0) + amountMsats,
+      maxMsats: Math.max(currentStats?.maxMsats ?? 0, amountMsats)
     };
 
     // キャッシュを更新
@@ -122,13 +127,14 @@ export class StatsManager {
   }
 
   recalculateStats(baseStats, events) {
+    // 初期値が0でも有効な統計として扱う
     let stats = {
-      count: baseStats?.count || 0,
-      msats: baseStats?.msats || 0,
-      maxMsats: baseStats?.maxMsats || 0
+      count: baseStats?.count ?? 0,
+      msats: baseStats?.msats ?? 0,
+      maxMsats: baseStats?.maxMsats ?? 0
     };
 
-    // 未計算のリアルタイムイベントのみを処理
+    // 未計算のリアルタイムイベントを処理
     events.forEach(event => {
       if (event.isRealTimeEvent && !event.isStatsCalculated && event.amountMsats > 0) {
         stats.count++;
