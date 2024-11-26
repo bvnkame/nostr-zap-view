@@ -329,6 +329,11 @@ class NostrZapViewDialog extends HTMLElement {
       </div>
     ` : '';
 
+    // referenceの有無でnip05とreferenceを区別して表示
+    const pubkeyDisplay = reference 
+      ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
+      : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
+
     return `
       <div class="zap-sender${comment ? " with-comment" : ""}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
@@ -336,7 +341,7 @@ class NostrZapViewDialog extends HTMLElement {
         </div>
         <div class="sender-info">
           <span class="sender-name">${escapedName}</span>
-          <span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>
+          ${pubkeyDisplay}
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
@@ -349,7 +354,7 @@ class NostrZapViewDialog extends HTMLElement {
     `;
   }
 
-  async prependZap(event) {
+  async prependZap(event, viewId) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
@@ -359,16 +364,28 @@ class NostrZapViewDialog extends HTMLElement {
       noZapsMessage.remove();
     }
 
-    await this.#prefetchProfiles([event]);
+    try {
+      const zapInfo = await this.#extractZapInfo(event);
+      // referenceを追加
+      zapInfo.reference = event.reference;
+      
+      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      const li = document.createElement("li");
+      li.className = `zap-list-item ${colorClass}${
+        zapInfo.comment ? " with-comment" : ""
+      }`;
+      li.setAttribute("data-pubkey", zapInfo.pubkey);
+      li.innerHTML = this.#createZapHTML(zapInfo);
 
-    const zapInfo = await this.#extractZapInfo(event);
-    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-    const li = document.createElement("li");
-    li.className = `zap-list-item ${colorClass}${
-      zapInfo.comment ? " with-comment" : ""
-    }`;
-    li.innerHTML = this.#createZapHTML(zapInfo);
-    list.prepend(li);
+      list.prepend(li);
+
+      // プロフィール情報を非同期で更新
+      if (zapInfo.pubkey) {
+        this.#loadProfileAndUpdate(zapInfo.pubkey, li);
+      }
+    } catch (error) {
+      console.error("Failed to prepend zap:", error);
+    }
   }
 
   #getElement(selector) {
@@ -482,7 +499,7 @@ class NostrZapViewDialog extends HTMLElement {
       const nip05 = await profileManager.verifyNip05Async(pubkey);
       if (nip05) {
         const elements = this.shadowRoot.querySelectorAll(
-          `[data-pubkey="${pubkey}"]`
+          `[data-nip05-target="true"][data-pubkey="${pubkey}"]`
         );
         elements.forEach((el) => {
           if (!el.hasAttribute("data-nip05-updated")) {
@@ -525,7 +542,7 @@ export const createDialog = (viewId) => {
   }
 };
 
-// UIの操作関数を修正してviewIdを使用
+// UIの��作関数を修正してviewIdを使用
 export const {
   closeDialog,
   showDialog,
@@ -550,7 +567,7 @@ export const {
       getDialog(viewId)?.replacePlaceholderWithZap(event, index),
     renderZapListFromCache: (cache, max, viewId) =>
       getDialog(viewId)?.renderZapListFromCache(cache, max),
-    prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event),
+    prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
     displayZapStats: (stats, viewId) =>
       getDialog(viewId)?.displayZapStats(stats),
     showNoZapsMessage: (viewId) => getDialog(viewId)?.showNoZapsMessage(),

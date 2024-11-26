@@ -89,26 +89,39 @@ class ZapSubscriptionManager {
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = true;
       event.isStatsCalculated = false;
-      state.zapEventsCache.unshift(event);
 
       try {
+        // 統計情報の更新
         const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
         if (bolt11Tag) {
           const decoded = window.decodeBolt11(bolt11Tag);
           const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
 
           if (amountMsats > 0) {
-            // 統計情報の更新処理を改善
             state.currentStats = state.currentStats || { count: 0, msats: 0, maxMsats: 0 };
             const updatedStats = await statsManager.incrementStats(state.currentStats, amountMsats, viewId);
             state.currentStats = updatedStats;
             displayZapStats(updatedStats, viewId);
             event.isStatsCalculated = true;
-            event.amountMsats = amountMsats; // 金額を保存
+            event.amountMsats = amountMsats;
           }
         }
 
-        await prependZap(event, viewId);
+        // reference情報の取得
+        const eTag = event.tags.find(tag => tag[0] === 'e');
+        const config = this.getViewConfig(viewId);
+
+        if (eTag && this.shouldShowReference(config?.identifier)) {
+          const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+          if (reference) {
+            event.reference = reference;
+          }
+        }
+
+        // キャッシュに追加
+        state.zapEventsCache.unshift(event);
+        // UIを更新（referenceの取得後に実行）
+        await prependZap(event, viewId);  // viewIdを渡すように修正
       } catch (error) {
         console.error("Failed to handle realtime Zap event:", error);
       }
