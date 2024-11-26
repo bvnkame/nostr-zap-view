@@ -129,12 +129,23 @@ export function formatIdentifier(identifier) {
   }
 }
 
+// Add function to check identifier type
+export function isProfileIdentifier(identifier) {
+  if (!identifier || typeof identifier !== 'string') return false;
+  return identifier.startsWith('npub1') || identifier.startsWith('nprofile1');
+}
+
+export function isEventIdentifier(identifier) {
+  if (!identifier || typeof identifier !== 'string') return false;
+  return identifier.startsWith('note1') || identifier.startsWith('nevent1');
+}
+
 export function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.name || "nameless";
 }
 
 export async function parseZapEvent(event) {
-  const { pubkey, content } = await parseDescriptionTag(event);
+  const { pubkey, content } = parseDescriptionTag(event);
   const satsText = await parseBolt11(event);
 
   return {

@@ -10,6 +10,7 @@ import {
   isWithin24Hours,
   preloadImage,
   escapeHTML,
+  isEventIdentifier, // 追加
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 import { UIStatus } from "./UIStatus.js";
@@ -458,7 +459,7 @@ class NostrZapViewDialog extends HTMLElement {
     const viewId = this.getAttribute("data-view-id");
     const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
     const identifier = fetchButton?.getAttribute("data-nzv-identifier") || "";
-    const shouldShowReference = !identifier.startsWith("note1") && !identifier.startsWith("nevent1");
+    const shouldShowReference = !isEventIdentifier(identifier);
 
     list.innerHTML = Array(maxCount)
       .fill(null)

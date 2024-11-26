@@ -1,6 +1,6 @@
 import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
-import { decodeIdentifier } from "./utils.js";
+import { decodeIdentifier, isProfileIdentifier } from "./utils.js";
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
 
@@ -47,7 +47,7 @@ class ZapSubscriptionManager {
       const eTag = event.tags.find(tag => tag[0] === 'e');
       const config = this.getViewConfig(viewId);
 
-      if (eTag && this.shouldShowReference(config?.identifier)) {
+      if (eTag && isProfileIdentifier(config?.identifier)) {
         const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
         
         if (reference) {
@@ -75,11 +75,6 @@ class ZapSubscriptionManager {
     }
   }
 
-  shouldShowReference(identifier) {
-    if (!identifier) return false;
-    return identifier.startsWith('npub1') || identifier.startsWith('nprofile1');
-  }
-
   async handleRealTimeEvent(event, viewId) {
     const state = this.getOrCreateViewState(viewId);
     if (!state.isInitialFetchComplete) return;
@@ -89,7 +84,7 @@ class ZapSubscriptionManager {
       event.isStatsCalculated = false;
 
       try {
-        // 統計情報の更新（すべてのイベントで実行）
+        // 統計情報の更��（すべてのイベントで実行）
         await this.updateEventStats(event, state, viewId);
 
         // reference情報の取得（必要な場合のみ）
@@ -125,7 +120,7 @@ class ZapSubscriptionManager {
     const eTag = event.tags.find(tag => tag[0] === 'e');
     const config = this.getViewConfig(viewId);
 
-    if (eTag && this.shouldShowReference(config?.identifier)) {
+    if (eTag && isProfileIdentifier(config?.identifier)) {
       const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
       if (reference) {
         event.reference = reference;
