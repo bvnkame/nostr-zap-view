@@ -1,4 +1,4 @@
-import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { API_CONFIG } from "./ZapConfig.js";
 
 export class StatsManager {
   constructor() {
@@ -18,7 +18,7 @@ export class StatsManager {
     const cached = viewCache.get(identifier);
     const now = Date.now();
 
-    if (cached && now - cached.timestamp < CONFIG.STATS_CACHE_DURATION) {
+    if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
       return cached.stats;
     }
 
@@ -51,7 +51,7 @@ export class StatsManager {
     const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
     console.log("Fetching stats from:", endpoint);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), CONFIG.STATS_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.REQUEST_TIMEOUT);
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });

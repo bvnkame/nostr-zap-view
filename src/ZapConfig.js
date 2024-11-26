@@ -14,17 +14,21 @@ export const APP_CONFIG = {
   },
 };
 
-// Modify Zap-related settings
+// Zap-related settings
 export const ZAP_CONFIG = {
-  SUBSCRIPTION_TIMEOUT: 20000, // Changed: Unnested
-  DEFAULT_LIMIT: 1, // Changed: Unnested
-  STATS_TIMEOUT: 4000,  // Changed: 統一されたタイムアウト値
-  STATS_CACHE_DURATION: 300000, // Added: 5分のキャッシュ期間
+  SUBSCRIPTION_TIMEOUT: 20000,
+  DEFAULT_LIMIT: 1,
   ERRORS: {
     DIALOG_NOT_FOUND: "Zap dialog not found",
     BUTTON_NOT_FOUND: "Fetch button not found",
     DECODE_FAILED: "Failed to decode identifier",
   },
+};
+
+// API-related settings
+export const API_CONFIG = {
+  REQUEST_TIMEOUT: 4000,
+  CACHE_DURATION: 300000,
 };
 
 // Profile management settings

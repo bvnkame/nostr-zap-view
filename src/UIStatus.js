@@ -1,5 +1,5 @@
 import { formatNumber } from "./utils.js";
-import { ZAP_CONFIG } from "./ZapConfig.js";
+import { API_CONFIG } from "./ZapConfig.js";
 
 export class UIStatus {
   constructor(rootElement) {
@@ -19,7 +19,7 @@ export class UIStatus {
       if (statsDiv.querySelector('.stats-skeleton')) {
         statsDiv.innerHTML = this.#createTimeoutStats();
       }
-    }, ZAP_CONFIG.STATS_TIMEOUT);
+    }, API_CONFIG.REQUEST_TIMEOUT);
   }
 
   displayStats(stats) {
