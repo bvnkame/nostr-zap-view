@@ -111,25 +111,39 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #extractZapInfo(event) {
-    const { pubkey, content, satsText } = await parseZapEvent(
-      event,
-      defaultIcon
-    );
-    const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-
-    // 基本情報のみを含む初期データ
-    return {
-      satsText,
-      satsAmount,
-      comment: content || "",
-      pubkey: pubkey || "",
-      created_at: event.created_at,
-      displayIdentifier: formatIdentifier(
-        window.NostrTools.nip19.npubEncode(pubkey)
-      ),
-      senderName: "anonymous",
-      senderIcon: defaultIcon,
-    };
+    try {
+      const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
+      const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
+  
+      // pubkeyの存在確認と型チェック
+      const normalizedPubkey = typeof pubkey === 'string' ? pubkey : null;
+      const displayIdentifier = normalizedPubkey 
+        ? formatIdentifier(window.NostrTools.nip19.npubEncode(normalizedPubkey))
+        : 'anonymous';
+  
+      return {
+        satsText,
+        satsAmount,
+        comment: content || "",
+        pubkey: normalizedPubkey || "",
+        created_at: event.created_at,
+        displayIdentifier,
+        senderName: "anonymous",
+        senderIcon: defaultIcon,
+      };
+    } catch (error) {
+      console.error("Failed to extract zap info:", error);
+      return {
+        satsText: "Amount: Unknown",
+        satsAmount: 0,
+        comment: "",
+        pubkey: "",
+        created_at: event.created_at,
+        displayIdentifier: "anonymous",
+        senderName: "anonymous",
+        senderIcon: defaultIcon,
+      };
+    }
   }
 
   async #loadProfileAndUpdate(pubkey, element) {
@@ -440,21 +454,39 @@ class NostrZapViewDialog extends HTMLElement {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
+    // viewIdからidentifierを取得
+    const viewId = this.getAttribute("data-view-id");
+    const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+    const identifier = fetchButton?.getAttribute("data-nzv-identifier") || "";
+    const shouldShowReference = !identifier.startsWith("note1") && !identifier.startsWith("nevent1");
+
     list.innerHTML = Array(maxCount)
       .fill(null)
       .map(
         (_, i) => `
         <li class="zap-list-item" data-index="${i}">
           <div class="zap-sender">
-            <div class="zap-placeholder-icon skeleton"></div>
-            <div class="zap-placeholder-content">
-              <div class="zap-placeholder-name skeleton"></div>
+            <div class="sender-icon">
+              <div class="zap-placeholder-icon skeleton"></div>
             </div>
-            <div class="zap-placeholder-amount skeleton"></div>
+            <div class="sender-info">
+              <div class="zap-placeholder-name skeleton"></div>
+              <div class="sender-pubkey skeleton"></div>
+            </div>
+            <div class="zap-amount skeleton"></div>
           </div>
-          <div class="zap-placeholder-details">
+          <div class="zap-details">
             <div class="zap-placeholder-comment skeleton"></div>
           </div>
+          ${shouldShowReference ? `
+          <div class="zap-reference">
+            <div class="reference-icon skeleton"></div>
+            <div class="reference-content">
+              <div class="reference-text skeleton"></div>
+              <div class="reference-link skeleton"></div>
+            </div>
+          </div>
+          ` : ''}
         </li>
       `
       )

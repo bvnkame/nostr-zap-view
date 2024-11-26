@@ -115,11 +115,18 @@ export function isWithin24Hours(timestamp) {
 
 // Change formatNpub function to a generic function
 export function formatIdentifier(identifier) {
-  const decoded = safeNip19Decode(identifier);
-  if (!decoded) return identifier;
+  if (!identifier || typeof identifier !== 'string') {
+    return 'unknown';
+  }
 
-  const { type } = decoded;
-  return `${type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
+  try {
+    const decoded = window.NostrTools.nip19.decode(identifier);
+    const { type } = decoded;
+    return `${type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
+  } catch (error) {
+    console.debug('Failed to format identifier:', error);
+    return 'unknown';
+  }
 }
 
 export function getProfileDisplayName(profile) {
@@ -142,12 +149,26 @@ export function parseDescriptionTag(event) {
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
-    // Remove control characters
-    const sanitizedDescription = descriptionTag.replace(/[\u0000-\u001F\u007F]/g, "");
+    // 制御文字の除去と不正なエスケープシーケンスの修正
+    const sanitizedDescription = descriptionTag
+      .replace(/[\u0000-\u001F\u007F]/g, "") // 制御文字の除去
+      .replace(/\\([^"\\\/bfnrtu])/g, '$1'); // 不正なエスケープシーケンスの修正
+
     const parsed = JSON.parse(sanitizedDescription);
-    return { pubkey: parsed.pubkey, content: parsed.content || "" };
+    
+    // pubkeyの型チェックと正規化
+    const pubkey = typeof parsed.pubkey === 'string' 
+      ? parsed.pubkey 
+      : typeof parsed.pubkey === 'object' && parsed.pubkey !== null
+        ? parsed.pubkey.toString()
+        : null;
+
+    return { 
+      pubkey: pubkey,
+      content: typeof parsed.content === 'string' ? parsed.content : "" 
+    };
   } catch (error) {
-    console.error("Description tag parse error:", error);
+    console.warn("Description tag parse warning:", error, { tag: descriptionTag });
     return { pubkey: null, content: "" };
   }
 }

@@ -405,3 +405,48 @@ button {
     width: auto;
   }
 }
+
+/* Skeleton styles */
+.zap-placeholder-icon.skeleton {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.zap-placeholder-name.skeleton {
+  width: 120px;
+  height: 16px;
+  margin-bottom: 4px;
+}
+
+.sender-pubkey.skeleton {
+  width: 80px;
+  height: 12px;
+}
+
+.zap-amount.skeleton {
+  width: 60px;
+  height: 24px;
+}
+
+.zap-placeholder-comment.skeleton {
+  width: 200px;
+  height: 16px;
+}
+
+.reference-icon.skeleton {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.reference-text.skeleton {
+  width: 160px;
+  height: 14px;
+}
+
+.reference-link.skeleton {
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+}
