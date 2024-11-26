@@ -33,8 +33,8 @@ export const API_CONFIG = {
 
 // Profile management settings
 export const PROFILE_CONFIG = {
-  BATCH_SIZE: 10,
-  BATCH_DELAY: 100,
+  BATCH_SIZE: 20,
+  BATCH_DELAY: 50,
   RELAYS: [
     "wss://relay.nostr.band",
     "wss://purplepag.es",

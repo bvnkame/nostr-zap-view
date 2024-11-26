@@ -1,13 +1,12 @@
 import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
-import arrowRightIcon from "./assets/arrow_right.svg";  // 追加
-import quickReferenceIcon from "./assets/link.svg";  // 追加
+import arrowRightIcon from "./assets/arrow_right.svg"; // 追加
+import quickReferenceIcon from "./assets/link.svg"; // 追加
 import {
   formatIdentifier,
   parseZapEvent,
   getProfileDisplayName,
-  parseDescriptionTag,
   isWithin24Hours,
   preloadImage,
   escapeHTML,
@@ -178,8 +177,8 @@ class NostrZapViewDialog extends HTMLElement {
       // 基本情報を即時表示
       const zapInfo = await this.#extractZapInfo(event);
       // イベントから参照情報を取得
-      zapInfo.reference = event.reference;  // この行を追加
-      
+      zapInfo.reference = event.reference; // この行を追加
+
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
       placeholder.className = `zap-list-item ${colorClass}${
@@ -211,8 +210,8 @@ class NostrZapViewDialog extends HTMLElement {
       const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
         // イベントから参照情報を取得
-        zapInfo.reference = event.reference;  // この行を追加
-        
+        zapInfo.reference = event.reference; // この行を追加
+
         const li = document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
@@ -278,12 +277,11 @@ class NostrZapViewDialog extends HTMLElement {
     senderName,
     senderIcon,
     satsText,
-    satsAmount,
     comment,
     pubkey,
     created_at,
     displayIdentifier,
-    reference,  // Add reference parameter
+    reference, // Add reference parameter
   }) {
     const [amount, unit] = satsText.split(" ");
     const isNew = isWithin24Hours(created_at);
@@ -296,8 +294,9 @@ class NostrZapViewDialog extends HTMLElement {
     // リンクURLを取得する関数を追加
     const getLinkUrl = (reference) => {
       if (reference.kind === 31990) {
-        const rTags = reference.tags.filter(t => t[0] === 'r');
-        const nonSourceTag = rTags.find(t => !t.includes('source')) || rTags[0];
+        const rTags = reference.tags.filter((t) => t[0] === "r");
+        const nonSourceTag =
+          rTags.find((t) => !t.includes("source")) || rTags[0];
         return nonSourceTag?.[1];
       }
       return `https://njump.me/${window.NostrTools.nip19.neventEncode({
@@ -307,7 +306,8 @@ class NostrZapViewDialog extends HTMLElement {
       })}`;
     };
 
-    const referenceHTML = reference ? `
+    const referenceHTML = reference
+      ? `
       <div class="zap-reference">
         <div class="reference-icon">
           <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
@@ -315,22 +315,36 @@ class NostrZapViewDialog extends HTMLElement {
         <div class="reference-content">
           <div class="reference-text">${
             reference.kind === 30023 || reference.kind === 30030
-              ? escapeHTML(reference.tags.find(t => t[0] === 'title')?.[1] || reference.content)
-              : reference.kind === 30009 || reference.kind === 40 || reference.kind === 41
-              ? escapeHTML(reference.tags.find(t => t[0] === 'name')?.[1] || reference.content)
+              ? escapeHTML(
+                  reference.tags.find((t) => t[0] === "title")?.[1] ||
+                    reference.content
+                )
+              : reference.kind === 30009 ||
+                reference.kind === 40 ||
+                reference.kind === 41
+              ? escapeHTML(
+                  reference.tags.find((t) => t[0] === "name")?.[1] ||
+                    reference.content
+                )
               : reference.kind === 31990
-              ? escapeHTML(reference.tags.find(t => t[0] === 'alt')?.[1] || reference.content)
+              ? escapeHTML(
+                  reference.tags.find((t) => t[0] === "alt")?.[1] ||
+                    reference.content
+                )
               : escapeHTML(reference.content)
           }</div>
-          <a href="${getLinkUrl(reference)}" target="_blank" class="reference-link">
+          <a href="${getLinkUrl(
+            reference
+          )}" target="_blank" class="reference-link">
             <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
           </a>
         </div>
       </div>
-    ` : '';
+    `
+      : "";
 
     // referenceの有無でnip05とreferenceを区別して表示
-    const pubkeyDisplay = reference 
+    const pubkeyDisplay = reference
       ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
       : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
 
@@ -354,7 +368,7 @@ class NostrZapViewDialog extends HTMLElement {
     `;
   }
 
-  async prependZap(event, viewId) {
+  async prependZap(event) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
@@ -368,7 +382,7 @@ class NostrZapViewDialog extends HTMLElement {
       const zapInfo = await this.#extractZapInfo(event);
       // referenceを追加
       zapInfo.reference = event.reference;
-      
+
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
       const li = document.createElement("li");
       li.className = `zap-list-item ${colorClass}${
@@ -459,60 +473,6 @@ class NostrZapViewDialog extends HTMLElement {
     this.uiStatus.showNoZaps();
   }
 
-  // Method to prefetch profile information
-  async #prefetchProfiles(sortedZaps) {
-    const pubkeys = [
-      ...new Set(
-        sortedZaps
-          .map((event) => parseDescriptionTag(event).pubkey)
-          .filter(Boolean)
-      ),
-    ];
-
-    if (pubkeys.length > 0) {
-      // Fetch profile information
-      this.profileManager = {
-        profiles: new Map(),
-        async init(pubkeys) {
-          const profiles = await profileManager.fetchProfiles(pubkeys);
-          profiles.forEach((profile, index) => {
-            this.profiles.set(pubkeys[index], profile);
-          });
-        },
-        getProfile(pubkey) {
-          return this.profiles.get(pubkey);
-        },
-        async verifyNip05(pubkey) {
-          return await profileManager.verifyNip05Async(pubkey);
-        },
-      };
-      await this.profileManager.init(pubkeys);
-      await Promise.all(
-        pubkeys.map((pubkey) => this.#updateDisplayIdentifier(pubkey))
-      );
-    }
-  }
-
-  async #updateDisplayIdentifier(pubkey) {
-    if (!pubkey) return;
-    try {
-      const nip05 = await profileManager.verifyNip05Async(pubkey);
-      if (nip05) {
-        const elements = this.shadowRoot.querySelectorAll(
-          `[data-nip05-target="true"][data-pubkey="${pubkey}"]`
-        );
-        elements.forEach((el) => {
-          if (!el.hasAttribute("data-nip05-updated")) {
-            el.textContent = nip05;
-            el.setAttribute("data-nip05-updated", "true");
-          }
-        });
-      }
-    } catch (error) {
-      console.debug(`NIP-05 verification error (${pubkey}):`, error);
-    }
-  }
-
   #createNoZapsMessage() {
     return `
       <div class="no-zaps-message">
@@ -542,7 +502,6 @@ export const createDialog = (viewId) => {
   }
 };
 
-// UIの��作関数を修正してviewIdを使用
 export const {
   closeDialog,
   showDialog,
