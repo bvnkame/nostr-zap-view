@@ -9,17 +9,16 @@ export class UIStatus {
     const statsDiv = this.root.querySelector(".zap-stats");
     if (!statsDiv) return;
 
-    statsDiv.innerHTML = `
-      <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">times</div>
-      <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">sats</div>
-      <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
-      <div class="stats-item">sats</div>
-    `;
+    // デフォルトのスケルトン表示を行う
+    this.#showSkeletonStats(statsDiv);
+
+    // タイムアウト用のタイマーを設定
+    setTimeout(() => {
+      // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
+      if (statsDiv.querySelector('.stats-skeleton')) {
+        statsDiv.innerHTML = this.#createTimeoutStats();
+      }
+    }, 4000); // 10秒後にタイムアウト
   }
 
   displayStats(stats) {
@@ -41,6 +40,20 @@ export class UIStatus {
     if (list) {
       list.innerHTML = this.#createNoZapsMessage();
     }
+  }
+
+  #showSkeletonStats(statsDiv) {
+    statsDiv.innerHTML = `
+      <div class="stats-item">Total Count</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">times</div>
+      <div class="stats-item">Total Amount</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">sats</div>
+      <div class="stats-item">Max Amount</div>
+      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item">sats</div>
+    `;
   }
 
   #createTimeoutStats() {
