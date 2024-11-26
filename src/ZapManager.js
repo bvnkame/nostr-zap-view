@@ -35,7 +35,7 @@ class ZapSubscriptionManager {
   clearCache(viewId) {
     const state = this.getOrCreateViewState(viewId);
     state.zapEventsCache = [];
-    state.currentStats = null;  // Fix: currentStatsもクリア
+    state.currentStats = null;  // Fix: currentStats���クリア
   }
 
   async handleZapEvent(event, maxCount, viewId) {
@@ -43,17 +43,8 @@ class ZapSubscriptionManager {
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
       event.isRealTimeEvent = false;
       
-      // Add reference handling
-      const eTag = event.tags.find(tag => tag[0] === 'e');
-      const config = this.getViewConfig(viewId);
-
-      if (eTag && isProfileIdentifier(config?.identifier)) {
-        const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
-        
-        if (reference) {
-          event.reference = reference;
-        }
-      }
+      // Add reference handling before UI updates
+      await this.updateEventReference(event, viewId);
 
       state.zapEventsCache.push(event);
       state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
@@ -84,13 +75,13 @@ class ZapSubscriptionManager {
       event.isStatsCalculated = false;
 
       try {
-        // 統計情報の更��（すべてのイベントで実行）
+        // reference情報の取得を待機
+        await this.updateEventReference(event, viewId);
+        
+        // 統計情報の更新
         await this.updateEventStats(event, state, viewId);
 
-        // reference情報の取得（必要な場合のみ）
-        await this.updateEventReference(event, viewId);
-
-        // キャッシュに追加とUI更新
+        // キャッシュに追加とUI更新（referenceが取得済みの状態で）
         state.zapEventsCache.unshift(event);
         await prependZap(event, viewId);
       } catch (error) {
@@ -120,12 +111,18 @@ class ZapSubscriptionManager {
     const eTag = event.tags.find(tag => tag[0] === 'e');
     const config = this.getViewConfig(viewId);
 
-    if (eTag && isProfileIdentifier(config?.identifier)) {
-      const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
-      if (reference) {
-        event.reference = reference;
+    if (eTag && config?.relayUrls) {
+      try {
+        const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+        if (reference) {
+          event.reference = reference;
+          return true;
+        }
+      } catch (error) {
+        console.error("Failed to fetch reference:", error);
       }
     }
+    return false;
   }
 
   async initializeSubscriptions(config, viewId) {

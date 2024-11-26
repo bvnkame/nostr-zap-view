@@ -26,28 +26,37 @@ class ReferenceProcessor extends BatchProcessor {
         return;
       }
 
+      let processedEvents = 0;
       const sub = this.pool.zapPool.subscribeMany(
         this.relayUrls,
         [
           {
-            kinds: [1],
+            kinds: [1, 30023, 30030, 30009, 40, 41, 31990], // サポートするイベントの���類を拡張
             ids: items
           }
         ],
         {
           onevent: (event) => {
             this.resolveItem(event.id, event);
+            processedEvents++;
+            if (processedEvents === items.length) {
+              sub.close();
+              resolve();
+            }
           },
           oneose: () => {
+            // 未解決のアイテムを処理
             items.forEach(id => {
               if (this.resolvers.has(id)) {
                 this.resolveItem(id, null);
               }
             });
+            resolve();
           }
         }
       );
 
+      // タイムアウト処理
       setTimeout(() => {
         sub.close();
         items.forEach(id => {
@@ -124,8 +133,17 @@ class ZapPoolManager {
   }
 
   async fetchReference(relayUrls, eventId) {
-    this.referenceProcessor.setRelayUrls(relayUrls);  // Add: relayUrlsを設定
-    return this.referenceProcessor.getOrCreateFetchPromise(eventId);
+    if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
+      return null;
+    }
+    this.referenceProcessor.setRelayUrls(relayUrls);
+    try {
+      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
+      return reference;
+    } catch (error) {
+      console.error("Error fetching reference:", error);
+      return null;
+    }
   }
 }
 
