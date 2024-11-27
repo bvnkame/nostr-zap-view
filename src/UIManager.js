@@ -8,7 +8,6 @@ import {
   parseZapEvent,
   getProfileDisplayName,
   isWithin24Hours,
-  preloadImage,
   escapeHTML,
   isEventIdentifier, // 追加
 } from "./utils.js";

@@ -1,5 +1,5 @@
 import { profilePool } from "./ZapPool.js";
-import { getProfileDisplayName, verifyNip05 } from "./utils.js";
+import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./ZapConfig.js";
 import { BatchProcessor } from "./BatchProcessor.js";
 
@@ -140,7 +140,7 @@ export class ProfileManager {
         if (nip05Result) {
           const formattedNip05 = nip05Result.startsWith("_@") ? nip05Result.slice(1) : nip05Result;
           // エスケープしてからキャッシュに保存
-          const escapedNip05 = this._escapeHTML(formattedNip05);
+          const escapedNip05 = escapeHTML(formattedNip05);
           this.nip05Cache.set(pubkey, escapedNip05);
           return escapedNip05;
         } else {
@@ -158,12 +158,6 @@ export class ProfileManager {
 
     this.nip05PendingFetches.set(pubkey, fetchPromise);
     return fetchPromise;
-  }
-
-  _escapeHTML(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
   }
 
   _resolvePromise(pubkey, profile) {

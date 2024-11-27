@@ -1,6 +1,6 @@
 import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
-import { decodeIdentifier, isProfileIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
+import { decodeIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
 
