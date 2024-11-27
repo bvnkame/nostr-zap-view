@@ -342,7 +342,14 @@ class NostrZapViewDialog extends HTMLElement {
       })}`;
     };
 
-    const referenceHTML = reference
+    // viewIdからidentifierを取得
+    const viewId = this.getAttribute("data-view-id");
+    const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+    const identifier = fetchButton?.getAttribute("data-nzv-id") || "";
+    const shouldShowReference = !isEventIdentifier(identifier);
+
+    // note1やnevent1の場合はreferenceHTMLを生成しない
+    const referenceHTML = reference && shouldShowReference
       ? `
       <div class="zap-reference">
         <div class="reference-icon">
@@ -380,7 +387,7 @@ class NostrZapViewDialog extends HTMLElement {
       : "";
 
     // referenceの有無でnip05とreferenceを区別して表示
-    const pubkeyDisplay = reference
+    const pubkeyDisplay = reference && shouldShowReference
       ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
       : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
 
@@ -543,14 +550,14 @@ class NostrZapViewDialog extends HTMLElement {
   }
 }
 
-customElements.define("nostr-zap-view-dialog", NostrZapViewDialog);
+customElements.define("nzv-dialog", NostrZapViewDialog);
 
 // Simplified external API
 export const createDialog = (viewId) => {
   if (
-    !document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`)
+    !document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
   ) {
-    const dialog = document.createElement("nostr-zap-view-dialog");
+    const dialog = document.createElement("nzv-dialog");
     dialog.setAttribute("data-view-id", viewId);
     document.body.appendChild(dialog);
   }
@@ -568,7 +575,7 @@ export const {
   showNoZapsMessage, // ここに統合
 } = (() => {
   const getDialog = (viewId) =>
-    document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
+    document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
 
   return {
     closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),

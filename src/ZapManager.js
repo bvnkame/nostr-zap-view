@@ -1,6 +1,6 @@
 import { poolManager } from "./ZapPool.js";
 import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
-import { decodeIdentifier, isProfileIdentifier } from "./utils.js";
+import { decodeIdentifier, isProfileIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
 import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
 
@@ -35,7 +35,7 @@ class ZapSubscriptionManager {
   clearCache(viewId) {
     const state = this.getOrCreateViewState(viewId);
     state.zapEventsCache = [];
-    state.currentStats = null;  // Fix: currentStats���クリア
+    state.currentStats = null;  // Fix: currentStats����クリア
   }
 
   async handleZapEvent(event, maxCount, viewId) {
@@ -110,6 +110,12 @@ class ZapSubscriptionManager {
   async updateEventReference(event, viewId) {
     const eTag = event.tags.find(tag => tag[0] === 'e');
     const config = this.getViewConfig(viewId);
+    
+    // Identifierがnote1またはnevent1の場合は参照情報を取得しない
+    const identifier = config?.identifier || '';
+    if (isEventIdentifier(identifier)) {
+      return false;
+    }
 
     if (eTag && config?.relayUrls) {
       try {
@@ -191,7 +197,7 @@ export async function fetchLatestZaps(event) {
   
   try {
     if (!viewId) throw new Error("Missing view ID");
-    const zapDialog = document.querySelector(`nostr-zap-view-dialog[data-view-id="${viewId}"]`);
+    const zapDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
     if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
     const config = ZapConfig.fromButton(button);
