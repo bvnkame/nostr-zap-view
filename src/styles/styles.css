@@ -13,6 +13,8 @@
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
   --border: #edf2f7;
+  --skeleton: #fdfdfd;
+  --skeleton2: #e2e5ec;
   --zap-stats-skeleton-bg: #dde4eb;
   --new-mark: #22c55e;
 
@@ -160,11 +162,6 @@ button {
   height: 46px;
   justify-content: space-between;
   padding: 6px;
-}
-
-.zap-placeholder-icon,
-.sender-icon {
-  background: var(--hover-bg);
 }
 
 .sender-icon {
@@ -321,17 +318,16 @@ button {
 
 .skeleton {
   color: transparent;
-  background-color: var(--hover-bg);
   border-radius: 2px;
   background: linear-gradient(
     90deg,
-    var(--zap-stats-skeleton-bg) 0%,
-    var(--hover-bg) 50%,
-    var(--zap-stats-skeleton-bg) 100%
+    var(--skeleton) 0%,
+    var(--skeleton2) 50%,
+    var(--skeleton) 100%
   );
   background-size: 200% 100%;
-  animation: loading-animation 1.5s infinite;
-  opacity: 0.6;
+  animation: loading-animation 3.5s infinite;
+  opacity: 0.7;
 }
 
 @keyframes loading-animation {
