@@ -359,36 +359,10 @@ button {
   height: 24px;
 }
 
-.zap-placeholder-comment.skeleton {
-  width: 200px;
-  height: 16px;
-}
-
-.reference-icon.skeleton {
-  width: 16px;
-  height: 16px;
-  margin-right: 4px;
-}
-
-.reference-text.skeleton {
-  width: 160px;
-  height: 14px;
-}
-
-.reference-link.skeleton {
-  width: 16px;
-  height: 16px;
-  margin-left: 6px;
-}
-
 .zap-placeholder-name,
 .zap-placeholder-amount,
-.zap-placeholder-comment,
 .sender-pubkey.skeleton,
-.zap-amount.skeleton,
-.reference-icon.skeleton,
-.reference-text.skeleton,
-.reference-link.skeleton {
+.zap-amount.skeleton {
   border-radius: 2px;
 }
 
@@ -396,7 +370,7 @@ button {
 .dialog-title,
 .sender-name,
 .sender-pubkey,
-.reference-text{
+.reference-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

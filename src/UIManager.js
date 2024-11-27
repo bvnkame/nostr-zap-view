@@ -482,12 +482,6 @@ class NostrZapViewDialog extends HTMLElement {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    // viewIdからidentifierを取得
-    const viewId = this.getAttribute("data-view-id");
-    const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
-    const identifier = fetchButton?.getAttribute("data-nzv-id") || "";
-    const shouldShowReference = !isEventIdentifier(identifier);
-
     list.innerHTML = Array(maxCount)
       .fill(null)
       .map(
@@ -503,18 +497,6 @@ class NostrZapViewDialog extends HTMLElement {
             </div>
             <div class="zap-amount skeleton"></div>
           </div>
-          <div class="zap-details">
-            <div class="zap-placeholder-comment skeleton"></div>
-          </div>
-          ${shouldShowReference ? `
-          <div class="zap-reference">
-            <div class="reference-icon skeleton"></div>
-            <div class="reference-content">
-              <div class="reference-text skeleton"></div>
-              <div class="reference-link skeleton"></div>
-            </div>
-          </div>
-          ` : ''}
         </li>
       `
       )
