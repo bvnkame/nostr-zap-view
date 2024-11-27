@@ -3,6 +3,8 @@
 
 View any nostr zaps from anywhere, supporting npub, nprofile, note, and nevent identifiers.
 
+Example page: https://lokuyow.github.io/nostr-zap-view/
+
 ## Usage
 
 To configure a button for displaying zap information, use the following attributes:
@@ -26,7 +28,8 @@ To configure a button for displaying zap information, use the following attribut
 
 Add this script tag right before the bottom closing body tag.
 ```js
-<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@0.2.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.0.0"></script>
 ```
 
-Example page: https://lokuyow.github.io/nostr-zap-view/
+## Related repository
+- [nostr-zap](https://github.com/SamSamskies/nostr-zap) ![stars](https://img.shields.io/github/stars/SamSamskies/nostr-zap.svg?style=social) - Zap any Nostr npub or note from anywhere.
