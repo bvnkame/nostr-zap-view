@@ -191,18 +191,22 @@ class NostrZapViewDialog extends HTMLElement {
 
   async #loadProfileAndUpdate(pubkey, element) {
     if (!pubkey) return;
-
+  
     try {
-      const [profile] = await profileManager.fetchProfiles([pubkey]);
-      if (!profile) return;
-
-      const senderName = getProfileDisplayName(profile) || "nameless";
-      // デフォルトアイコンのフォールバックをここで行う
-      const senderIcon = profile.picture ? sanitizeImageUrl(profile.picture) : null;
-
-      // 名前の更新
+      // 必要な要素を事前に取得
       const nameElement = element.querySelector(".sender-name");
       const nameContainer = element.querySelector(".zap-placeholder-name");
+      const iconContainer = element.querySelector(".sender-icon");
+      const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
+      const pubkeyElement = element.querySelector(".sender-pubkey");
+  
+      // プロフィールの非同期取得を開始
+      const [profile] = await profileManager.fetchProfiles([pubkey]);
+      
+      const senderName = profile ? getProfileDisplayName(profile) || "nameless" : "anonymous";
+      const senderIcon = profile?.picture ? sanitizeImageUrl(profile.picture) : null;
+  
+      // 名前の更新
       if (nameContainer) {
         nameContainer.replaceWith(
           Object.assign(document.createElement("span"), {
@@ -213,55 +217,65 @@ class NostrZapViewDialog extends HTMLElement {
       } else if (nameElement) {
         nameElement.textContent = senderName;
       }
-
-      // アイコンの非同期読み込み
-      const iconContainer = element.querySelector(".sender-icon");
-      if (!iconContainer) return;
-
-      const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
-      if (!skeleton) return;
-
-      if (senderIcon) {
-        const img = new Image();
-        img.onload = () => {
+  
+      // アイコンの更新
+      if (skeleton && iconContainer) {
+        const updateIcon = (src) => {
           skeleton.remove();
-          img.className = "profile-icon";
-          img.alt = `${escapeHTML(senderName)}'s icon`;
-          img.loading = "lazy";
+          const img = Object.assign(document.createElement("img"), {
+            src,
+            alt: `${escapeHTML(senderName)}'s icon`,
+            loading: "lazy",
+            className: "profile-icon",
+          });
           iconContainer.appendChild(img);
         };
-        img.onerror = () => {
-          skeleton.remove();
-          const defaultImg = document.createElement("img");
-          defaultImg.src = defaultIcon;
-          defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
-          defaultImg.loading = "lazy";
-          iconContainer.appendChild(defaultImg);
-        };
-        img.src = senderIcon;
-      } else {
-        skeleton.remove();
-        const defaultImg = document.createElement("img");
-        defaultImg.src = defaultIcon;
-        defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
-        defaultImg.loading = "lazy";
-        iconContainer.appendChild(defaultImg);
+  
+        if (senderIcon) {
+          // プロフィール画像がある場合
+          const img = new Image();
+          img.onload = () => updateIcon(senderIcon);
+          img.onerror = () => updateIcon(defaultIcon);
+          img.src = senderIcon;
+        } else {
+          // プロフィール画像がない場合
+          updateIcon(defaultIcon);
+        }
       }
-
-      // NIP-05の非同期取得と更新
-      const pubkeyElement = element.querySelector(".sender-pubkey");
+  
+      // NIP-05の更新（未更新の場合のみ）
       if (pubkeyElement && !pubkeyElement.getAttribute("data-nip05-updated")) {
-        profileManager.verifyNip05Async(pubkey).then(nip05 => {
-          if (nip05) {
-            pubkeyElement.textContent = nip05;
-            pubkeyElement.setAttribute("data-nip05-updated", "true");
-          }
-        });
+        const cachedNip05 = profileManager.getNip05(pubkey);
+        if (cachedNip05) {
+          pubkeyElement.textContent = cachedNip05;
+          pubkeyElement.setAttribute("data-nip05-updated", "true");
+        } else {
+          profileManager.verifyNip05Async(pubkey).then(nip05 => {
+            if (nip05) {
+              pubkeyElement.textContent = nip05;
+              pubkeyElement.setAttribute("data-nip05-updated", "true");
+            }
+          });
+        }
       }
     } catch (error) {
       console.debug("Failed to load profile:", error);
+      // エラー時にもデフォルトアイコンを設定
+      const skeleton = element.querySelector(".zap-placeholder-icon");
+      if (skeleton) {
+        const iconContainer = skeleton.parentElement;
+        skeleton.remove();
+        const defaultImg = Object.assign(document.createElement("img"), {
+          src: defaultIcon,
+          alt: "anonymous user's icon",
+          loading: "lazy",
+          className: "profile-icon",
+        });
+        iconContainer.appendChild(defaultImg);
+      }
     }
   }
+  
 
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);

@@ -26,42 +26,47 @@ class ProfileBatchProcessor extends BatchProcessor {
   }
 
   async onBatchProcess(pubkeys) {
+    // プロフィール情報の一括取得
     const profiles = await profilePool.querySync(this.config.RELAYS, {
       kinds: [0],
       authors: pubkeys,
     });
 
-    const latestProfiles = Array.from(
-      profiles.reduce((map, profile) => {
-        const existing = map.get(profile.pubkey);
-        if (!existing || existing.created_at < profile.created_at) {
-          map.set(profile.pubkey, profile);
-        }
-        return map;
-      }, new Map())
-    ).map(([_, profile]) => profile);
+    // プロフィール情報の高速な処理
+    const profileMap = new Map();
+    profiles.forEach(profile => {
+      const existing = profileMap.get(profile.pubkey);
+      if (!existing || existing.created_at < profile.created_at) {
+        profileMap.set(profile.pubkey, profile);
+      }
+    });
 
+    // バッチ処理による一括更新
     await Promise.all(
-      latestProfiles.map(async profile => {
+      Array.from(profileMap.values()).map(async profile => {
         try {
-          const parsedContent = JSON.parse(profile.content);
-          const parsedProfile = {
-            ...parsedContent,
-            name: getProfileDisplayName(parsedContent) || "nameless",
+          const content = JSON.parse(profile.content);
+          const processedProfile = {
+            ...content,
+            name: getProfileDisplayName(content) || "nameless",
+            _lastUpdated: Date.now()
           };
-          this.profileManager.profileCache.set(profile.pubkey, parsedProfile);
-          this.resolveItem(profile.pubkey, parsedProfile);
+          this.profileManager.profileCache.set(profile.pubkey, processedProfile);
+          this.resolveItem(profile.pubkey, processedProfile);
         } catch (error) {
-          console.error(`Failed to parse profile: ${profile.pubkey}`, error);
-          this.resolveItem(profile.pubkey, this.profileManager._createDefaultProfile());
+          const defaultProfile = this.profileManager._createDefaultProfile();
+          this.profileManager.profileCache.set(pubkey, defaultProfile);
+          this.resolveItem(pubkey, defaultProfile);
         }
       })
     );
 
+    // 未取得のプロフィールにデフォルト値を設定
     pubkeys.forEach(pubkey => {
       if (!this.profileManager.profileCache.has(pubkey)) {
-        this.profileManager.profileCache.set(pubkey, null);
-        this.resolveItem(pubkey, null);
+        const defaultProfile = this.profileManager._createDefaultProfile();
+        this.profileManager.profileCache.set(pubkey, defaultProfile);
+        this.resolveItem(pubkey, defaultProfile);
       }
     });
   }
@@ -114,50 +119,51 @@ export class ProfileManager {
   }
 
   async verifyNip05Async(pubkey) {
-    if (this.nip05Cache.has(pubkey)) {
-      return this.nip05Cache.get(pubkey);
-    }
+    // キャッシュチェックを最適化
+    const cachedNip05 = this.nip05Cache.get(pubkey);
+    if (cachedNip05 !== undefined) return cachedNip05;
 
-    if (this.nip05PendingFetches.has(pubkey)) {
-      return this.nip05PendingFetches.get(pubkey);
-    }
+    const pendingFetch = this.nip05PendingFetches.get(pubkey);
+    if (pendingFetch) return pendingFetch;
 
-    const fetchPromise = (async () => {
-      const NIP05_TIMEOUT = 5000;
-
-      try {
-        const profile = await this.fetchProfiles([pubkey]).then(profiles => profiles[0]);
-        if (!profile?.nip05) {
-          this.nip05Cache.set(pubkey, null);
-          return null;
-        }
-
-        const nip05Result = await Promise.race([
-          verifyNip05(profile.nip05, pubkey),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('NIP-05 verification timeout')), NIP05_TIMEOUT)),
-        ]);
-
-        if (nip05Result) {
-          const formattedNip05 = nip05Result.startsWith("_@") ? nip05Result.slice(1) : nip05Result;
-          // エスケープしてからキャッシュに保存
-          const escapedNip05 = escapeHTML(formattedNip05);
-          this.nip05Cache.set(pubkey, escapedNip05);
-          return escapedNip05;
-        } else {
-          this.nip05Cache.set(pubkey, null);
-          return null;
-        }
-      } catch (error) {
-        console.debug('NIP-05 verification failed or timed out:', error);
-        this.nip05Cache.set(pubkey, null);
-        return null;
-      } finally {
-        this.nip05PendingFetches.delete(pubkey);
-      }
-    })();
-
+    const fetchPromise = this.#processNip05Verification(pubkey);
     this.nip05PendingFetches.set(pubkey, fetchPromise);
     return fetchPromise;
+  }
+
+  async #processNip05Verification(pubkey) {
+    try {
+      const [profile] = await this.fetchProfiles([pubkey]);
+      if (!profile?.nip05) {
+        this.nip05Cache.set(pubkey, null);
+        return null;
+      }
+
+      const nip05Result = await Promise.race([
+        verifyNip05(profile.nip05, pubkey),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('NIP-05 timeout')), 5000)
+        ),
+      ]);
+
+      if (!nip05Result) {
+        this.nip05Cache.set(pubkey, null);
+        return null;
+      }
+
+      const formattedNip05 = nip05Result.startsWith("_@") ? 
+        nip05Result.slice(1) : nip05Result;
+      const escapedNip05 = escapeHTML(formattedNip05);
+      this.nip05Cache.set(pubkey, escapedNip05);
+      return escapedNip05;
+
+    } catch (error) {
+      console.debug('NIP-05 verification failed:', error);
+      this.nip05Cache.set(pubkey, null);
+      return null;
+    } finally {
+      this.nip05PendingFetches.delete(pubkey);
+    }
   }
 
   _resolvePromise(pubkey, profile) {
