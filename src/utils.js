@@ -33,7 +33,6 @@ class CacheManager {
 
 // Shared cache instances
 const decodedCache = new CacheManager();
-const imageCache = new CacheManager();
 
 // Validation utilities
 const Validator = {
@@ -196,31 +195,6 @@ export async function parseBolt11(event) {
     console.error("BOLT11 decode error:", error);
     return "Amount: Unknown";
   }
-}
-
-// Image related functions
-export async function preloadImage(url) {
-  if (!url || !Validator.isValidUrl(url)) return null;
-  if (imageCache.has(url)) return imageCache.get(url);
-
-  try {
-    const validatedUrl = await loadAndValidateImage(url);
-    imageCache.set(url, validatedUrl);
-    return validatedUrl;
-  } catch (error) {
-    console.error("Image preload error:", error);
-    imageCache.set(url, null);
-    return null;
-  }
-}
-
-async function loadAndValidateImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(escapeHTML(url));
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
 }
 
 export function escapeHTML(str) {

@@ -198,13 +198,9 @@ class NostrZapViewDialog extends HTMLElement {
       const senderName = getProfileDisplayName(profile) || "nameless";
       const senderIcon = profile.picture || defaultIcon;
 
-      // プロフィール情報を更新
+      // 名前の更新
       const nameElement = element.querySelector(".sender-name");
       const nameContainer = element.querySelector(".zap-placeholder-name");
-      const iconContainer = element.querySelector(".sender-icon");
-      const pubkeyElement = element.querySelector(".sender-pubkey");
-
-      // 名前の更新: スケルトンがある場合は置き換え、ない場合は直接更新
       if (nameContainer) {
         nameContainer.replaceWith(
           Object.assign(document.createElement("span"), {
@@ -216,27 +212,57 @@ class NostrZapViewDialog extends HTMLElement {
         nameElement.textContent = senderName;
       }
 
-      if (iconContainer) {
-        // スケルトンを削除して画像を追加
-        const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
+      // アイコンの非同期読み込み
+      if (senderIcon !== defaultIcon) {
+        const iconContainer = element.querySelector(".sender-icon");
+        if (iconContainer) {
+          const img = new Image();
+          img.onload = () => {
+            const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
+            if (skeleton) {
+              skeleton.remove();
+              img.className = "profile-icon";
+              img.alt = `${escapeHTML(senderName)}'s icon`;
+              img.loading = "lazy";
+              iconContainer.appendChild(img);
+            }
+          };
+          img.onerror = () => {
+            const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
+            if (skeleton) {
+              skeleton.remove();
+              const defaultImg = document.createElement("img");
+              defaultImg.src = defaultIcon;
+              defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
+              defaultImg.loading = "lazy";
+              iconContainer.appendChild(defaultImg);
+            }
+          };
+          img.src = senderIcon;
+        }
+      } else {
+        // デフォルトアイコンの即時表示
+        const iconContainer = element.querySelector(".sender-icon");
+        const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
         if (skeleton) {
           skeleton.remove();
-          const img = document.createElement("img");
-          img.src = senderIcon;
-          img.alt = `${escapeHTML(senderName)}'s icon`;
-          img.loading = "lazy";
-          img.onerror = () => {
-            img.src = defaultIcon;
-          };
-          iconContainer.appendChild(img);
+          const defaultImg = document.createElement("img");
+          defaultImg.src = defaultIcon;
+          defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
+          defaultImg.loading = "lazy";
+          iconContainer.appendChild(defaultImg);
         }
       }
 
-      // NIP-05の取得と更新
-      const nip05 = await profileManager.verifyNip05Async(pubkey);
-      if (nip05 && pubkeyElement) {
-        pubkeyElement.textContent = nip05;
-        pubkeyElement.setAttribute("data-nip05-updated", "true");
+      // NIP-05の非同期取得と更新
+      const pubkeyElement = element.querySelector(".sender-pubkey");
+      if (pubkeyElement && !pubkeyElement.getAttribute("data-nip05-updated")) {
+        profileManager.verifyNip05Async(pubkey).then(nip05 => {
+          if (nip05) {
+            pubkeyElement.textContent = nip05;
+            pubkeyElement.setAttribute("data-nip05-updated", "true");
+          }
+        });
       }
     } catch (error) {
       console.debug("Failed to load profile:", error);
