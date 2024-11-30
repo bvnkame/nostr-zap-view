@@ -68,12 +68,13 @@ class ZapSubscriptionManager {
    */
   async handleZapEvent(event, maxCount, viewId) {
     const state = this.getOrCreateViewState(viewId);
+    
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
-      // イベントの作成時刻をチェックしてリアルタイムかどうかを判定
+      // リファレンス情報を先に取得
+      await this.updateEventReference(event, viewId);
+      
       const isRealTime = event.created_at >= Math.floor(Date.now() / 1000) - 5;
       event.isRealTimeEvent = isRealTime;
-      
-      this.updateEventReference(event, viewId);
 
       if (isRealTime) {
         state.zapEventsCache.unshift(event);
@@ -90,7 +91,6 @@ class ZapSubscriptionManager {
           await renderZapListFromCache(state.zapEventsCache, maxCount, viewId);
         }
       }
-
     }
   }
 
@@ -131,6 +131,37 @@ class ZapSubscriptionManager {
   }
 
   /**
+   * イベントバッチの参照情報を一括更新
+   * @param {Array} events - Zapイベントの配列
+   * @param {string} viewId - ビューID
+   */
+  async updateEventReferenceBatch(events, viewId) {
+    const config = this.getViewConfig(viewId);
+    if (!config?.relayUrls) return;
+
+    const identifier = config?.identifier || '';
+    if (isEventIdentifier(identifier)) return;
+
+    const eventIds = events
+      .map(event => event.tags.find(tag => tag[0] === 'e')?.[1])
+      .filter(Boolean);
+
+    await Promise.all(
+      eventIds.map(async (eventId) => {
+        try {
+          const reference = await poolManager.fetchReference(config.relayUrls, eventId);
+          const event = events.find(e => e.tags.some(t => t[0] === 'e' && t[1] === eventId));
+          if (event && reference) {
+            event.reference = reference;
+          }
+        } catch (error) {
+          console.error("Failed to fetch reference:", error);
+        }
+      })
+    );
+  }
+
+  /**
    * サブスクリプションの初期化
    * - 識別子のデコード
    * - Zapイベントの購読開始
@@ -146,11 +177,15 @@ class ZapSubscriptionManager {
     state.isInitialFetchComplete = false;
 
     return new Promise((resolve) => {
+      const events = [];
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
+          events.push(event);
           await this.handleZapEvent(event, config.maxCount, viewId);
         },
-        oneose: () => {
+        oneose: async () => {
+          // イベントの参照情報を一括取得
+          await this.updateEventReferenceBatch(events, viewId);
           state.isInitialFetchComplete = true;
           resolve();
         }

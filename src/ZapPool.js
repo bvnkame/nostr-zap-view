@@ -26,7 +26,9 @@ class ReferenceProcessor extends BatchProcessor {
         return;
       }
 
-      let processedEvents = 0;
+      let timeoutId;
+      let processedEvents = new Set();
+
       const sub = this.pool.zapPool.subscribeMany(
         this.relayUrls,
         [
@@ -37,9 +39,12 @@ class ReferenceProcessor extends BatchProcessor {
         ],
         {
           onevent: (event) => {
+            processedEvents.add(event.id);
             this.resolveItem(event.id, event);
-            processedEvents++;
-            if (processedEvents === items.length) {
+            
+            // 全てのイベントを受信したらサブスクリプションを終了
+            if (items.every(id => processedEvents.has(id))) {
+              clearTimeout(timeoutId);
               sub.close();
               resolve();
             }
@@ -47,7 +52,7 @@ class ReferenceProcessor extends BatchProcessor {
           oneose: () => {
             // 未解決のアイテムを処理
             items.forEach(id => {
-              if (this.resolvers.has(id)) {
+              if (!processedEvents.has(id) && this.resolvers.has(id)) {
                 this.resolveItem(id, null);
               }
             });
@@ -56,11 +61,11 @@ class ReferenceProcessor extends BatchProcessor {
         }
       );
 
-      // タイムアウト処理
-      setTimeout(() => {
+      // タイムアウト処理の改善
+      timeoutId = setTimeout(() => {
         sub.close();
         items.forEach(id => {
-          if (this.resolvers.has(id)) {
+          if (!processedEvents.has(id) && this.resolvers.has(id)) {
             this.resolveItem(id, null);
           }
         });
@@ -82,6 +87,7 @@ class ZapPoolManager {
     this.state = new Map(); // 状態も複数管理
     // referencePoolを削除
     this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
+    this.referenceCache = new Map(); // リファレンスキャッシュを追加
   }
 
   closeSubscription(viewId) {
@@ -121,13 +127,18 @@ class ZapPoolManager {
     if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
       return null;
     }
-    this.referenceProcessor.setRelayUrls(relayUrls);
+    
     try {
+      this.referenceProcessor.setRelayUrls(relayUrls);
       const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
-      return reference;
+      // キャッシュのために参照を保持
+      if (reference) {
+        this.referenceCache.set(eventId, reference);
+      }
+      return reference || this.referenceCache.get(eventId);
     } catch (error) {
       console.error("Error fetching reference:", error);
-      return null;
+      return this.referenceCache.get(eventId);
     }
   }
 }
