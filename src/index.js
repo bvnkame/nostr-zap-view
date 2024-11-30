@@ -1,6 +1,6 @@
 import { APP_CONFIG, ZAP_CONFIG } from "./ZapConfig.js";
 import { ZapConfig } from "./ZapConfig.js";
-import { createDialog, initializeZapPlaceholders, initializeZapStats } from "./UIManager.js";
+import { createDialog } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profileManager } from "./ProfileManager.js";
@@ -15,15 +15,13 @@ async function handleButtonClick(button, viewId) {
   try {
     const config = ZapConfig.fromButton(button);
 
-    // 1. 即時実行: UIの表示を最優先
+    // 1. 設定を保存してからダイアログを表示
+    subscriptionManager.setViewConfig(viewId, config); // 追加
     createDialog(viewId);
-    initializeZapPlaceholders(config.maxCount, viewId);
-    initializeZapStats(viewId);
     subscriptionManager.handleViewClick(viewId);
 
     // 2. 未初期化の場合のみバックグラウンドで実行
     if (!button.hasAttribute('data-initialized')) {
-      // 統計情報の初期化とZapイベントの購読を並行して開始
       Promise.all([
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)

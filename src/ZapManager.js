@@ -1,8 +1,16 @@
-import { poolManager } from "./ZapPool.js";
-import { replacePlaceholderWithZap, prependZap, showDialog, renderZapListFromCache, showNoZapsMessage } from "./UIManager.js";
+import { 
+  replacePlaceholderWithZap, 
+  prependZap, 
+  showDialog, 
+  renderZapListFromCache, 
+  showNoZapsMessage,
+  initializeZapPlaceholders, // 追加
+  initializeZapStats // 追加
+} from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
 import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
+import { poolManager } from "./ZapPool.js"; // 既存のインポート
 
 class ZapSubscriptionManager {
   // ビューの状態とconfig情報を管理するクラス
@@ -206,13 +214,27 @@ class ZapSubscriptionManager {
       const viewState = this.getOrCreateViewState(viewId);
       const config = this.getViewConfig(viewId);
       
-      showDialog(viewId);
-
-      if (viewState.zapEventsCache.length > 0) {
-        await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+      // configが未定義の場合のチェックを追加
+      if (!config) {
+        console.warn("Configuration not found for viewId:", viewId);
+        showDialog(viewId);
+        showNoZapsMessage(viewId);
+        return;
       }
 
-      if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
+      showDialog(viewId);
+
+      // キャッシュがある場合は即時表示
+      if (viewState.zapEventsCache.length > 0) {
+        await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+        return;
+      }
+
+      // キャッシュがない場合のみプレースホルダーを表示
+      if (!viewState.isInitialFetchComplete) {
+        initializeZapPlaceholders(config.maxCount, viewId);
+        initializeZapStats(viewId);
+      } else if (viewState.zapEventsCache.length === 0) {
         showNoZapsMessage(viewId);
       }
     } catch (error) {

@@ -566,8 +566,27 @@ export const {
     initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
     replacePlaceholderWithZap: (event, index, viewId) =>
       getDialog(viewId)?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: (cache, max, viewId) =>
-      getDialog(viewId)?.renderZapListFromCache(cache, max),
+    renderZapListFromCache: async (cache, max, viewId) => {
+      const dialog = getDialog(viewId);
+      if (!dialog) return;
+
+      // 一時的にリストをクリア
+      const list = dialog.shadowRoot.querySelector(".dialog-zap-list");
+      if (!list) return;
+      list.innerHTML = "";
+
+      // キャッシュからデータを即時表示
+      const sortedZaps = [...cache]
+        .sort((a, b) => b.created_at - a.created_at)
+        .slice(0, max);
+
+      if (sortedZaps.length === 0) {
+        dialog.showNoZapsMessage();
+        return;
+      }
+
+      await dialog.renderZapListFromCache(sortedZaps, max);
+    },
     prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
     displayZapStats: (stats, viewId) =>
       getDialog(viewId)?.displayZapStats(stats),
