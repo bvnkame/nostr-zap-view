@@ -1,7 +1,8 @@
+
 import { formatNumber } from "./utils.js";
 import { API_CONFIG } from "./ZapConfig.js";
 
-export class UIStatus {
+export class StatusUI {
   constructor(rootElement) {
     this.root = rootElement;
   }

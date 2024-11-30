@@ -13,7 +13,7 @@ import {
   sanitizeImageUrl, // Add import
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
-import { UIStatus } from "./UIStatus.js";
+import { StatusUI } from "./StatusUI.js";  // updated import
 
 // Zapイベント情報を扱うクラス
 class ZapInfo {
@@ -101,7 +101,7 @@ class NostrZapViewDialog extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.uiStatus = null;
+    this.statusUI = null;  // renamed from uiStatus
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -147,7 +147,7 @@ class NostrZapViewDialog extends HTMLElement {
     this.#setupStyles();
     this.#setupTemplate();
     this.#setupEventListeners();
-    this.uiStatus = new UIStatus(this.shadowRoot);
+    this.statusUI = new StatusUI(this.shadowRoot);  // renamed from uiStatus
   }
 
   #setupStyles() {
@@ -602,15 +602,15 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   initializeZapStats() {
-    this.uiStatus.initializeStats();
+    this.statusUI.initializeStats();  // renamed from uiStatus
   }
 
   displayZapStats(stats) {
-    this.uiStatus.displayStats(stats);
+    this.statusUI.displayStats(stats);  // renamed from uiStatus
   }
 
   showNoZapsMessage() {
-    this.uiStatus.showNoZaps();
+    this.statusUI.showNoZaps();  // renamed from uiStatus
   }
 
   #createNoZapsMessage() {
