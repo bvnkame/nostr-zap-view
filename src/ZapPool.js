@@ -1,19 +1,24 @@
 import { SimplePool } from "nostr-tools/pool";
-import { ZAP_CONFIG as CONFIG, REQUEST_CONFIG } from "./ZapConfig.js"; // 変更
+import {
+  ZAP_CONFIG as CONFIG,
+  REQUEST_CONFIG,
+  PROFILE_CONFIG,
+} from "./ZapConfig.js"; // PROFILE_CONFIGを追加
 import { BatchProcessor } from "./BatchProcessor.js";
 
 class ReferenceProcessor extends BatchProcessor {
   constructor(pool, config) {
     super({
       batchSize: 10,
-      batchDelay: 50
+      batchDelay: 50,
     });
     this.pool = pool;
     this.config = config;
-    this.relayUrls = null;  // Add: relayUrlsを保持するプロパティ
+    this.relayUrls = null; // Add: relayUrlsを保持するプロパティ
   }
 
-  setRelayUrls(urls) {  // Add: relayUrlsを設定するメソッド
+  setRelayUrls(urls) {
+    // Add: relayUrlsを設定するメソッド
     this.relayUrls = urls;
   }
 
@@ -21,7 +26,7 @@ class ReferenceProcessor extends BatchProcessor {
     return new Promise((resolve) => {
       if (!this.relayUrls || !Array.isArray(this.relayUrls)) {
         console.error("No relay URLs provided");
-        items.forEach(id => this.resolveItem(id, null));
+        items.forEach((id) => this.resolveItem(id, null));
         resolve();
         return;
       }
@@ -34,16 +39,16 @@ class ReferenceProcessor extends BatchProcessor {
         [
           {
             kinds: [1, 30023, 30030, 30009, 40, 41, 31990], // サポートするイベントの種類を拡張
-            ids: items
-          }
+            ids: items,
+          },
         ],
         {
           onevent: (event) => {
             processedEvents.add(event.id);
             this.resolveItem(event.id, event);
-            
+
             // 全てのイベントを受信したらサブスクリプションを終了
-            if (items.every(id => processedEvents.has(id))) {
+            if (items.every((id) => processedEvents.has(id))) {
               clearTimeout(timeoutId);
               sub.close();
               resolve();
@@ -51,20 +56,20 @@ class ReferenceProcessor extends BatchProcessor {
           },
           oneose: () => {
             // 未解決のアイテムを処理
-            items.forEach(id => {
+            items.forEach((id) => {
               if (!processedEvents.has(id) && this.resolvers.has(id)) {
                 this.resolveItem(id, null);
               }
             });
             resolve();
-          }
+          },
         }
       );
 
       // タイムアウト処理の改善
       timeoutId = setTimeout(() => {
         sub.close();
-        items.forEach(id => {
+        items.forEach((id) => {
           if (!processedEvents.has(id) && this.resolvers.has(id)) {
             this.resolveItem(id, null);
           }
@@ -75,7 +80,7 @@ class ReferenceProcessor extends BatchProcessor {
   }
 
   onBatchError(items, error) {
-    items.forEach(id => this.resolveItem(id, null));
+    items.forEach((id) => this.resolveItem(id, null));
   }
 }
 
@@ -88,12 +93,35 @@ class ZapPoolManager {
     // referencePoolを削除
     this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
     this.referenceCache = new Map(); // リファレンスキャッシュを追加
+    this.isConnected = false; // Add: リレー接続状態フラグ
+  }
+
+  // Add: リレーへの事前接続を行うメソッド
+  async connectToRelays(zapRelayUrls) {
+    if (this.isConnected) return;
+
+    try {
+      // プロフィール用リレーに接続
+      await Promise.allSettled(
+        PROFILE_CONFIG.RELAYS.map((url) => this.profilePool.ensureRelay(url))
+      );
+
+      // Zapリレーに接続
+      await Promise.allSettled(
+        zapRelayUrls.map((url) => this.zapPool.ensureRelay(url))
+      );
+
+      this.isConnected = true;
+      console.log("[ZapPool] Connected to relays");
+    } catch (error) {
+      console.error("[ZapPool] Failed to connect to relays:", error);
+    }
   }
 
   closeSubscription(viewId) {
     const subs = this.subscriptions.get(viewId);
     const state = this.state.get(viewId);
-    
+
     if (subs?.zap && !state?.isZapClosed) {
       subs.zap.close();
       state.isZapClosed = true;
@@ -101,14 +129,14 @@ class ZapPoolManager {
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {
-    console.log('[ZapPool] Zap購読開始:', {
+    console.log("[ZapPool] Zap購読開始:", {
       viewId,
       relayUrls: config.relayUrls,
-      filter: decoded.req
+      filter: decoded.req,
     });
 
     this.closeSubscription(viewId);
-    
+
     if (!this.subscriptions.has(viewId)) {
       this.subscriptions.set(viewId, { zap: null });
       this.state.set(viewId, { isZapClosed: false });
@@ -120,20 +148,20 @@ class ZapPoolManager {
     const subs = this.subscriptions.get(viewId);
     subs.zap = this.zapPool.subscribeMany(
       config.relayUrls,
-      [{ ...decoded.req }],  // Fix: Make sure decoded.req is an array
+      [{ ...decoded.req }], // Fix: Make sure decoded.req is an array
       {
         ...handlers,
         onevent: (event) => {
-          console.log('[ZapPool] イベント受信:', {
+          console.log("[ZapPool] イベント受信:", {
             eventId: event.id,
-            relayUrl: event.relay
+            relayUrl: event.relay,
           });
           handlers.onevent(event);
         },
         oneose: () => {
-          console.log('[ZapPool] リレー購読完了:', { viewId });
+          console.log("[ZapPool] リレー購読完了:", { viewId });
           handlers.oneose();
-        }
+        },
       }
     );
   }
@@ -144,10 +172,12 @@ class ZapPoolManager {
     if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
       return null;
     }
-    
+
     try {
       this.referenceProcessor.setRelayUrls(relayUrls);
-      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
+      const reference = await this.referenceProcessor.getOrCreateFetchPromise(
+        eventId
+      );
       // キャッシュのために参照を保持
       if (reference) {
         this.referenceCache.set(eventId, reference);

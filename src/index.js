@@ -4,7 +4,7 @@ import { createDialog } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profileManager } from "./ProfileManager.js";
-import { zapPool } from "./ZapPool.js";
+import { zapPool, poolManager } from "./ZapPool.js";  // poolManagerを追加
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
@@ -15,14 +15,15 @@ async function handleButtonClick(button, viewId) {
   try {
     const config = ZapConfig.fromButton(button);
 
-    // 1. 設定を保存してからダイアログを表示
-    subscriptionManager.setViewConfig(viewId, config); // 追加
+    // 1. 即座にダイアログとスケルトンを表示
+    subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);
     subscriptionManager.handleViewClick(viewId);
 
-    // 2. 未初期化の場合のみバックグラウンドで実行
+    // 2. バックグラウンドでリレー接続とデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
       Promise.all([
+        poolManager.connectToRelays(config.relayUrls),
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)
       ]).catch(error => {
