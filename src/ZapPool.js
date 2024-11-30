@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools/pool";
-import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { ZAP_CONFIG as CONFIG, REQUEST_CONFIG } from "./ZapConfig.js"; // 変更
 import { BatchProcessor } from "./BatchProcessor.js";
 
 class ReferenceProcessor extends BatchProcessor {
@@ -70,7 +70,7 @@ class ReferenceProcessor extends BatchProcessor {
           }
         });
         resolve();
-      }, CONFIG.SUBSCRIPTION_TIMEOUT);
+      }, REQUEST_CONFIG.METADATA_TIMEOUT); // 変更: メタデータ用のタイムアウトを使用
     });
   }
 
@@ -101,6 +101,12 @@ class ZapPoolManager {
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {
+    console.log('[ZapPool] Zap購読開始:', {
+      viewId,
+      relayUrls: config.relayUrls,
+      filter: decoded.req
+    });
+
     this.closeSubscription(viewId);
     
     if (!this.subscriptions.has(viewId)) {
@@ -115,10 +121,21 @@ class ZapPoolManager {
     subs.zap = this.zapPool.subscribeMany(
       config.relayUrls,
       [{ ...decoded.req }],  // Fix: Make sure decoded.req is an array
-      handlers
+      {
+        ...handlers,
+        onevent: (event) => {
+          console.log('[ZapPool] イベント受信:', {
+            eventId: event.id,
+            relayUrl: event.relay
+          });
+          handlers.onevent(event);
+        },
+        oneose: () => {
+          console.log('[ZapPool] リレー購読完了:', { viewId });
+          handlers.oneose();
+        }
+      }
     );
-
-    setTimeout(() => this.closeSubscription(viewId), CONFIG.SUBSCRIPTION_TIMEOUT);
   }
 
   // subscribeToRealTimeメソッドを削除

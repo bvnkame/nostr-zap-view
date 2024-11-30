@@ -76,30 +76,36 @@ class ZapSubscriptionManager {
    */
   async handleZapEvent(event, maxCount, viewId) {
     const state = this.getOrCreateViewState(viewId);
+    console.log('[ZapManager] 受信したZapイベント:', event);
     
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
-      // リファレンス情報を先に取得
       await this.updateEventReference(event, viewId);
       
       const isRealTime = event.created_at >= Math.floor(Date.now() / 1000) - 5;
       event.isRealTimeEvent = isRealTime;
 
-      if (isRealTime) {
-        state.zapEventsCache.unshift(event);
-        await prependZap(event, viewId);
-        await statsManager.handleZapEvent(event, state, viewId); // 修正: stateを渡す
-      } else {
-        state.zapEventsCache.push(event);
-        state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
-        
-        const index = state.zapEventsCache.findIndex((e) => e.id === event.id);
-        if (index < maxCount) {
-          await replacePlaceholderWithZap(event, index, viewId);
-          await new Promise(resolve => setTimeout(resolve, 50));
-          await renderZapListFromCache(state.zapEventsCache, maxCount, viewId);
-          await statsManager.handleZapEvent(event, state, viewId); // 修正: stateを渡す
-        }
-      }
+      // キャッシュに追加して時系列でソート
+      state.zapEventsCache.push(event);
+      state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
+
+      console.log('[ZapManager] キャッシュ更新後の状態:', {
+        totalEvents: state.zapEventsCache.length,
+        isRealTime,
+        eventId: event.id
+      });
+
+      // 統計情報を更新
+      await statsManager.handleZapEvent(event, state, viewId);
+
+      // 最新のmaxCount分のイベントを表示
+      const displayEvents = state.zapEventsCache.slice(0, maxCount);
+      console.log('[ZapManager] 表示対象イベント:', {
+        displayCount: displayEvents.length,
+        maxCount
+      });
+      await renderZapListFromCache(displayEvents, maxCount, viewId);
+    } else {
+      console.log('[ZapManager] 重複イベントをスキップ:', event.id);
     }
   }
 
@@ -178,6 +184,11 @@ class ZapSubscriptionManager {
    * @param {string} viewId - ビューID
    */
   async initializeSubscriptions(config, viewId) {
+    console.log('[ZapManager] サブスクリプション初期化開始:', {
+      viewId,
+      config
+    });
+
     const decoded = decodeIdentifier(config.identifier, config.maxCount);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
@@ -189,11 +200,18 @@ class ZapSubscriptionManager {
       const events = [];
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
+          console.log('[ZapManager] リレーからイベント受信:', {
+            eventId: event.id,
+            kind: event.kind,
+            created_at: event.created_at
+          });
           events.push(event);
           await this.handleZapEvent(event, config.maxCount, viewId);
         },
         oneose: async () => {
-          // イベントの参照情報を一括取得
+          console.log('[ZapManager] リレー購読完了:', {
+            totalEvents: events.length
+          });
           await this.updateEventReferenceBatch(events, viewId);
           state.isInitialFetchComplete = true;
           resolve();

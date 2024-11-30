@@ -16,13 +16,17 @@ export const APP_CONFIG = {
 
 // Zap-related settings
 export const ZAP_CONFIG = {
-  SUBSCRIPTION_TIMEOUT: 20000,
   DEFAULT_LIMIT: 1,
   ERRORS: {
     DIALOG_NOT_FOUND: "Zap dialog not found",
     BUTTON_NOT_FOUND: "Fetch button not found",
     DECODE_FAILED: "Failed to decode identifier",
   },
+};
+
+// Timeout settings for metadata requests
+export const REQUEST_CONFIG = {
+  METADATA_TIMEOUT: 20000,  // プロフィール、reference、nip05検証用のタイムアウト
 };
 
 // API-related settings

@@ -636,7 +636,12 @@ export const {
       const dialog = getDialog(viewId);
       if (!dialog) return;
 
-      // 一時的にリストをクリア
+      console.log('[UIManager] キャッシュからの表示開始:', {
+        cacheSize: cache.length,
+        maxDisplay: max,
+        viewId
+      });
+
       const list = dialog.shadowRoot.querySelector(".dialog-zap-list");
       if (!list) return;
       list.innerHTML = "";
@@ -645,6 +650,11 @@ export const {
       const sortedZaps = [...cache]
         .sort((a, b) => b.created_at - a.created_at)
         .slice(0, max);
+
+      console.log('[UIManager] 表示するZaps:', {
+        count: sortedZaps.length,
+        ids: sortedZaps.map(zap => zap.id)
+      });
 
       if (sortedZaps.length === 0) {
         dialog.showNoZapsMessage();
