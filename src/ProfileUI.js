@@ -1,24 +1,31 @@
-
 import { profileManager } from "./ProfileManager.js";
 import defaultIcon from "./assets/nostr-icon.svg";
-import { getProfileDisplayName, escapeHTML, sanitizeImageUrl } from "./utils.js";
+import {
+  getProfileDisplayName,
+  escapeHTML,
+  sanitizeImageUrl,
+} from "./utils.js";
 
 export class ProfileUI {
   async loadAndUpdate(pubkey, element) {
     if (!pubkey) return;
-  
+
     try {
       const nameElement = element.querySelector(".sender-name");
       const nameContainer = element.querySelector(".zap-placeholder-name");
       const iconContainer = element.querySelector(".sender-icon");
       const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
-  
+
       const [profile] = await profileManager.fetchProfiles([pubkey]);
-      
-      const senderName = profile ? getProfileDisplayName(profile) || "nameless" : "anonymous";
-      const senderIcon = profile?.picture ? sanitizeImageUrl(profile.picture) : null;
-  
+
+      const senderName = profile
+        ? getProfileDisplayName(profile) || "nameless"
+        : "anonymous";
+      const senderIcon = profile?.picture
+        ? sanitizeImageUrl(profile.picture)
+        : null;
+
       this.#updateName(nameContainer, nameElement, senderName);
       this.#updateIcon(skeleton, iconContainer, senderIcon, senderName);
       this.#updateNip05(pubkeyElement, pubkey);
@@ -53,7 +60,7 @@ export class ProfileUI {
         });
         iconContainer.appendChild(img);
       };
-  
+
       if (senderIcon) {
         const img = new Image();
         img.onload = () => updateIcon(senderIcon);
@@ -72,7 +79,7 @@ export class ProfileUI {
         pubkeyElement.textContent = cachedNip05;
         pubkeyElement.setAttribute("data-nip05-updated", "true");
       } else {
-        profileManager.verifyNip05Async(pubkey).then(nip05 => {
+        profileManager.verifyNip05Async(pubkey).then((nip05) => {
           if (nip05) {
             pubkeyElement.textContent = nip05;
             pubkeyElement.setAttribute("data-nip05-updated", "true");

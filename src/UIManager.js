@@ -1,4 +1,3 @@
-import { profileManager } from "./ProfileManager.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
 import arrowRightIcon from "./assets/arrow_right.svg"; // 追加
@@ -6,11 +5,9 @@ import quickReferenceIcon from "./assets/link.svg"; // 追加
 import {
   formatIdentifier,
   parseZapEvent,
-  getProfileDisplayName,
   isWithin24Hours,
   escapeHTML,
-  isEventIdentifier, // 追加
-  sanitizeImageUrl, // Add import
+  isEventIdentifier, // Add import
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 import { StatusUI } from "./StatusUI.js";  // updated import

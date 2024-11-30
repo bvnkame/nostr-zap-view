@@ -1,4 +1,3 @@
-
 import { formatNumber } from "./utils.js";
 import { API_CONFIG } from "./ZapConfig.js";
 
@@ -17,7 +16,7 @@ export class StatusUI {
     // タイムアウト用のタイマーを設定
     setTimeout(() => {
       // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
-      if (statsDiv.querySelector('.stats-skeleton')) {
+      if (statsDiv.querySelector(".stats-skeleton")) {
         statsDiv.innerHTML = this.#createTimeoutStats();
       }
     }, API_CONFIG.REQUEST_TIMEOUT);
@@ -28,9 +27,10 @@ export class StatusUI {
     if (!statsDiv) return;
 
     // エラー状態とタイムアウト状態の判定を厳密に行う
-    const isTimeout = !stats || 
-                     (stats.error === true && stats.timeout === true) || 
-                     (!stats.hasOwnProperty('count') && !stats.hasOwnProperty('msats'));
+    const isTimeout =
+      !stats ||
+      (stats.error === true && stats.timeout === true) ||
+      (!stats.hasOwnProperty("count") && !stats.hasOwnProperty("msats"));
 
     statsDiv.innerHTML = isTimeout
       ? this.#createTimeoutStats()
@@ -75,13 +75,19 @@ export class StatusUI {
   #createNormalStats(stats) {
     return `
       <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number">${formatNumber(stats.count)}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        stats.count
+      )}</span></div>
       <div class="stats-item">times</div>
       <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.msats / 1000))}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        Math.floor(stats.msats / 1000)
+      )}</span></div>
       <div class="stats-item">sats</div>
       <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number">${formatNumber(Math.floor(stats.maxMsats / 1000))}</span></div>
+      <div class="stats-item"><span class="number">${formatNumber(
+        Math.floor(stats.maxMsats / 1000)
+      )}</span></div>
       <div class="stats-item">sats</div>
     `;
   }
