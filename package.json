@@ -1,6 +1,6 @@
 {
   "name": "nostr-zap-view",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "View any nostr npub or note zaps from anywhere.",
   "main": "dist/nostr-zap-view.js",
   "author": "Lokuyow",
