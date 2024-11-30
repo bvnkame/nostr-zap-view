@@ -519,39 +519,6 @@ class NostrZapViewDialog extends HTMLElement {
     `;
   }
 
-  async prependZap(event) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    // "No Zaps" メッセージが存在する場合、メッセージのみを削除
-    const noZapsMessage = list.querySelector(".no-zaps-message");
-    if (noZapsMessage) {
-      noZapsMessage.remove();
-    }
-
-    try {
-      const zapInfo = await this.#extractZapInfo(event);
-      // zapInfo.reference = event.reference; // この行を削除
-
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      const li = document.createElement("li");
-      li.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
-      li.setAttribute("data-pubkey", zapInfo.pubkey);
-      li.innerHTML = this.#createZapHTML(zapInfo);
-
-      list.prepend(li);
-
-      // プロフィール情報を非同期で更新
-      if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, li);
-      }
-    } catch (error) {
-      console.error("Failed to prepend zap:", error);
-    }
-  }
-
   #getElement(selector) {
     return this.shadowRoot.querySelector(selector);
   }
