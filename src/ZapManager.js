@@ -212,8 +212,15 @@ class ZapSubscriptionManager {
           console.log('[ZapManager] リレー購読完了:', {
             totalEvents: events.length
           });
+          
           await this.updateEventReferenceBatch(events, viewId);
           state.isInitialFetchComplete = true;
+          
+          // イベントが0件の場合、メッセージを表示
+          if (events.length === 0) {
+            showNoZapsMessage(viewId);
+          }
+          
           resolve();
         }
       });
