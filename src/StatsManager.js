@@ -1,5 +1,6 @@
 import { API_CONFIG } from "./ZapConfig.js";
 import { displayZapStats } from "./UIManager.js";
+import { safeNip19Decode } from "./utils.js"; // Add import
 
 export class StatsManager {
   constructor() {
@@ -60,11 +61,14 @@ export class StatsManager {
   }
 
   async _fetchFromApi(identifier) {
-    const decoded = window.NostrTools.nip19.decode(identifier);
+    const decoded = safeNip19Decode(identifier);
+    if (!decoded) return null;
+    
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
     const endpoint = `https://api.nostr.band/v0/stats/${
       isProfile ? "profile" : "event"
     }/${identifier}`;
+    
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),

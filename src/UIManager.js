@@ -8,6 +8,8 @@ import {
   isWithin24Hours,
   escapeHTML,
   isEventIdentifier, // Add import
+  encodeNevent,   // Add import
+  encodeNpub, // Add import
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 import { StatusUI } from "./StatusUI.js";  // updated import
@@ -39,9 +41,7 @@ class ZapInfo {
         pubkey: normalizedPubkey || "",
         created_at: this.event.created_at,
         displayIdentifier: normalizedPubkey
-          ? formatIdentifier(
-              window.NostrTools.nip19.npubEncode(normalizedPubkey)
-            )
+          ? formatIdentifier(encodeNpub(normalizedPubkey))
           : "anonymous",
         senderName: null,
         senderIcon: null,
@@ -228,7 +228,7 @@ class NostrZapViewDialog extends HTMLElement {
         .sort((a, b) => b.created_at - a.created_at)
         .slice(0, maxCount);
 
-      // 基本情報のみで表示を即時更新
+      // 基本��報のみで表示を即時更新
       const fragment = document.createDocumentFragment();
       const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
@@ -406,11 +406,11 @@ class NostrZapViewDialog extends HTMLElement {
       const nonSourceTag = rTags.find((t) => !t.includes("source")) || rTags[0];
       return nonSourceTag?.[1];
     }
-    return `https://njump.me/${window.NostrTools.nip19.neventEncode({
-      id: reference.id,
-      kind: reference.kind,
-      pubkey: reference.pubkey,
-    })}`;
+    return `https://njump.me/${encodeNevent(
+      reference.id,
+      reference.kind,
+      reference.pubkey
+    )}`;
   }
 
   #getReferenceContent(reference) {

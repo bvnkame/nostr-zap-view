@@ -1,10 +1,10 @@
 import { profileManager } from "./ProfileManager.js";
 import defaultIcon from "./assets/nostr-icon.svg";
-import { nip19 } from "nostr-tools";
 import {
   getProfileDisplayName,
   escapeHTML,
   sanitizeImageUrl,
+  encodeNprofile, // Add import
 } from "./utils.js";
 
 export class ProfileUI {
@@ -63,10 +63,7 @@ export class ProfileUI {
         // Create link wrapper
         const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
         if (pubkey) {
-          const nprofile = nip19.nprofileEncode({
-            pubkey: pubkey,
-            relays: []
-          });
+          const nprofile = encodeNprofile(pubkey);
           const link = Object.assign(document.createElement("a"), {
             href: `https://njump.me/${nprofile}`,
             target: "_blank",

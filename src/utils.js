@@ -74,11 +74,12 @@ export function decodeIdentifier(identifier, maxCount) {
   return result;
 }
 
-function safeNip19Decode(identifier) {
+// Change from function to export function
+export function safeNip19Decode(identifier) {
   try {
     return window.NostrTools.nip19.decode(identifier);
   } catch (error) {
-    console.error("Failed to decode identifier:", error);
+    console.debug('Failed to decode identifier:', error);
     return null;
   }
 }
@@ -229,6 +230,42 @@ export function sanitizeImageUrl(url) {
     // パラメータとハッシュは保持するように変更
     return parsed.href;
   } catch {
+    return null;
+  }
+}
+
+// Add NIP-19 encoding utilities
+export function encodeNpub(pubkey) {
+  try {
+    return window.NostrTools.nip19.npubEncode(pubkey);
+  } catch (error) {
+    console.debug('Failed to encode npub:', error);
+    return null;
+  }
+}
+
+export function encodeNprofile(pubkey, relays = []) {
+  try {
+    return window.NostrTools.nip19.nprofileEncode({
+      pubkey,
+      relays
+    });
+  } catch (error) {
+    console.debug('Failed to encode nprofile:', error);
+    return null;
+  }
+}
+
+export function encodeNevent(id, kind, pubkey, relays = []) {
+  try {
+    return window.NostrTools.nip19.neventEncode({
+      id,
+      kind,
+      pubkey,
+      relays
+    });
+  } catch (error) {
+    console.debug('Failed to encode nevent:', error);
     return null;
   }
 }
