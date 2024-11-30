@@ -102,68 +102,6 @@ export class StatsManager {
     return formattedStats;
   }
 
-  async updateStatsWithZap(currentStats, amountMsats, viewId) {
-    if (currentStats?.error && currentStats?.timeout) {
-      return currentStats;
-    }
-
-    const updatedStats = {
-      count: (currentStats?.count ?? 0) + 1,
-      msats: (currentStats?.msats ?? 0) + amountMsats,
-      maxMsats: Math.max(currentStats?.maxMsats ?? 0, amountMsats),
-    };
-
-    const viewCache = this.getOrCreateViewCache(viewId);
-    const identifier = Array.from(viewCache.keys())[0];
-    if (identifier) {
-      this.updateCache(viewId, identifier, updatedStats);
-    }
-
-    return updatedStats;
-  }
-
-  recalculateStats(baseStats, events) {
-    let stats = {
-      count: baseStats?.count ?? 0,
-      msats: baseStats?.msats ?? 0,
-      maxMsats: baseStats?.maxMsats ?? 0,
-    };
-
-    events.forEach((event) => {
-      if (
-        event.isRealTimeEvent &&
-        !event.isStatsCalculated &&
-        event.amountMsats > 0
-      ) {
-        stats.count++;
-        stats.msats += event.amountMsats;
-        stats.maxMsats = Math.max(stats.maxMsats, event.amountMsats);
-        event.isStatsCalculated = true;
-      }
-    });
-
-    return stats;
-  }
-
-  extractAmountFromEvent(event) {
-    try {
-      const bolt11Tag = event.tags.find(
-        (tag) => tag[0].toLowerCase() === "bolt11"
-      )?.[1];
-      if (!bolt11Tag) return 0;
-
-      const decoded = window.decodeBolt11(bolt11Tag);
-      return parseInt(
-        decoded.sections.find((section) => section.name === "amount")?.value ||
-          "0",
-        10
-      );
-    } catch (error) {
-      console.error("Failed to extract amount from event:", error);
-      return 0;
-    }
-  }
-
   async handleCachedZaps(viewId, config) {
     const viewState = this.getOrCreateViewState(viewId);
     try {

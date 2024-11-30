@@ -1,6 +1,4 @@
 import { 
-  replacePlaceholderWithZap, 
-  prependZap, 
   showDialog, 
   renderZapListFromCache, 
   showNoZapsMessage,
