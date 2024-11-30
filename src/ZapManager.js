@@ -1,7 +1,7 @@
 import { poolManager } from "./ZapPool.js";
-import { initializeZapPlaceholders, replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, initializeZapStats, showNoZapsMessage } from "./UIManager.js";
+import { replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, showNoZapsMessage } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
-import { ZapConfig, ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
 
 class ZapSubscriptionManager {
@@ -211,63 +211,39 @@ class ZapSubscriptionManager {
       displayZapStats({ timeout: true }, viewId);
     }
   }
-}
 
-const subscriptionManager = new ZapSubscriptionManager();
+  /**
+   * ビューのクリックイベントを処理
+   * @param {string} viewId - ビューID
+   */
+  async handleViewClick(viewId) {
+    try {
+      if (!viewId) throw new Error("Missing view ID");
+      const zapDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+      if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
 
-/**
- * 最新のZapを取得する
- * - ダイアログの表示
- * - キャッシュの有無による処理分岐
- * - エラー処理
- * @param {Event} event - クリックイベント
- */
-export async function fetchLatestZaps(event) {
-  const button = event.currentTarget;
-  const viewId = button.getAttribute("data-zap-view-id");
-  
-  try {
-    if (!viewId) throw new Error("Missing view ID");
-    const zapDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-    if (!zapDialog) throw new Error(CONFIG.ERRORS.DIALOG_NOT_FOUND);
+      const viewState = this.getOrCreateViewState(viewId);
+      const config = this.getViewConfig(viewId);
+      const hasCache = viewState.zapEventsCache.length > 0;
 
-    const config = ZapConfig.fromButton(button);
-    subscriptionManager.setViewConfig(viewId, config);
-    const viewState = subscriptionManager.getOrCreateViewState(viewId);
-    const hasCache = viewState.zapEventsCache.length > 0;
+      showDialog(viewId);
 
-    showDialog(viewId);
-
-    if (hasCache) {
-      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
-      if (viewState.currentStats) {
-        displayZapStats(viewState.currentStats, viewId);
+      if (hasCache) {
+        await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+        if (viewState.currentStats) {
+          displayZapStats(viewState.currentStats, viewId);
+        }
       }
-    } else {
-      subscriptionManager.clearCache(viewId);
-      await initializeNewFetch(viewId, config);
-    }
 
-    if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
-      showNoZapsMessage(viewId);
+      if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
+        showNoZapsMessage(viewId);
+      }
+    } catch (error) {
+      console.error("Error occurred while handling view click:", error);
+      displayZapStats({ timeout: true }, viewId);
     }
-  } catch (error) {
-    console.error("Error occurred while fetching Zaps:", error);
-    displayZapStats({ timeout: true }, viewId);
   }
 }
 
-/**
- * 新規フェッチの初期化
- * - プレースホルダーの初期化
- * - 統計情報の初期化
- * - サブスクリプションの開始
- * @param {string} viewId - ビューID
- * @param {Object} config - 設定オブジェクト
- */
-async function initializeNewFetch(viewId, config) {
-  initializeZapPlaceholders(config.maxCount, viewId);
-  initializeZapStats(viewId);  // スケルトン表示を即時実行
-
-  await subscriptionManager.initializeSubscriptions(config, viewId);
-}
+const subscriptionManager = new ZapSubscriptionManager();
+export { subscriptionManager };
