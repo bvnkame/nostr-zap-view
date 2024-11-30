@@ -1,9 +1,8 @@
 import { API_CONFIG } from "./ZapConfig.js";
-import { displayZapStats } from "./UIManager.js"; // UIManager関数をインポート
+import { displayZapStats } from "./UIManager.js";
 
 export class StatsManager {
   constructor() {
-    this.statsCache = new Map();
     this.viewStatsCache = new Map();
   }
 
@@ -24,41 +23,60 @@ export class StatsManager {
     }
 
     const stats = await this.fetchStats(identifier);
-
     if (stats) {
-      viewCache.set(identifier, {
-        stats,
-        timestamp: now,
-      });
+      this.updateCache(viewId, identifier, stats);
     }
     return stats;
+  }
+
+  updateCache(viewId, identifier, stats) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    viewCache.set(identifier, {
+      stats,
+      timestamp: Date.now(),
+    });
   }
 
   async fetchStats(identifier) {
     try {
       const response = await this._fetchFromApi(identifier);
       const stats = this._formatStats(response);
-      // statsがnullの場合はタイムアウトエラーを返す
-      return stats || { error: true, timeout: true };
+      return stats || this.createTimeoutError();
     } catch (error) {
-      console.error("Failed to fetch Zap stats:", error);
-      return { error: true, timeout: error.message === 'STATS_TIMEOUT' };
+      return this.handleFetchError(error);
     }
+  }
+
+  createTimeoutError() {
+    return { error: true, timeout: true };
+  }
+
+  handleFetchError(error) {
+    console.error("Failed to fetch Zap stats:", error);
+    return {
+      error: true,
+      timeout: error.message === "STATS_TIMEOUT",
+    };
   }
 
   async _fetchFromApi(identifier) {
     const decoded = window.NostrTools.nip19.decode(identifier);
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
-    const endpoint = `https://api.nostr.band/v0/stats/${isProfile ? "profile" : "event"}/${identifier}`;
+    const endpoint = `https://api.nostr.band/v0/stats/${
+      isProfile ? "profile" : "event"
+    }/${identifier}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.REQUEST_TIMEOUT);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      API_CONFIG.REQUEST_TIMEOUT
+    );
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
       return response.json();
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('STATS_TIMEOUT');
+      if (error.name === "AbortError") {
+        throw new Error("STATS_TIMEOUT");
       }
       throw error;
     } finally {
@@ -72,70 +90,51 @@ export class StatsManager {
     const stats = Object.values(responseData.stats)[0];
     if (!stats) return null;
 
-    // 数値が未定義の場合やすべての値が0の場合でも有効な統計として扱う
     const formattedStats = {
       count: parseInt(stats.zaps_received?.count || stats.zaps?.count || 0, 10),
       msats: parseInt(stats.zaps_received?.msats || stats.zaps?.msats || 0, 10),
-      maxMsats: parseInt(stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0, 10)
+      maxMsats: parseInt(
+        stats.zaps_received?.max_msats || stats.zaps?.max_msats || 0,
+        10
+      ),
     };
 
-    // すべての値が0でもnullを返さずに有効な統計として扱う
     return formattedStats;
   }
 
-  async incrementStats(currentStats, amountMsats, viewId) {
-    // タイムアウト状態以外は常に統計を更新する
+  async updateStatsWithZap(currentStats, amountMsats, viewId) {
     if (currentStats?.error && currentStats?.timeout) {
       return currentStats;
     }
 
-    // 初期値が0でも有効な統計として扱う
     const updatedStats = {
       count: (currentStats?.count ?? 0) + 1,
       msats: (currentStats?.msats ?? 0) + amountMsats,
-      maxMsats: Math.max(currentStats?.maxMsats ?? 0, amountMsats)
+      maxMsats: Math.max(currentStats?.maxMsats ?? 0, amountMsats),
     };
 
-    // キャッシュを更新
     const viewCache = this.getOrCreateViewCache(viewId);
     const identifier = Array.from(viewCache.keys())[0];
     if (identifier) {
-      viewCache.set(identifier, {
-        stats: updatedStats,
-        timestamp: Date.now()
-      });
+      this.updateCache(viewId, identifier, updatedStats);
     }
 
     return updatedStats;
   }
 
-  updateStats(currentStats, amountMsats) {
-    if (!currentStats) {
-      return {
-        count: 1,
-        msats: amountMsats,
-        maxMsats: amountMsats
-      };
-    }
-
-    return {
-      count: currentStats.count + 1,
-      msats: currentStats.msats + amountMsats,
-      maxMsats: Math.max(currentStats.maxMsats, amountMsats)
-    };
-  }
-
   recalculateStats(baseStats, events) {
-    // 初期値が0でも有効な統計として扱う
     let stats = {
       count: baseStats?.count ?? 0,
       msats: baseStats?.msats ?? 0,
-      maxMsats: baseStats?.maxMsats ?? 0
+      maxMsats: baseStats?.maxMsats ?? 0,
     };
 
-    // 未計算のリアルタイムイベントを処理
-    events.forEach(event => {
-      if (event.isRealTimeEvent && !event.isStatsCalculated && event.amountMsats > 0) {
+    events.forEach((event) => {
+      if (
+        event.isRealTimeEvent &&
+        !event.isStatsCalculated &&
+        event.amountMsats > 0
+      ) {
         stats.count++;
         stats.msats += event.amountMsats;
         stats.maxMsats = Math.max(stats.maxMsats, event.amountMsats);
@@ -148,11 +147,17 @@ export class StatsManager {
 
   extractAmountFromEvent(event) {
     try {
-      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+      const bolt11Tag = event.tags.find(
+        (tag) => tag[0].toLowerCase() === "bolt11"
+      )?.[1];
       if (!bolt11Tag) return 0;
 
       const decoded = window.decodeBolt11(bolt11Tag);
-      return parseInt(decoded.sections.find(section => section.name === "amount")?.value || "0", 10);
+      return parseInt(
+        decoded.sections.find((section) => section.name === "amount")?.value ||
+          "0",
+        10
+      );
     } catch (error) {
       console.error("Failed to extract amount from event:", error);
       return 0;
@@ -164,20 +169,23 @@ export class StatsManager {
     try {
       if (!viewState.currentStats) {
         const stats = await this.getZapStats(config.identifier, viewId);
-        viewState.currentStats = !stats?.error 
+        viewState.currentStats = !stats?.error
           ? this.recalculateStats(stats, viewState.zapEventsCache)
           : { timeout: stats.timeout };
       }
-      
+
       displayZapStats(viewState.currentStats, viewId);
-      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
+      await renderZapListFromCache(
+        viewState.zapEventsCache,
+        config.maxCount,
+        viewId
+      );
     } catch (error) {
       console.error("Failed to handle cached zaps:", error);
       displayZapStats({ timeout: true }, viewId);
     }
   }
 
-  // 統計情報の初期化と表示を行う
   async initializeStats(identifier, viewId) {
     try {
       const stats = await this.getZapStats(identifier, viewId);
@@ -191,41 +199,44 @@ export class StatsManager {
     }
   }
 
-  // Zapイベントからの統計更新処理
   async handleZapEvent(event, state, viewId) {
-    const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-    if (!bolt11Tag) return;
+    const amountMsats = this.extractAmountFromBolt11(
+      event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
+    );
 
-    const amountMsats = this.extractAmountFromBolt11(bolt11Tag);
     if (amountMsats <= 0) return;
 
-    // 常に現在の統計情報を初期化
-    state.currentStats = state.currentStats || { count: 0, msats: 0, maxMsats: 0 };
-    
-    // 統計情報を更新
-    const updatedStats = await this.incrementStats(state.currentStats, amountMsats, viewId);
-    state.currentStats = updatedStats;
-    
-    // イベント情報を更新
+    state.currentStats = state.currentStats || {
+      count: 0,
+      msats: 0,
+      maxMsats: 0,
+    };
+    state.currentStats = await this.updateStatsWithZap(
+      state.currentStats,
+      amountMsats,
+      viewId
+    );
+
     event.isStatsCalculated = true;
     event.amountMsats = amountMsats;
-    
-    // 統計情報を表示
-    this.displayStats(updatedStats, viewId);
+
+    this.displayStats(state.currentStats, viewId);
   }
 
-  // BOLT11から金額を抽出
   extractAmountFromBolt11(bolt11) {
     try {
       const decoded = window.decodeBolt11(bolt11);
-      return parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
+      return parseInt(
+        decoded.sections.find((section) => section.name === "amount")?.value ??
+          "0",
+        10
+      );
     } catch (error) {
       console.error("Failed to decode bolt11:", error);
       return 0;
     }
   }
 
-  // 統計情報の表示
   displayStats(stats, viewId) {
     displayZapStats(stats, viewId);
   }
