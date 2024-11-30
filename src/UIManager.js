@@ -14,6 +14,7 @@ import {
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 import { StatusUI } from "./StatusUI.js";  // updated import
+import { ProfileUI } from "./ProfileUI.js"; // Add import
 
 // Zapイベント情報を扱うクラス
 class ZapInfo {
@@ -102,6 +103,7 @@ class NostrZapViewDialog extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this.statusUI = null;  // renamed from uiStatus
+    this.profileUI = new ProfileUI();  // Add ProfileUI instance
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -191,91 +193,8 @@ class NostrZapViewDialog extends HTMLElement {
 
   async #loadProfileAndUpdate(pubkey, element) {
     if (!pubkey) return;
-  
-    try {
-      // 必要な要素を事前に取得
-      const nameElement = element.querySelector(".sender-name");
-      const nameContainer = element.querySelector(".zap-placeholder-name");
-      const iconContainer = element.querySelector(".sender-icon");
-      const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
-      const pubkeyElement = element.querySelector(".sender-pubkey");
-  
-      // プロフィールの非同期取得を開始
-      const [profile] = await profileManager.fetchProfiles([pubkey]);
-      
-      const senderName = profile ? getProfileDisplayName(profile) || "nameless" : "anonymous";
-      const senderIcon = profile?.picture ? sanitizeImageUrl(profile.picture) : null;
-  
-      // 名前の更新
-      if (nameContainer) {
-        nameContainer.replaceWith(
-          Object.assign(document.createElement("span"), {
-            className: "sender-name",
-            textContent: senderName,
-          })
-        );
-      } else if (nameElement) {
-        nameElement.textContent = senderName;
-      }
-  
-      // アイコンの更新
-      if (skeleton && iconContainer) {
-        const updateIcon = (src) => {
-          skeleton.remove();
-          const img = Object.assign(document.createElement("img"), {
-            src,
-            alt: `${escapeHTML(senderName)}'s icon`,
-            loading: "lazy",
-            className: "profile-icon",
-          });
-          iconContainer.appendChild(img);
-        };
-  
-        if (senderIcon) {
-          // プロフィール画像がある場合
-          const img = new Image();
-          img.onload = () => updateIcon(senderIcon);
-          img.onerror = () => updateIcon(defaultIcon);
-          img.src = senderIcon;
-        } else {
-          // プロフィール画像がない場合
-          updateIcon(defaultIcon);
-        }
-      }
-  
-      // NIP-05の更新（未更新の場合のみ）
-      if (pubkeyElement && !pubkeyElement.getAttribute("data-nip05-updated")) {
-        const cachedNip05 = profileManager.getNip05(pubkey);
-        if (cachedNip05) {
-          pubkeyElement.textContent = cachedNip05;
-          pubkeyElement.setAttribute("data-nip05-updated", "true");
-        } else {
-          profileManager.verifyNip05Async(pubkey).then(nip05 => {
-            if (nip05) {
-              pubkeyElement.textContent = nip05;
-              pubkeyElement.setAttribute("data-nip05-updated", "true");
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.debug("Failed to load profile:", error);
-      // エラー時にもデフォルトアイコンを設定
-      const skeleton = element.querySelector(".zap-placeholder-icon");
-      if (skeleton) {
-        const iconContainer = skeleton.parentElement;
-        skeleton.remove();
-        const defaultImg = Object.assign(document.createElement("img"), {
-          src: defaultIcon,
-          alt: "anonymous user's icon",
-          loading: "lazy",
-          className: "profile-icon",
-        });
-        iconContainer.appendChild(defaultImg);
-      }
-    }
+    await this.profileUI.loadAndUpdate(pubkey, element);
   }
-  
 
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
