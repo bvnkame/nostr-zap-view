@@ -1,4 +1,6 @@
 /dist/
+/dist/test.html
 /node_modules/
 /.vscode/
 licenses.json
+/nostr/

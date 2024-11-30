@@ -31,7 +31,7 @@ class ReferenceProcessor extends BatchProcessor {
         this.relayUrls,
         [
           {
-            kinds: [1, 30023, 30030, 30009, 40, 41, 31990], // サポートするイベントの���類を拡張
+            kinds: [1, 30023, 30030, 30009, 40, 41, 31990], // サポートするイベントの種類を拡張
             ids: items
           }
         ],
@@ -84,23 +84,21 @@ class ZapPoolManager {
     this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
   }
 
-  closeSubscription(viewId, type = 'zap') {
+  closeSubscription(viewId) {
     const subs = this.subscriptions.get(viewId);
     const state = this.state.get(viewId);
     
-    if (subs?.[type] && !state?.isZapClosed) {
-      subs[type].close();
-      if (type === 'zap') {
-        state.isZapClosed = true;
-      }
+    if (subs?.zap && !state?.isZapClosed) {
+      subs.zap.close();
+      state.isZapClosed = true;
     }
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {
-    this.closeSubscription(viewId, 'zap');
+    this.closeSubscription(viewId);
     
     if (!this.subscriptions.has(viewId)) {
-      this.subscriptions.set(viewId, { zap: null, realTime: null });
+      this.subscriptions.set(viewId, { zap: null });
       this.state.set(viewId, { isZapClosed: false });
     }
 
@@ -114,23 +112,10 @@ class ZapPoolManager {
       handlers
     );
 
-    setTimeout(() => this.closeSubscription(viewId, 'zap'), CONFIG.SUBSCRIPTION_TIMEOUT);
+    setTimeout(() => this.closeSubscription(viewId), CONFIG.SUBSCRIPTION_TIMEOUT);
   }
 
-  subscribeToRealTime(viewId, config, decoded, handlers) {
-    const subs = this.subscriptions.get(viewId);
-    if (!subs || subs.realTime) return;  // Fix: Check if subs exists
-
-    subs.realTime = this.zapPool.subscribeMany(
-      config.relayUrls,
-      [{
-        ...decoded.req,
-        limit: CONFIG.DEFAULT_LIMIT,
-        since: Math.floor(Date.now() / 1000)
-      }],
-      handlers
-    );
-  }
+  // subscribeToRealTimeメソッドを削除
 
   async fetchReference(relayUrls, eventId) {
     if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
