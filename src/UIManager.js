@@ -30,24 +30,8 @@ class ZapInfo {
       const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
       const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
 
-      // referenceの抽出ロジックを修正
-      let reference = null;
-      if (this.event.reference) {
-        reference = this.event.reference;
-      } else if (this.event.tags) {
-        // tagsから参照情報を構築
-        const eTag = this.event.tags.find((tag) => tag[0] === "e");
-        const pTag = this.event.tags.find((tag) => tag[0] === "p");
-        if (eTag) {
-          reference = {
-            id: eTag[1],
-            kind: parseInt(eTag[3], 10) || 1,
-            pubkey: pTag?.[1] || this.event.pubkey || "",
-            content: this.event.content || "",
-            tags: this.event.tags || [],
-          };
-        }
-      }
+      // referenceの抽出を単純化
+      const reference = this.event.reference || this.#extractReferenceFromTags();
 
       return {
         satsText,
@@ -68,6 +52,23 @@ class ZapInfo {
       console.error("Failed to extract zap info:", error, this.event);
       return this.#createDefaultInfo();
     }
+  }
+
+  #extractReferenceFromTags() {
+    if (!this.event.tags) return null;
+    
+    const eTag = this.event.tags.find((tag) => tag[0] === "e");
+    const pTag = this.event.tags.find((tag) => tag[0] === "p");
+    
+    if (!eTag) return null;
+
+    return {
+      id: eTag[1],
+      kind: parseInt(eTag[3], 10) || 1,
+      pubkey: pTag?.[1] || this.event.pubkey || "",
+      content: this.event.content || "",
+      tags: this.event.tags || [],
+    };
   }
 
   #createDefaultInfo() {
@@ -428,24 +429,11 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #createReferenceComponent({ reference }) {
-    if (!reference) {
-      return "";
-    }
+    if (!reference) return "";
 
     try {
-      const getLinkUrl = (ref) => {
-        if (ref.kind === 31990) {
-          const rTags = ref.tags.filter((t) => t[0] === "r");
-          const nonSourceTag =
-            rTags.find((t) => !t.includes("source")) || rTags[0];
-          return nonSourceTag?.[1];
-        }
-        return `https://njump.me/${window.NostrTools.nip19.neventEncode({
-          id: ref.id,
-          kind: ref.kind,
-          pubkey: ref.pubkey,
-        })}`;
-      };
+      const getLinkUrl = this.#getReferenceUrl(reference);
+      const content = this.#getReferenceContent(reference);
 
       return `
         <div class="zap-reference">
@@ -453,29 +441,8 @@ class NostrZapViewDialog extends HTMLElement {
             <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
           </div>
           <div class="reference-content">
-            <div class="reference-text">${
-              reference.kind === 30023 || reference.kind === 30030
-                ? escapeHTML(
-                    reference.tags.find((t) => t[0] === "title")?.[1] ||
-                      reference.content
-                  )
-                : reference.kind === 30009 ||
-                  reference.kind === 40 ||
-                  reference.kind === 41
-                ? escapeHTML(
-                    reference.tags.find((t) => t[0] === "name")?.[1] ||
-                      reference.content
-                  )
-                : reference.kind === 31990
-                ? escapeHTML(
-                    reference.tags.find((t) => t[0] === "alt")?.[1] ||
-                      reference.content
-                  )
-                : escapeHTML(reference.content)
-            }</div>
-            <a href="${getLinkUrl(
-              reference
-            )}" target="_blank" class="reference-link">
+            <div class="reference-text">${escapeHTML(content)}</div>
+            <a href="${getLinkUrl}" target="_blank" class="reference-link">
               <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
             </a>
           </div>
@@ -485,6 +452,32 @@ class NostrZapViewDialog extends HTMLElement {
       console.error("Failed to create reference component:", error);
       return "";
     }
+  }
+
+  #getReferenceUrl(reference) {
+    if (reference.kind === 31990) {
+      const rTags = reference.tags.filter((t) => t[0] === "r");
+      const nonSourceTag = rTags.find((t) => !t.includes("source")) || rTags[0];
+      return nonSourceTag?.[1];
+    }
+    return `https://njump.me/${window.NostrTools.nip19.neventEncode({
+      id: reference.id,
+      kind: reference.kind,
+      pubkey: reference.pubkey,
+    })}`;
+  }
+
+  #getReferenceContent(reference) {
+    const kindContentMap = {
+      30023: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
+      30030: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
+      30009: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
+      40: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
+      41: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
+      31990: () => reference.tags.find((t) => t[0] === "alt")?.[1] || reference.content,
+    };
+
+    return kindContentMap[reference.kind]?.() || reference.content;
   }
 
   #createZapHTML(zapInfo) {
