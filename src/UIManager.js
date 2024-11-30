@@ -14,6 +14,77 @@ import {
 import { APP_CONFIG } from "./index.js";
 import { UIStatus } from "./UIStatus.js";
 
+// Zapイベント情報を扱うクラス
+class ZapInfo {
+  constructor(event, defaultIcon) {
+    this.event = event;
+    this.defaultIcon = defaultIcon;
+  }
+
+  async extractInfo() {
+    try {
+      const { pubkey, content, satsText } = await parseZapEvent(
+        this.event,
+        this.defaultIcon
+      );
+      const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
+      const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
+
+      // referenceの抽出ロジックを修正
+      let reference = null;
+      if (this.event.reference) {
+        reference = this.event.reference;
+      } else if (this.event.tags) {
+        // tagsから参照情報を構築
+        const eTag = this.event.tags.find((tag) => tag[0] === "e");
+        const pTag = this.event.tags.find((tag) => tag[0] === "p");
+        if (eTag) {
+          reference = {
+            id: eTag[1],
+            kind: parseInt(eTag[3], 10) || 1,
+            pubkey: pTag?.[1] || this.event.pubkey || "",
+            content: this.event.content || "",
+            tags: this.event.tags || [],
+          };
+        }
+      }
+
+      return {
+        satsText,
+        satsAmount,
+        comment: content || "",
+        pubkey: normalizedPubkey || "",
+        created_at: this.event.created_at,
+        displayIdentifier: normalizedPubkey
+          ? formatIdentifier(
+              window.NostrTools.nip19.npubEncode(normalizedPubkey)
+            )
+          : "anonymous",
+        senderName: null,
+        senderIcon: null,
+        reference,
+      };
+    } catch (error) {
+      console.error("Failed to extract zap info:", error, this.event);
+      return this.#createDefaultInfo();
+    }
+  }
+
+  #createDefaultInfo() {
+    return {
+      satsText: "Amount: Unknown",
+      satsAmount: 0,
+      comment: "",
+      pubkey: "",
+      created_at: this.event.created_at,
+      displayIdentifier: "anonymous",
+      senderName: "anonymous",
+      senderIcon: this.defaultIcon,
+      reference: null,
+    };
+  }
+}
+
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
     return ["data-theme", "data-max-count"];
@@ -111,39 +182,9 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #extractZapInfo(event) {
-    try {
-      const { pubkey, content, satsText } = await parseZapEvent(event, defaultIcon);
-      const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-  
-      // pubkeyの存在確認と型チェック
-      const normalizedPubkey = typeof pubkey === 'string' ? pubkey : null;
-      const displayIdentifier = normalizedPubkey 
-        ? formatIdentifier(window.NostrTools.nip19.npubEncode(normalizedPubkey))
-        : 'anonymous';
-  
-      return {
-        satsText,
-        satsAmount,
-        comment: content || "",
-        pubkey: normalizedPubkey || "",
-        created_at: event.created_at,
-        displayIdentifier,
-        senderName: null, // nullに変更: 初期表示時はスケルトンを表示
-        senderIcon: null, // nullに変更: 初期表示時はスケルトンを表示
-      };
-    } catch (error) {
-      console.error("Failed to extract zap info:", error);
-      return {
-        satsText: "Amount: Unknown",
-        satsAmount: 0,
-        comment: "",
-        pubkey: "",
-        created_at: event.created_at,
-        displayIdentifier: "anonymous",
-        senderName: "anonymous",
-        senderIcon: defaultIcon,
-      };
-    }
+    const zapInfo = new ZapInfo(event, defaultIcon);
+    const info = await zapInfo.extractInfo();
+    return info; // 修正: referenceを再設定せず、そのまま返す
   }
 
   async #loadProfileAndUpdate(pubkey, element) {
@@ -164,24 +205,28 @@ class NostrZapViewDialog extends HTMLElement {
 
       // 名前の更新: スケルトンがある場合は置き換え、ない場合は直接更新
       if (nameContainer) {
-        nameContainer.replaceWith(Object.assign(document.createElement("span"), {
-          className: "sender-name",
-          textContent: senderName
-        }));
+        nameContainer.replaceWith(
+          Object.assign(document.createElement("span"), {
+            className: "sender-name",
+            textContent: senderName,
+          })
+        );
       } else if (nameElement) {
         nameElement.textContent = senderName;
       }
 
       if (iconContainer) {
         // スケルトンを削除して画像を追加
-        const skeleton = iconContainer.querySelector('.zap-placeholder-icon');
+        const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
         if (skeleton) {
           skeleton.remove();
-          const img = document.createElement('img');
+          const img = document.createElement("img");
           img.src = senderIcon;
           img.alt = `${escapeHTML(senderName)}'s icon`;
           img.loading = "lazy";
-          img.onerror = () => { img.src = defaultIcon; };
+          img.onerror = () => {
+            img.src = defaultIcon;
+          };
           iconContainer.appendChild(img);
         }
       }
@@ -204,8 +249,7 @@ class NostrZapViewDialog extends HTMLElement {
     try {
       // 基本情報を即時表示
       const zapInfo = await this.#extractZapInfo(event);
-      // イベントから参照情報を取得
-      zapInfo.reference = event.reference; // この行を追加
+      // zapInfo.reference = event.reference; // この行を削除
 
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
@@ -237,8 +281,7 @@ class NostrZapViewDialog extends HTMLElement {
       const fragment = document.createDocumentFragment();
       const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
-        // イベントから参照情報を取得
-        zapInfo.reference = event.reference; // この行を追加
+        // zapInfo.reference = event.reference; // この行を削除
 
         const li = document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
@@ -266,6 +309,39 @@ class NostrZapViewDialog extends HTMLElement {
       });
     } catch (error) {
       console.error("Failed to render zap list:", error);
+    }
+  }
+
+  async prependZap(event) {
+    const list = this.#getElement(".dialog-zap-list");
+    if (!list) return;
+
+    // "No Zaps" メッセージが存在する場合、メッセージのみを削除
+    const noZapsMessage = list.querySelector(".no-zaps-message");
+    if (noZapsMessage) {
+      noZapsMessage.remove();
+    }
+
+    try {
+      const zapInfo = await this.#extractZapInfo(event);
+      // zapInfo.reference = event.reference; // この行を削除
+
+      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      const li = document.createElement("li");
+      li.className = `zap-list-item ${colorClass}${
+        zapInfo.comment ? " with-comment" : ""
+      }`;
+      li.setAttribute("data-pubkey", zapInfo.pubkey);
+      li.innerHTML = this.#createZapHTML(zapInfo);
+
+      list.prepend(li);
+
+      // プロフィール情報を非同期で更新
+      if (zapInfo.pubkey) {
+        this.#loadProfileAndUpdate(zapInfo.pubkey, li);
+      }
+    } catch (error) {
+      console.error("Failed to prepend zap:", error);
     }
   }
 
@@ -301,112 +377,145 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // UI element creation methods
-  #createZapHTML({
-    senderName,
-    senderIcon,
-    satsText,
-    comment,
-    pubkey,
-    created_at,
-    displayIdentifier,
-    reference, // Add reference parameter
-  }) {
-    const [amount, unit] = satsText.split(" ");
-    const isNew = isWithin24Hours(created_at);
-    const escapedName = senderName ? escapeHTML(senderName) : null;
-    const escapedComment = escapeHTML(comment);
+  #createUIComponents(zapInfo) {
+    const iconComponent = this.#createIconComponent(zapInfo);
+    const nameComponent = this.#createNameComponent(zapInfo);
+    const pubkeyComponent = this.#createPubkeyComponent(zapInfo);
 
-    // アイコンの表示: senderIconがnullの場合はスケルトンを表示
-    const iconHTML = senderIcon
-      ? `<img src="${senderIcon}" alt="${escapedName || 'anonymous'}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
-      : `<div class="zap-placeholder-icon skeleton"></div>`;
-
-    // 名前の表示: senderNameがnullの場合はスケルトンを表示
-    const nameHTML = senderName
-      ? `<span class="sender-name">${escapedName}</span>`
-      : `<div class="zap-placeholder-name skeleton"></div>`;
-
-    // リンクURLを取得する関数を追加
-    const getLinkUrl = (reference) => {
-      if (reference.kind === 31990) {
-        const rTags = reference.tags.filter((t) => t[0] === "r");
-        const nonSourceTag =
-          rTags.find((t) => !t.includes("source")) || rTags[0];
-        return nonSourceTag?.[1];
-      }
-      return `https://njump.me/${window.NostrTools.nip19.neventEncode({
-        id: reference.id,
-        kind: reference.kind,
-        pubkey: reference.pubkey,
-      })}`;
-    };
-
-    // viewIdからidentifierを取得
+    // referenceComponentの生成を条件付きに
     const viewId = this.getAttribute("data-view-id");
-    const fetchButton = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
-    const identifier = fetchButton?.getAttribute("data-nzv-id") || "";
-    const shouldShowReference = !isEventIdentifier(identifier);
-
-    // note1やnevent1の場合はreferenceHTMLを生成しない
-    const referenceHTML = reference && shouldShowReference
-      ? `
-      <div class="zap-reference">
-        <div class="reference-icon">
-          <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
-        </div>
-        <div class="reference-content">
-          <div class="reference-text">${
-            reference.kind === 30023 || reference.kind === 30030
-              ? escapeHTML(
-                  reference.tags.find((t) => t[0] === "title")?.[1] ||
-                    reference.content
-                )
-              : reference.kind === 30009 ||
-                reference.kind === 40 ||
-                reference.kind === 41
-              ? escapeHTML(
-                  reference.tags.find((t) => t[0] === "name")?.[1] ||
-                    reference.content
-                )
-              : reference.kind === 31990
-              ? escapeHTML(
-                  reference.tags.find((t) => t[0] === "alt")?.[1] ||
-                    reference.content
-                )
-              : escapeHTML(reference.content)
-          }</div>
-          <a href="${getLinkUrl(
-            reference
-          )}" target="_blank" class="reference-link">
-            <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
-          </a>
-        </div>
-      </div>
-    `
+    const identifier =
+      document
+        .querySelector(`button[data-zap-view-id="${viewId}"]`)
+        ?.getAttribute("data-nzv-id") || "";
+    const referenceComponent = !isEventIdentifier(identifier)
+      ? this.#createReferenceComponent(zapInfo)
       : "";
 
-    // referenceの有無でnip05とreferenceを区別して表示
-    const pubkeyDisplay = reference && shouldShowReference
+    return {
+      iconComponent,
+      nameComponent,
+      pubkeyComponent,
+      referenceComponent,
+    };
+  }
+
+  #createIconComponent({ senderIcon, senderName }) {
+    return senderIcon
+      ? `<img src="${senderIcon}" alt="${escapeHTML(
+          senderName || "anonymous"
+        )}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
+      : `<div class="zap-placeholder-icon skeleton"></div>`;
+  }
+
+  #createNameComponent({ senderName }) {
+    return senderName
+      ? `<span class="sender-name">${escapeHTML(senderName)}</span>`
+      : `<div class="zap-placeholder-name skeleton"></div>`;
+  }
+
+  #createPubkeyComponent({ pubkey, displayIdentifier, reference }) {
+    const viewId = this.getAttribute("data-view-id");
+    const identifier =
+      document
+        .querySelector(`button[data-zap-view-id="${viewId}"]`)
+        ?.getAttribute("data-nzv-id") || "";
+    const shouldShowReference = !isEventIdentifier(identifier);
+
+    return reference && shouldShowReference
       ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
       : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
+  }
+
+  #createReferenceComponent({ reference }) {
+    if (!reference) {
+      return "";
+    }
+
+    try {
+      const getLinkUrl = (ref) => {
+        if (ref.kind === 31990) {
+          const rTags = ref.tags.filter((t) => t[0] === "r");
+          const nonSourceTag =
+            rTags.find((t) => !t.includes("source")) || rTags[0];
+          return nonSourceTag?.[1];
+        }
+        return `https://njump.me/${window.NostrTools.nip19.neventEncode({
+          id: ref.id,
+          kind: ref.kind,
+          pubkey: ref.pubkey,
+        })}`;
+      };
+
+      return `
+        <div class="zap-reference">
+          <div class="reference-icon">
+            <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
+          </div>
+          <div class="reference-content">
+            <div class="reference-text">${
+              reference.kind === 30023 || reference.kind === 30030
+                ? escapeHTML(
+                    reference.tags.find((t) => t[0] === "title")?.[1] ||
+                      reference.content
+                  )
+                : reference.kind === 30009 ||
+                  reference.kind === 40 ||
+                  reference.kind === 41
+                ? escapeHTML(
+                    reference.tags.find((t) => t[0] === "name")?.[1] ||
+                      reference.content
+                  )
+                : reference.kind === 31990
+                ? escapeHTML(
+                    reference.tags.find((t) => t[0] === "alt")?.[1] ||
+                      reference.content
+                  )
+                : escapeHTML(reference.content)
+            }</div>
+            <a href="${getLinkUrl(
+              reference
+            )}" target="_blank" class="reference-link">
+              <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
+            </a>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      console.error("Failed to create reference component:", error);
+      return "";
+    }
+  }
+
+  #createZapHTML(zapInfo) {
+    const {
+      iconComponent,
+      nameComponent,
+      pubkeyComponent,
+      referenceComponent,
+    } = this.#createUIComponents(zapInfo);
+    const [amount, unit] = zapInfo.satsText.split(" ");
+    const isNew = isWithin24Hours(zapInfo.created_at);
 
     return `
-      <div class="zap-sender${comment ? " with-comment" : ""}">
+      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
-          ${iconHTML}
+          ${iconComponent}
         </div>
         <div class="sender-info">
-          ${nameHTML}
-          ${pubkeyDisplay}
+          ${nameComponent}
+          ${pubkeyComponent}
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
       ${
-        comment
-          ? `<div class="zap-details"><span class="zap-comment">${escapedComment}</span></div>`
+        zapInfo.comment
+          ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(
+              zapInfo.comment
+            )}</span></div>`
           : ""
       }
-      ${referenceHTML}
+      ${referenceComponent}
     `;
   }
 
@@ -422,8 +531,7 @@ class NostrZapViewDialog extends HTMLElement {
 
     try {
       const zapInfo = await this.#extractZapInfo(event);
-      // referenceを追加
-      zapInfo.reference = event.reference;
+      // zapInfo.reference = event.reference; // この行を削除
 
       const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
       const li = document.createElement("li");
@@ -535,9 +643,7 @@ customElements.define("nzv-dialog", NostrZapViewDialog);
 
 // Simplified external API
 export const createDialog = (viewId) => {
-  if (
-    !document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
-  ) {
+  if (!document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)) {
     const dialog = document.createElement("nzv-dialog");
     dialog.setAttribute("data-view-id", viewId);
     document.body.appendChild(dialog);
