@@ -1,4 +1,5 @@
 import { API_CONFIG } from "./ZapConfig.js";
+import { displayZapStats } from "./UIManager.js"; // UIManager関数をインポート
 
 export class StatsManager {
   constructor() {
@@ -164,7 +165,7 @@ export class StatsManager {
       if (!viewState.currentStats) {
         const stats = await this.getZapStats(config.identifier, viewId);
         viewState.currentStats = !stats?.error 
-          ? await this.recalculateStats(stats, viewState.zapEventsCache)
+          ? this.recalculateStats(stats, viewState.zapEventsCache)
           : { timeout: stats.timeout };
       }
       
@@ -174,6 +175,59 @@ export class StatsManager {
       console.error("Failed to handle cached zaps:", error);
       displayZapStats({ timeout: true }, viewId);
     }
+  }
+
+  // 統計情報の初期化と表示を行う
+  async initializeStats(identifier, viewId) {
+    try {
+      const stats = await this.getZapStats(identifier, viewId);
+      const initialStats = stats?.error ? { timeout: true } : stats;
+      this.displayStats(initialStats, viewId);
+      return initialStats;
+    } catch (error) {
+      console.error("Failed to fetch initial stats:", error);
+      this.displayStats({ timeout: true }, viewId);
+      return { error: true, timeout: true };
+    }
+  }
+
+  // Zapイベントからの統計更新処理
+  async handleZapEvent(event, state, viewId) {
+    const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+    if (!bolt11Tag) return;
+
+    const amountMsats = this.extractAmountFromBolt11(bolt11Tag);
+    if (amountMsats <= 0) return;
+
+    // 常に現在の統計情報を初期化
+    state.currentStats = state.currentStats || { count: 0, msats: 0, maxMsats: 0 };
+    
+    // 統計情報を更新
+    const updatedStats = await this.incrementStats(state.currentStats, amountMsats, viewId);
+    state.currentStats = updatedStats;
+    
+    // イベント情報を更新
+    event.isStatsCalculated = true;
+    event.amountMsats = amountMsats;
+    
+    // 統計情報を表示
+    this.displayStats(updatedStats, viewId);
+  }
+
+  // BOLT11から金額を抽出
+  extractAmountFromBolt11(bolt11) {
+    try {
+      const decoded = window.decodeBolt11(bolt11);
+      return parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
+    } catch (error) {
+      console.error("Failed to decode bolt11:", error);
+      return 0;
+    }
+  }
+
+  // 統計情報の表示
+  displayStats(stats, viewId) {
+    displayZapStats(stats, viewId);
   }
 }
 

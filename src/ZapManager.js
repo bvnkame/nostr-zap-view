@@ -1,5 +1,5 @@
 import { poolManager } from "./ZapPool.js";
-import { replacePlaceholderWithZap, prependZap, showDialog, displayZapStats, renderZapListFromCache, showNoZapsMessage } from "./UIManager.js";
+import { replacePlaceholderWithZap, prependZap, showDialog, renderZapListFromCache, showNoZapsMessage } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js"; // isEventIdentifierを追加
 import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
 import { statsManager } from "./StatsManager.js";
@@ -54,7 +54,7 @@ class ZapSubscriptionManager {
   clearCache(viewId) {
     const state = this.getOrCreateViewState(viewId);
     state.zapEventsCache = [];
-    state.currentStats = null;  // Fix: currentStats����クリア
+    state.currentStats = null;  // Fix: currentStatsをクリア
   }
 
   /**
@@ -78,7 +78,7 @@ class ZapSubscriptionManager {
       if (isRealTime) {
         state.zapEventsCache.unshift(event);
         await prependZap(event, viewId);
-        await this.updateEventStats(event, state, viewId);
+        await statsManager.handleZapEvent(event, state, viewId);
       } else {
         state.zapEventsCache.push(event);
         state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
@@ -94,30 +94,9 @@ class ZapSubscriptionManager {
     }
   }
 
-  /**
-   * イベントの統計情報を更新
-   * - BOLT11からの金額デコード
-   * - 統計情報の計算と表示更新
-   * @param {Object} event - Zapイベント
-   * @param {Object} state - ビューの状態
-   * @param {string} viewId - ビューID
-   */
-  async updateEventStats(event, state, viewId) {
-    const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-    if (bolt11Tag) {
-      const decoded = window.decodeBolt11(bolt11Tag);
-      const amountMsats = parseInt(decoded.sections.find(section => section.name === "amount")?.value ?? "0", 10);
+  // updateEventStats メソッドを削除
 
-      if (amountMsats > 0) {
-        state.currentStats = state.currentStats || { count: 0, msats: 0, maxMsats: 0 };
-        const updatedStats = await statsManager.incrementStats(state.currentStats, amountMsats, viewId);
-        state.currentStats = updatedStats;
-        displayZapStats(updatedStats, viewId);
-        event.isStatsCalculated = true;
-        event.amountMsats = amountMsats;
-      }
-    }
-  }
+  // handleCachedZaps メソッドを削除
 
   /**
    * イベントの参照情報を更新
@@ -154,7 +133,6 @@ class ZapSubscriptionManager {
   /**
    * サブスクリプションの初期化
    * - 識別子のデコード
-   * - 統計情報の初期取得
    * - Zapイベントの購読開始
    * @param {Object} config - 設定オブジェクト
    * @param {string} viewId - ビューID
@@ -166,15 +144,6 @@ class ZapSubscriptionManager {
     this.setViewConfig(viewId, config);
     const state = this.getOrCreateViewState(viewId);
     state.isInitialFetchComplete = false;
-
-    // 統計情報の取得を非同期で開始
-    statsManager.getZapStats(config.identifier, viewId)
-      .then(stats => {
-        state.currentStats = stats;
-        if (!stats?.error) {
-          displayZapStats(stats, viewId);
-        }
-      });
 
     return new Promise((resolve) => {
       poolManager.subscribeToZaps(viewId, config, decoded, {
@@ -190,29 +159,6 @@ class ZapSubscriptionManager {
   }
 
   /**
-   * キャッシュされたZapの処理
-   * - 統計情報の再計算
-   * - UIの更新
-   * @param {string} viewId - ビューID
-   * @param {Object} config - 設定オブジェクト
-   */
-  async handleCachedZaps(viewId, config) {
-    const viewState = this.getOrCreateViewState(viewId);
-    try {
-      const stats = await statsManager.getZapStats(config.identifier, viewId);
-      const updatedStats = !stats?.error 
-        ? statsManager.recalculateStats(stats, viewState.zapEventsCache)
-        : { timeout: stats.timeout };
-      
-      displayZapStats(updatedStats, viewId);
-      await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
-    } catch (error) {
-      console.error("Failed to handle cached zaps:", error);
-      displayZapStats({ timeout: true }, viewId);
-    }
-  }
-
-  /**
    * ビューのクリックイベントを処理
    * @param {string} viewId - ビューID
    */
@@ -224,15 +170,11 @@ class ZapSubscriptionManager {
 
       const viewState = this.getOrCreateViewState(viewId);
       const config = this.getViewConfig(viewId);
-      const hasCache = viewState.zapEventsCache.length > 0;
-
+      
       showDialog(viewId);
 
-      if (hasCache) {
+      if (viewState.zapEventsCache.length > 0) {
         await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
-        if (viewState.currentStats) {
-          displayZapStats(viewState.currentStats, viewId);
-        }
       }
 
       if (viewState.zapEventsCache.length === 0 && viewState.isInitialFetchComplete) {
@@ -240,7 +182,6 @@ class ZapSubscriptionManager {
       }
     } catch (error) {
       console.error("Error occurred while handling view click:", error);
-      displayZapStats({ timeout: true }, viewId);
     }
   }
 }

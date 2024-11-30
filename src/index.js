@@ -23,12 +23,12 @@ async function handleButtonClick(button, viewId) {
 
     // 2. 未初期化の場合のみバックグラウンドで実行
     if (!button.hasAttribute('data-initialized')) {
-      // UIの表示に影響を与えない非同期処理
+      // 統計情報の初期化とZapイベントの購読を並行して開始
       Promise.all([
-        subscriptionManager.initializeSubscriptions(config, viewId),
-        statsManager.getZapStats(config.identifier, viewId)
+        statsManager.initializeStats(config.identifier, viewId),
+        subscriptionManager.initializeSubscriptions(config, viewId)
       ]).catch(error => {
-        console.error(`Background initialization failed for viewId ${viewId}:`, error);
+        console.error("Failed to initialize:", error);
       });
 
       button.setAttribute('data-initialized', 'true');
