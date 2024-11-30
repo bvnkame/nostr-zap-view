@@ -169,9 +169,8 @@ export class StatsManager {
     try {
       if (!viewState.currentStats) {
         const stats = await this.getZapStats(config.identifier, viewId);
-        viewState.currentStats = !stats?.error
-          ? this.recalculateStats(stats, viewState.zapEventsCache)
-          : { timeout: stats.timeout };
+        // 初期データはそのまま使用
+        viewState.currentStats = stats?.error ? { timeout: stats.timeout } : stats;
       }
 
       displayZapStats(viewState.currentStats, viewId);
@@ -206,21 +205,37 @@ export class StatsManager {
 
     if (amountMsats <= 0) return;
 
-    state.currentStats = state.currentStats || {
-      count: 0,
-      msats: 0,
-      maxMsats: 0,
-    };
-    state.currentStats = await this.updateStatsWithZap(
-      state.currentStats,
-      amountMsats,
-      viewId
-    );
+    // リアルタイムイベントの場合のみ現在の統計情報に加算
+    if (event.isRealTimeEvent) {
+      // 統計情報が未初期化の場合は初期化
+      if (!state.currentStats || state.currentStats.error) {
+        state.currentStats = await this.getZapStats(this.getViewIdentifier(viewId), viewId) || {
+          count: 0,
+          msats: 0,
+          maxMsats: 0
+        };
+      }
+
+      // 現在の統計情報に加算
+      state.currentStats = {
+        count: state.currentStats.count + 1,
+        msats: state.currentStats.msats + amountMsats,
+        maxMsats: Math.max(state.currentStats.maxMsats, amountMsats)
+      };
+
+      // キャッシュとUIを更新
+      this.updateCache(viewId, this.getViewIdentifier(viewId), state.currentStats);
+      this.displayStats(state.currentStats, viewId);
+    }
 
     event.isStatsCalculated = true;
     event.amountMsats = amountMsats;
+  }
 
-    this.displayStats(state.currentStats, viewId);
+  // 新しくビューの識別子を取得するメソッドを追加
+  getViewIdentifier(viewId) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    return Array.from(viewCache.keys())[0];
   }
 
   extractAmountFromBolt11(bolt11) {

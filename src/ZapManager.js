@@ -87,7 +87,7 @@ class ZapSubscriptionManager {
       if (isRealTime) {
         state.zapEventsCache.unshift(event);
         await prependZap(event, viewId);
-        await statsManager.handleZapEvent(event, state, viewId);
+        await statsManager.handleZapEvent(event, state, viewId); // 修正: stateを渡す
       } else {
         state.zapEventsCache.push(event);
         state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
@@ -97,6 +97,7 @@ class ZapSubscriptionManager {
           await replacePlaceholderWithZap(event, index, viewId);
           await new Promise(resolve => setTimeout(resolve, 50));
           await renderZapListFromCache(state.zapEventsCache, maxCount, viewId);
+          await statsManager.handleZapEvent(event, state, viewId); // 修正: stateを渡す
         }
       }
     }
