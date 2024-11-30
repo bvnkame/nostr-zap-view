@@ -215,3 +215,20 @@ export async function verifyNip05(nip05, pubkey) {
     return null;
   }
 }
+
+// Add secure URL sanitization function
+export function sanitizeImageUrl(url) {
+  if (!url || typeof url !== 'string') return null;
+  
+  try {
+    const parsed = new URL(url);
+    // Allow only http and https protocols
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return null;
+    }
+    // パラメータとハッシュは保持するように変更
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}

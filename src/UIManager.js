@@ -10,6 +10,7 @@ import {
   isWithin24Hours,
   escapeHTML,
   isEventIdentifier, // 追加
+  sanitizeImageUrl, // Add import
 } from "./utils.js";
 import { APP_CONFIG } from "./index.js";
 import { UIStatus } from "./UIStatus.js";
@@ -196,7 +197,8 @@ class NostrZapViewDialog extends HTMLElement {
       if (!profile) return;
 
       const senderName = getProfileDisplayName(profile) || "nameless";
-      const senderIcon = profile.picture || defaultIcon;
+      // デフォルトアイコンのフォールバックをここで行う
+      const senderIcon = profile.picture ? sanitizeImageUrl(profile.picture) : null;
 
       // 名前の更新
       const nameElement = element.querySelector(".sender-name");
@@ -213,45 +215,37 @@ class NostrZapViewDialog extends HTMLElement {
       }
 
       // アイコンの非同期読み込み
-      if (senderIcon !== defaultIcon) {
-        const iconContainer = element.querySelector(".sender-icon");
-        if (iconContainer) {
-          const img = new Image();
-          img.onload = () => {
-            const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
-            if (skeleton) {
-              skeleton.remove();
-              img.className = "profile-icon";
-              img.alt = `${escapeHTML(senderName)}'s icon`;
-              img.loading = "lazy";
-              iconContainer.appendChild(img);
-            }
-          };
-          img.onerror = () => {
-            const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
-            if (skeleton) {
-              skeleton.remove();
-              const defaultImg = document.createElement("img");
-              defaultImg.src = defaultIcon;
-              defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
-              defaultImg.loading = "lazy";
-              iconContainer.appendChild(defaultImg);
-            }
-          };
-          img.src = senderIcon;
-        }
-      } else {
-        // デフォルトアイコンの即時表示
-        const iconContainer = element.querySelector(".sender-icon");
-        const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
-        if (skeleton) {
+      const iconContainer = element.querySelector(".sender-icon");
+      if (!iconContainer) return;
+
+      const skeleton = iconContainer.querySelector(".zap-placeholder-icon");
+      if (!skeleton) return;
+
+      if (senderIcon) {
+        const img = new Image();
+        img.onload = () => {
+          skeleton.remove();
+          img.className = "profile-icon";
+          img.alt = `${escapeHTML(senderName)}'s icon`;
+          img.loading = "lazy";
+          iconContainer.appendChild(img);
+        };
+        img.onerror = () => {
           skeleton.remove();
           const defaultImg = document.createElement("img");
           defaultImg.src = defaultIcon;
           defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
           defaultImg.loading = "lazy";
           iconContainer.appendChild(defaultImg);
-        }
+        };
+        img.src = senderIcon;
+      } else {
+        skeleton.remove();
+        const defaultImg = document.createElement("img");
+        defaultImg.src = defaultIcon;
+        defaultImg.alt = `${escapeHTML(senderName)}'s icon`;
+        defaultImg.loading = "lazy";
+        iconContainer.appendChild(defaultImg);
       }
 
       // NIP-05の非同期取得と更新
@@ -428,11 +422,7 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #createIconComponent({ senderIcon, senderName }) {
-    return senderIcon
-      ? `<img src="${senderIcon}" alt="${escapeHTML(
-          senderName || "anonymous"
-        )}'s icon" loading="lazy" onerror="this.src='${defaultIcon}'">`
-      : `<div class="zap-placeholder-icon skeleton"></div>`;
+    return `<div class="zap-placeholder-icon skeleton"></div>`;
   }
 
   #createNameComponent({ senderName }) {
