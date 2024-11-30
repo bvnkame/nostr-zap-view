@@ -1,5 +1,6 @@
 import { profileManager } from "./ProfileManager.js";
 import defaultIcon from "./assets/nostr-icon.svg";
+import { nip19 } from "nostr-tools";
 import {
   getProfileDisplayName,
   escapeHTML,
@@ -58,7 +59,24 @@ export class ProfileUI {
           loading: "lazy",
           className: "profile-icon",
         });
-        iconContainer.appendChild(img);
+
+        // Create link wrapper
+        const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
+        if (pubkey) {
+          const nprofile = nip19.nprofileEncode({
+            pubkey: pubkey,
+            relays: []
+          });
+          const link = Object.assign(document.createElement("a"), {
+            href: `https://njump.me/${nprofile}`,
+            target: "_blank",
+            rel: "noopener noreferrer",
+          });
+          link.appendChild(img);
+          iconContainer.appendChild(link);
+        } else {
+          iconContainer.appendChild(img);
+        }
       };
 
       if (senderIcon) {

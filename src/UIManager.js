@@ -437,7 +437,7 @@ class NostrZapViewDialog extends HTMLElement {
     const isNew = isWithin24Hours(zapInfo.created_at);
 
     return `
-      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}">
+      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
           ${iconComponent}
         </div>
