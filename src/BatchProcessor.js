@@ -1,4 +1,3 @@
-
 export class BatchProcessor {
   constructor(options = {}) {
     this.batchSize = options.batchSize || 50;
@@ -56,6 +55,24 @@ export class BatchProcessor {
       if (this.batchQueue.size > 0) {
         this._scheduleBatchProcess();
       }
+    }
+  }
+
+  async processBatch() {
+    if (this.currentBatch.size === 0) return;
+
+    const items = Array.from(this.currentBatch);
+    this.currentBatch.clear();
+
+    try {
+      // バッチ処理を非同期で実行し、完了を待たない
+      this.onBatchProcess(items).catch(error => {
+        console.error("Batch processing error:", error);
+        this.onBatchError(items, error);
+      });
+    } catch (error) {
+      console.error("Batch processing error:", error);
+      this.onBatchError(items, error);
     }
   }
 

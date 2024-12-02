@@ -194,8 +194,13 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #loadProfileAndUpdate(pubkey, element) {
-    if (!pubkey) return;
-    await this.profileUI.loadAndUpdate(pubkey, element);
+    if (!pubkey || !element) return;
+  
+    try {
+      await this.profileUI.loadAndUpdate(pubkey, element);
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    }
   }
 
   async replacePlaceholderWithZap(event, index) {
@@ -233,29 +238,29 @@ class NostrZapViewDialog extends HTMLElement {
         return;
       }
 
-      // キャッシュからデータを即時表示
-      const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
+      // 高速な初期表示のために最小限の情報でレンダリング
       const fragment = document.createDocumentFragment();
+      const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
       const profileUpdates = [];
 
-      // Fast initial render without profiles
       for (const event of sortedZaps) {
-        const zapInfo = await this.extractZapInfo(event);
         const li = document.createElement("li");
+        const zapInfo = await this.extractZapInfo(event);
         const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
         
         li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
         li.setAttribute("data-pubkey", zapInfo.pubkey);
+        li.setAttribute("data-event-id", event.id);
         li.innerHTML = this.#createZapHTML(zapInfo);
         fragment.appendChild(li);
 
-        // プロフィール更新情報を収集
+        // プロフィール更新を後回し
         if (zapInfo.pubkey) {
           profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
         }
       }
 
-      // Preserve trigger element
+      // DOMの一括更新
       const existingTrigger = list.querySelector('.load-more-trigger');
       list.innerHTML = '';
       list.appendChild(fragment);
@@ -264,9 +269,11 @@ class NostrZapViewDialog extends HTMLElement {
         list.appendChild(existingTrigger);
       }
 
-      // Update profiles in the background
-      profileUpdates.forEach(({ pubkey, element }) => {
-        this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
+      // バックグラウンドでプロフィール更新
+      requestIdleCallback(() => {
+        profileUpdates.forEach(({ pubkey, element }) => {
+          this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
+        });
       });
 
     } catch (error) {
@@ -300,7 +307,7 @@ class NostrZapViewDialog extends HTMLElement {
 
       // プロフィール情報を非同期で更新
       if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, li);
+        this.#loadProfileAndUpdate(zapInfo.pubkey, li).catch(console.error);
       }
     } catch (error) {
       console.error("Failed to prepend zap:", error);

@@ -44,23 +44,23 @@ class ZapSubscriptionManager {
     console.log('[ZapManager] 受信したZapイベント:', event);
     
     if (!state.zapEventsCache.some((e) => e.id === event.id)) {
-      await this.updateEventReference(event, viewId);
-      
-      const isRealTime = event.created_at >= Math.floor(Date.now() / 1000) - 5;
-      event.isRealTimeEvent = isRealTime;
-
+      // 即時表示のためにキャッシュに追加
       state.zapEventsCache.push(event);
       state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
 
+      // 基本情報の表示を即時実行
+      await renderZapListFromCache(state.zapEventsCache, viewId);
+
+      // バックグラウンドでの処理
+      Promise.all([
+        this.updateEventReference(event, viewId),
+        statsManager.handleZapEvent(event, state, viewId)
+      ]).catch(console.error);
+
       console.log('[ZapManager] キャッシュ更新後の状態:', {
         totalEvents: state.zapEventsCache.length,
-        isRealTime,
         eventId: event.id
       });
-
-      await statsManager.handleZapEvent(event, state, viewId);
-    } else {
-      console.log('[ZapManager] 重複イベントをスキップ:', event.id);
     }
   }
 
@@ -129,22 +129,26 @@ class ZapSubscriptionManager {
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
           if (!state.zapEventsCache.some(e => e.id === event.id)) {
-            await this.updateEventReference(event, viewId);
             events.push(event);
+            // 即時表示のために都度レンダリング
+            state.zapEventsCache.push(event);
+            state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
+            await renderZapListFromCache(state.zapEventsCache, viewId);
+            
             if (!state.lastEventTime || event.created_at < state.lastEventTime) {
               state.lastEventTime = event.created_at;
             }
           }
         },
         oneose: async () => {
-          if (events.length > 0) {
-            state.zapEventsCache.push(...events);
-            state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
-            for (const event of events) {
-              await statsManager.handleZapEvent(event, state, viewId);
-            }
-            await renderZapListFromCache(state.zapEventsCache, viewId);
-          }
+          // バックグラウンドで参照情報とプロフィールを更新
+          Promise.all(events.map(event => {
+            return Promise.all([
+              this.updateEventReference(event, viewId),
+              statsManager.handleZapEvent(event, state, viewId)
+            ]);
+          })).catch(console.error);
+
           state.isInitialFetchComplete = true;
           if (state.zapEventsCache.length === 0) {
             showNoZapsMessage(viewId);
