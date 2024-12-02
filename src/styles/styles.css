@@ -61,14 +61,13 @@ button {
   color: var(--main-text);
   font-size: medium;
   font-weight: normal;
-  width: 340px;
+  height: 100dvh;
+  width: 360px;
   margin: auto;
-  padding: 0 8px;
+  padding: 0;
   border: none;
   border-radius: 10px;
   background: var(--dialog-bg);
-  height: 80vh;
-  max-height: 600px;
   display: flex;
   flex-direction: column;
 }
@@ -126,6 +125,7 @@ button {
   grid-template-columns: 90px 1fr 40px;
   grid-template-rows: repeat(3, 1fr);
   gap: 4px;
+  margin: 0 8px;
 }
 
 .stats-item {
@@ -151,11 +151,36 @@ button {
 .dialog-zap-list {
   list-style-type: none;
   margin: 10px 0;
-  padding: 0;
+  padding: 0 6px;
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
+
+  /* スクロールバーのスタイリング */
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 3px;
+    transition: background 0.2s;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  /* Firefox用のスクロールバースタイル */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
 }
 
 .zap-list-item {
@@ -380,7 +405,7 @@ button {
   white-space: nowrap;
 }
 
-/* 共通のフレックスボックス設定 */
+/* 共通のフ��ックスボックス設定 */
 .zap-sender,
 .stats-item,
 .zap-details,
