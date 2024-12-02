@@ -15,6 +15,12 @@ async function handleButtonClick(button, viewId) {
   try {
     const config = ZapConfig.fromButton(button);
 
+    // 既存のダイアログを削除
+    const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+    if (existingDialog) {
+      existingDialog.remove();
+    }
+
     // 1. 即座にダイアログとスケルトンを表示
     subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);

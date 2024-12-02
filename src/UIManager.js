@@ -489,7 +489,11 @@ class NostrZapViewDialog extends HTMLElement {
 
   closeDialog() {
     const dialog = this.#getElement(".dialog");
-    if (dialog?.open) dialog.close();
+    if (dialog?.open) {
+      dialog.close();
+      // ダイアログを閉じた後に要素自体を削除
+      this.remove();
+    }
   }
 
   // Zap display methods
