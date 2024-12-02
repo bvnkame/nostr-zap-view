@@ -329,8 +329,8 @@ class ZapSubscriptionManager {
       },
       { 
         root: list,
-        rootMargin: '200px',
-        threshold: [0, 0.1, 0.5, 1.0]
+        rootMargin: '500px', // 500pxに増やして早めに読み込み開始
+        threshold: [0]  // しきい値を簡素化
       }
     );
 
