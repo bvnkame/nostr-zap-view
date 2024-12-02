@@ -47,6 +47,9 @@ async function handleButtonClick(button, viewId) {
       initializeZapStats(viewId);
     }
 
+    // キャッシュからの表示後に無限スクロールをセットアップ
+    subscriptionManager.setupInfiniteScroll(viewId);
+
     // 2. バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
       Promise.all([
