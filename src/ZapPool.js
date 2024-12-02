@@ -3,14 +3,15 @@ import {
   ZAP_CONFIG as CONFIG,
   REQUEST_CONFIG,
   PROFILE_CONFIG,
+  BATCH_CONFIG, // Add this import
 } from "./AppSettings.js"; // PROFILE_CONFIGを追加
 import { BatchProcessor } from "./BatchProcessor.js";
 
 class ReferenceProcessor extends BatchProcessor {
   constructor(pool, config) {
     super({
-      batchSize: 10,
-      batchDelay: 50,
+      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY,
     });
     this.pool = pool;
     this.config = config;
@@ -38,7 +39,7 @@ class ReferenceProcessor extends BatchProcessor {
         this.relayUrls,
         [
           {
-            kinds: [1, 30023, 30030, 30009, 40, 41, 31990], // サポートするイベントの種類を拡張
+            kinds: BATCH_CONFIG.SUPPORTED_EVENT_KINDS,
             ids: items,
           },
         ],

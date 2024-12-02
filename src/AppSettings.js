@@ -78,6 +78,15 @@ export const PROFILE_CONFIG = {
   ],
 };
 
+// Add new settings for batch processing
+export const BATCH_CONFIG = {
+  REFERENCE_PROCESSOR: {
+    BATCH_SIZE: 20,
+    BATCH_DELAY: 50,
+  },
+  SUPPORTED_EVENT_KINDS: [1, 30023, 30030, 30009, 40, 41, 31990],
+};
+
 export class ViewerConfig {
   constructor(identifier, maxCount, relayUrls) {
     this.identifier = identifier;
