@@ -1,94 +1,18 @@
+import { ZapInfo } from "./ZapInfo.js";
+import { DialogComponents } from "./DialogComponents.js";
+import { StatusUI } from "./StatusUI.js";
+import { ProfileUI } from "./ProfileUI.js";
+import { APP_CONFIG, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
 import defaultIcon from "./assets/nostr-icon.svg";
-import arrowRightIcon from "./assets/arrow_right.svg"; // 追加
-import quickReferenceIcon from "./assets/link.svg"; // 追加
 import {
-  formatIdentifier,
-  parseZapEvent,
   isWithin24Hours,
-  escapeHTML,
-  isEventIdentifier, // Add import
-  encodeNevent,   // Add import
-  encodeNpub, // Add import
-  extractReferenceFromTags, // Add import
-  createDefaultZapInfo, // Add import
-  getAmountColorClass, // Add import
-  isColorModeEnabled, // Add import
-  createNoZapsMessage, // Add import
+  getAmountColorClass,
+  isColorModeEnabled,
+  createNoZapsMessage,
+  formatIdentifier,
+  escapeHTML,  // 追加
 } from "./utils.js";
-import { APP_CONFIG, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
-import { StatusUI } from "./StatusUI.js";  // updated import
-import { ProfileUI } from "./ProfileUI.js"; // Add import
-
-// Zapイベント情報を扱うクラス
-class ZapInfo {
-  constructor(event, defaultIcon) {
-    this.event = event;
-    this.defaultIcon = defaultIcon;
-  }
-
-  async extractInfo() {
-    try {
-      const { pubkey, content, satsText } = await parseZapEvent(
-        this.event,
-        this.defaultIcon
-      );
-      const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-      const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
-
-      // referenceの抽出を単純化
-      const reference = this.event.reference || extractReferenceFromTags(this.event);
-
-      return {
-        satsText,
-        satsAmount,
-        comment: content || "",
-        pubkey: normalizedPubkey || "",
-        created_at: this.event.created_at,
-        displayIdentifier: normalizedPubkey
-          ? formatIdentifier(encodeNpub(normalizedPubkey))
-          : "anonymous",
-        senderName: null,
-        senderIcon: null,
-        reference,
-      };
-    } catch (error) {
-      console.error("Failed to extract zap info:", error, this.event);
-      return createDefaultZapInfo(this.event, this.defaultIcon);
-    }
-  }
-
-  #extractReferenceFromTags() {
-    if (!this.event.tags) return null;
-    
-    const eTag = this.event.tags.find((tag) => tag[0] === "e");
-    const pTag = this.event.tags.find((tag) => tag[0] === "p");
-    
-    if (!eTag) return null;
-
-    return {
-      id: eTag[1],
-      kind: parseInt(eTag[3], 10) || 1,
-      pubkey: pTag?.[1] || this.event.pubkey || "",
-      content: this.event.content || "",
-      tags: this.event.tags || [],
-    };
-  }
-
-  #createDefaultInfo() {
-    return {
-      satsText: "Amount: Unknown",
-      satsAmount: 0,
-      comment: "",
-      pubkey: "",
-      created_at: this.event.created_at,
-      displayIdentifier: "anonymous",
-      senderName: "anonymous",
-      senderIcon: this.defaultIcon,
-      reference: null,
-    };
-  }
-}
 
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
@@ -190,7 +114,7 @@ class NostrZapViewDialog extends HTMLElement {
   async extractZapInfo(event) {
     const zapInfo = new ZapInfo(event, defaultIcon);
     const info = await zapInfo.extractInfo();
-    return info; // 修正: referenceを再設定せず、そのまま返す
+    return info; // 修正: referenceを再設���せず、そのまま返す
   }
 
   async #loadProfileAndUpdate(pubkey, element) {
@@ -361,133 +285,28 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // UI element creation methods
-  #createUIComponents(zapInfo) {
-    const iconComponent = this.#createIconComponent(zapInfo);
-    const nameComponent = this.#createNameComponent(zapInfo);
-    const pubkeyComponent = this.#createPubkeyComponent(zapInfo);
-
-    // referenceComponentの生成を条件付きに
-    const viewId = this.getAttribute("data-view-id");
-    const identifier =
-      document
-        .querySelector(`button[data-zap-view-id="${viewId}"]`)
-        ?.getAttribute("data-nzv-id") || "";
-    const referenceComponent = !isEventIdentifier(identifier)
-      ? this.#createReferenceComponent(zapInfo)
-      : "";
-
-    return {
-      iconComponent,
-      nameComponent,
-      pubkeyComponent,
-      referenceComponent,
-    };
-  }
-
-  #createIconComponent({ senderIcon, senderName }) {
-    return `<div class="zap-placeholder-icon skeleton"></div>`;
-  }
-
-  #createNameComponent({ senderName }) {
-    return senderName
-      ? `<span class="sender-name">${escapeHTML(senderName)}</span>`
-      : `<div class="zap-placeholder-name skeleton"></div>`;
-  }
-
-  #createPubkeyComponent({ pubkey, displayIdentifier, reference }) {
-    const viewId = this.getAttribute("data-view-id");
-    const identifier =
-      document
-        .querySelector(`button[data-zap-view-id="${viewId}"]`)
-        ?.getAttribute("data-nzv-id") || "";
-    const shouldShowReference = !isEventIdentifier(identifier);
-
-    return reference && shouldShowReference
-      ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
-      : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
-  }
-
-  #createReferenceComponent({ reference }) {
-    if (!reference) return "";
-
-    try {
-      const getLinkUrl = this.#getReferenceUrl(reference);
-      const content = this.#getReferenceContent(reference);
-
-      return `
-        <div class="zap-reference">
-          <div class="reference-icon">
-            <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
-          </div>
-          <div class="reference-content">
-            <div class="reference-text">${escapeHTML(content)}</div>
-            <a href="${getLinkUrl}" target="_blank" class="reference-link">
-              <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
-            </a>
-          </div>
-        </div>
-      `;
-    } catch (error) {
-      console.error("Failed to create reference component:", error);
-      return "";
-    }
-  }
-
-  #getReferenceUrl(reference) {
-    if (reference.kind === 31990) {
-      const rTags = reference.tags.filter((t) => t[0] === "r");
-      const nonSourceTag = rTags.find((t) => !t.includes("source")) || rTags[0];
-      return nonSourceTag?.[1];
-    }
-    return `https://njump.me/${encodeNevent(
-      reference.id,
-      reference.kind,
-      reference.pubkey
-    )}`;
-  }
-
-  #getReferenceContent(reference) {
-    const kindContentMap = {
-      30023: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30030: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30009: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      40: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      41: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      31990: () => reference.tags.find((t) => t[0] === "alt")?.[1] || reference.content,
-    };
-
-    return kindContentMap[reference.kind]?.() || reference.content;
-  }
-
   #createZapHTML(zapInfo) {
-    const {
-      iconComponent,
-      nameComponent,
-      pubkeyComponent,
-      referenceComponent,
-    } = this.#createUIComponents(zapInfo);
+    const components = DialogComponents.createUIComponents(
+      zapInfo,
+      this.getAttribute("data-view-id")
+    );
+    
     const [amount, unit] = zapInfo.satsText.split(" ");
     const isNew = isWithin24Hours(zapInfo.created_at);
 
     return `
       <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
         <div class="sender-icon${isNew ? " is-new" : ""}">
-          ${iconComponent}
+          ${components.iconComponent}
         </div>
         <div class="sender-info">
-          ${nameComponent}
-          ${pubkeyComponent}
+          ${components.nameComponent}
+          ${components.pubkeyComponent}
         </div>
         <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
       </div>
-      ${
-        zapInfo.comment
-          ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(
-              zapInfo.comment
-            )}</span></div>`
-          : ""
-      }
-      ${referenceComponent}
+      ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
+      ${components.referenceComponent}
     `;
   }
 
