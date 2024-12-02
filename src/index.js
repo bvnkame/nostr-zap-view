@@ -28,40 +28,37 @@ async function handleButtonClick(button, viewId) {
       existingDialog.remove();
     }
 
-    // 1. ダイアログとスケルトンを表示
+    // 1. UIの初期化とキャッシュの確認を同時に実行
     subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);
-
-    // キャッシュの確認とUI初期化の順序を修正
-    const viewState = subscriptionManager.getOrCreateViewState(viewId);
-    const cachedStats = await statsManager.handleCachedStats(viewId, config.identifier);
-    
     showDialog(viewId);
 
-    if (viewState.zapEventsCache.length > 0) {
-      await renderZapListFromCache(viewState.zapEventsCache, viewId);
-      if (!cachedStats) {
-        initializeZapStats(viewId);
-      }
-    } else if (!viewState.isInitialFetchComplete) {
-      initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);  // 修正: 設定値を使用
-      if (!cachedStats) {
-        initializeZapStats(viewId);
-      }
-    } else {
-      showNoZapsMessage(viewId);
+    const viewState = subscriptionManager.getOrCreateViewState(viewId);
+    const [cachedStats] = await Promise.all([
+      statsManager.handleCachedStats(viewId, config.identifier),
+      viewState.zapEventsCache.length > 0 
+        ? renderZapListFromCache(viewState.zapEventsCache, viewId)
+        : viewState.isInitialFetchComplete
+          ? showNoZapsMessage(viewId)
+          : initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId)
+    ]);
+
+    if (!cachedStats) {
+      initializeZapStats(viewId);
     }
 
-    // 3. バックグラウンドでデータ取得を実行
+    // 2. バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
-      await Promise.all([
+      Promise.all([
         poolManager.connectToRelays(config.relayUrls),
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)
-      ]);
-
-      subscriptionManager.setupInfiniteScroll(viewId);
-      button.setAttribute('data-initialized', 'true');
+      ]).then(() => {
+        subscriptionManager.setupInfiniteScroll(viewId);
+        button.setAttribute('data-initialized', 'true');
+      }).catch(error => {
+        console.error('Failed to initialize:', error);
+      });
     }
   } catch (error) {
     console.error(`Failed to handle click for viewId ${viewId}:`, error);

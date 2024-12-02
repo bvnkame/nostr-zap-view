@@ -187,7 +187,7 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  async #extractZapInfo(event) {
+  async extractZapInfo(event) {
     const zapInfo = new ZapInfo(event, defaultIcon);
     const info = await zapInfo.extractInfo();
     return info; // 修正: referenceを再設定せず、そのまま返す
@@ -204,7 +204,7 @@ class NostrZapViewDialog extends HTMLElement {
 
     try {
       // 基本情報を即時表示
-      const zapInfo = await this.#extractZapInfo(event);
+      const zapInfo = await this.extractZapInfo(event);
 
       const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
 
@@ -228,47 +228,47 @@ class NostrZapViewDialog extends HTMLElement {
     if (!list) return;
 
     try {
-      // キャッシュが空の場合は早期リターン
       if (!zapEventsCache || zapEventsCache.length === 0) {
         this.showNoZapsMessage();
         return;
       }
 
+      // キャッシュからデータを即時表示
       const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
-
-      // Create fragment for batch DOM update
       const fragment = document.createDocumentFragment();
-      const zapInfoPromises = sortedZaps.map(async (event) => {
-        const zapInfo = await this.#extractZapInfo(event);
-        const li = document.createElement("li");
-        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      const profileUpdates = [];
 
+      // Fast initial render without profiles
+      for (const event of sortedZaps) {
+        const zapInfo = await this.extractZapInfo(event);
+        const li = document.createElement("li");
+        const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
+        
         li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
         li.setAttribute("data-pubkey", zapInfo.pubkey);
         li.innerHTML = this.#createZapHTML(zapInfo);
-
         fragment.appendChild(li);
-        return { li, pubkey: zapInfo.pubkey };
-      });
 
-      const zapElements = await Promise.all(zapInfoPromises);
-      
+        // プロフィール更新情報を収集
+        if (zapInfo.pubkey) {
+          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+        }
+      }
+
       // Preserve trigger element
       const existingTrigger = list.querySelector('.load-more-trigger');
       list.innerHTML = '';
       list.appendChild(fragment);
       
-      // Re-append trigger element
       if (existingTrigger) {
         list.appendChild(existingTrigger);
       }
 
-      // Update profiles asynchronously
-      zapElements.forEach(({ li, pubkey }) => {
-        if (pubkey) {
-          this.#loadProfileAndUpdate(pubkey, li);
-        }
+      // Update profiles in the background
+      profileUpdates.forEach(({ pubkey, element }) => {
+        this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
       });
+
     } catch (error) {
       console.error("Failed to render zap list:", error);
       this.showNoZapsMessage();
@@ -286,7 +286,7 @@ class NostrZapViewDialog extends HTMLElement {
     }
 
     try {
-      const zapInfo = await this.#extractZapInfo(event);
+      const zapInfo = await this.extractZapInfo(event);
 
       const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
       const li = document.createElement("li");
@@ -561,7 +561,7 @@ export const {
   renderZapListFromCache,
   prependZap,
   displayZapStats,
-  showNoZapsMessage, // ここに統合
+  showNoZapsMessage,
 } = (() => {
   const getDialog = (viewId) =>
     document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
@@ -583,22 +583,12 @@ export const {
         viewId
       });
 
-      const list = dialog.shadowRoot.querySelector(".dialog-zap-list");
-      if (!list) return;
-
       if (cache.length === 0) {
         dialog.showNoZapsMessage();
         return;
       }
 
-      // キャッシュからデータを即時表示
       const sortedZaps = [...cache].sort((a, b) => b.created_at - a.created_at);
-
-      console.log('[UIManager] 表示するZaps:', {
-        count: sortedZaps.length,
-        ids: sortedZaps.map(zap => zap.id)
-      });
-
       await dialog.renderZapListFromCache(sortedZaps);
     },
     prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
