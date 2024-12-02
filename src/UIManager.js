@@ -10,6 +10,11 @@ import {
   isEventIdentifier, // Add import
   encodeNevent,   // Add import
   encodeNpub, // Add import
+  extractReferenceFromTags, // Add import
+  createDefaultZapInfo, // Add import
+  getAmountColorClass, // Add import
+  isColorModeEnabled, // Add import
+  createNoZapsMessage, // Add import
 } from "./utils.js";
 import { APP_CONFIG, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import { StatusUI } from "./StatusUI.js";  // updated import
@@ -32,7 +37,7 @@ class ZapInfo {
       const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
 
       // referenceの抽出を単純化
-      const reference = this.event.reference || this.#extractReferenceFromTags();
+      const reference = this.event.reference || extractReferenceFromTags(this.event);
 
       return {
         satsText,
@@ -49,7 +54,7 @@ class ZapInfo {
       };
     } catch (error) {
       console.error("Failed to extract zap info:", error, this.event);
-      return this.#createDefaultInfo();
+      return createDefaultZapInfo(this.event, this.defaultIcon);
     }
   }
 
@@ -200,9 +205,8 @@ class NostrZapViewDialog extends HTMLElement {
     try {
       // 基本情報を即時表示
       const zapInfo = await this.#extractZapInfo(event);
-      // zapInfo.reference = event.reference; // この行を削除
 
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
 
       placeholder.className = `zap-list-item ${colorClass}${
         zapInfo.comment ? " with-comment" : ""
@@ -283,9 +287,8 @@ class NostrZapViewDialog extends HTMLElement {
 
     try {
       const zapInfo = await this.#extractZapInfo(event);
-      // zapInfo.reference = event.reference; // この行を削除
 
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+      const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
       const li = document.createElement("li");
       li.className = `zap-list-item ${colorClass}${
         zapInfo.comment ? " with-comment" : ""
@@ -307,10 +310,7 @@ class NostrZapViewDialog extends HTMLElement {
   #getAmountColorClass(amount) {
     if (!this.#isColorModeEnabled()) return "";
 
-    for (const threshold of ZAP_AMOUNT_CONFIG.THRESHOLDS) {
-      if (amount >= threshold.value) return threshold.className;
-    }
-    return "";
+    return getAmountColorClass(amount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
   }
 
   #isColorModeEnabled() {
@@ -319,10 +319,7 @@ class NostrZapViewDialog extends HTMLElement {
     const button = document.querySelector(
       `button[data-zap-view-id="${viewId}"]`
     );
-    const colorModeAttr = button?.getAttribute("data-zap-color-mode");
-    return !colorModeAttr || !["true", "false"].includes(colorModeAttr)
-      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
-      : colorModeAttr === "true";
+    return isColorModeEnabled(button, APP_CONFIG.DEFAULT_OPTIONS.colorMode);
   }
 
   // UI element creation methods
@@ -537,17 +534,9 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   showNoZapsMessage() {
-    this.statusUI.showNoZaps();  // renamed from uiStatus
-  }
-
-  #createNoZapsMessage() {
-    return DIALOG_CONFIG.NO_ZAPS_MESSAGE;
-  }
-
-  showNoZapsMessage() {
     const list = this.#getElement(".dialog-zap-list");
     if (list) {
-      list.innerHTML = this.#createNoZapsMessage();
+      list.innerHTML = createNoZapsMessage(DIALOG_CONFIG);
     }
   }
 }

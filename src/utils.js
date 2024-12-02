@@ -278,3 +278,57 @@ export function encodeNevent(id, kind, pubkey, relays = []) {
     return null;
   }
 }
+
+// Add function to extract reference from tags
+export function extractReferenceFromTags(event) {
+  if (!event.tags) return null;
+  
+  const eTag = event.tags.find((tag) => tag[0] === "e");
+  const pTag = event.tags.find((tag) => tag[0] === "p");
+  
+  if (!eTag) return null;
+
+  return {
+    id: eTag[1],
+    kind: parseInt(eTag[3], 10) || 1,
+    pubkey: pTag?.[1] || event.pubkey || "",
+    content: event.content || "",
+    tags: event.tags || [],
+  };
+}
+
+// Add function to create default zap info
+export function createDefaultZapInfo(event, defaultIcon) {
+  return {
+    satsText: "Amount: Unknown",
+    satsAmount: 0,
+    comment: "",
+    pubkey: "",
+    created_at: event.created_at,
+    displayIdentifier: "anonymous",
+    senderName: "anonymous",
+    senderIcon: defaultIcon,
+    reference: null,
+  };
+}
+
+// Add function to get amount color class
+export function getAmountColorClass(amount, thresholds) {
+  for (const threshold of thresholds) {
+    if (amount >= threshold.value) return threshold.className;
+  }
+  return "";
+}
+
+// Add function to check if color mode is enabled
+export function isColorModeEnabled(button, defaultColorMode) {
+  const colorModeAttr = button?.getAttribute("data-zap-color-mode");
+  return !colorModeAttr || !["true", "false"].includes(colorModeAttr)
+    ? defaultColorMode
+    : colorModeAttr === "true";
+}
+
+// Add function to create no zaps message
+export function createNoZapsMessage(dialogConfig) {
+  return dialogConfig.NO_ZAPS_MESSAGE;
+}
