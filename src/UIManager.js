@@ -11,7 +11,7 @@ import {
   isColorModeEnabled,
   createNoZapsMessage,
   formatIdentifier,
-  escapeHTML,  // 追加
+  escapeHTML,
 } from "./utils.js";
 
 class NostrZapViewDialog extends HTMLElement {
@@ -28,8 +28,8 @@ class NostrZapViewDialog extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.statusUI = null;  // renamed from uiStatus
-    this.profileUI = new ProfileUI();  // Add ProfileUI instance
+    this.statusUI = new StatusUI(this.shadowRoot);
+    this.profileUI = new ProfileUI();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -72,175 +72,79 @@ class NostrZapViewDialog extends HTMLElement {
 
   // Initialization methods
   #initializeDialog() {
-    this.#setupStyles();
-    this.#setupTemplate();
-    this.#setupEventListeners();
-    this.statusUI = new StatusUI(this.shadowRoot);  // renamed from uiStatus
-  }
-
-  #setupStyles() {
     const styleSheet = document.createElement("style");
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
-  }
 
-  #setupTemplate() {
     const template = document.createElement("template");
-    template.innerHTML = `
-      <dialog class="dialog">
-        <h2 class="dialog-title"></h2>
-        <button class="close-dialog-button">X</button>
-        <div class="zap-stats"></div>
-        <ul class="dialog-zap-list"></ul>
-      </dialog>
-    `;
+    template.innerHTML = DialogComponents.getDialogTemplate();
     this.shadowRoot.appendChild(template.content.cloneNode(true));
-  }
 
-  #setupEventListeners() {
     const dialog = this.#getElement(".dialog");
     const closeButton = this.#getElement(".close-dialog-button");
 
     closeButton.addEventListener("click", () => this.closeDialog());
-    dialog.addEventListener("click", this.#onDialogClick.bind(this));
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) this.closeDialog();
+    });
   }
 
-  #onDialogClick(event) {
-    if (event.target === this.#getElement(".dialog")) {
-      this.closeDialog();
-    }
-  }
-
-  async extractZapInfo(event) {
+  async #handleZapInfo(event) {
     const zapInfo = new ZapInfo(event, defaultIcon);
-    const info = await zapInfo.extractInfo();
-    return info; // 修正: referenceを再設���せず、そのまま返す
+    return await zapInfo.extractInfo();
   }
 
-  async #loadProfileAndUpdate(pubkey, element) {
-    if (!pubkey || !element) return;
-  
-    try {
-      await this.profileUI.loadAndUpdate(pubkey, element);
-    } catch (error) {
-      console.error("Failed to load profile:", error);
-    }
-  }
-
-  async replacePlaceholderWithZap(event, index) {
-    const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!this.#isValidPlaceholder(placeholder)) return;
-
-    try {
-      const zapInfo = await this.extractZapInfo(event);
-      this.#updatePlaceholderContent(placeholder, zapInfo, event.id);
-      await this.#updateProfileIfNeeded(zapInfo.pubkey, placeholder);
-    } catch (error) {
-      console.error("Failed to replace placeholder:", error);
-      placeholder.remove();
-    }
-  }
-
-  #isValidPlaceholder(element) {
-    return element && element.classList.contains('placeholder');
-  }
-
-  #updatePlaceholderContent(placeholder, zapInfo, eventId) {
+  #createListItem(zapInfo, event) {
+    const li = document.createElement("li");
     const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     
-    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-    placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
-    placeholder.setAttribute("data-event-id", eventId);
-    placeholder.innerHTML = this.#createZapHTML(zapInfo);
-    placeholder.removeAttribute('data-index');
+    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    li.setAttribute("data-pubkey", zapInfo.pubkey);
+    if (event?.id) li.setAttribute("data-event-id", event.id);
+    li.innerHTML = this.#createZapHTML(zapInfo);
+
+    return li;
   }
 
-  async #updateProfileIfNeeded(pubkey, element) {
-    if (pubkey) {
-      await this.#loadProfileAndUpdate(pubkey, element);
-    }
-  }
-
+  // Simplified render methods
   async renderZapListFromCache(zapEventsCache) {
     const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    try {
-      if (!zapEventsCache || zapEventsCache.length === 0) {
-        this.showNoZapsMessage();
-        return;
-      }
-
-      // 既存のトリガー要素を保存
-      const existingTrigger = list.querySelector('.load-more-trigger');
-
-      // 既存のイベントIDとその要素のマップを作成（HTMLコンテンツと要素自体を保持）
-      const existingEvents = new Map(
-        Array.from(list.children)
-          .filter(li => li.hasAttribute('data-event-id'))
-          .map(li => [li.getAttribute('data-event-id'), {
-            element: li,
-            html: li.innerHTML,
-            classes: li.className
-          }])
-      );
-
-      // 重複のないソート済みのイベントリストを作成
-      const uniqueEvents = [...new Map(zapEventsCache.map(e => [e.id, e])).values()]
-        .sort((a, b) => b.created_at - a.created_at);
-
-      const fragment = document.createDocumentFragment();
-      const newProfileUpdates = [];
-
-      // プレースホルダーを削除
-      Array.from(list.querySelectorAll('.placeholder')).forEach(el => el.remove());
-
-      for (const event of uniqueEvents) {
-        const existingEvent = existingEvents.get(event.id);
-        let li;
-
-        if (existingEvent) {
-          // 既存の要素を再利用
-          li = existingEvent.element;
-        } else {
-          // 新規要素を作成
-          li = document.createElement("li");
-          const zapInfo = await this.extractZapInfo(event);
-          const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
-          
-          li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-          li.setAttribute("data-pubkey", zapInfo.pubkey);
-          li.setAttribute("data-event-id", event.id);
-          
-          li.innerHTML = this.#createZapHTML(zapInfo);
-          
-          if (zapInfo.pubkey) {
-            newProfileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
-          }
-        }
-        fragment.appendChild(li);
-      }
-
-      // リストを一括更新
-      list.innerHTML = '';
-      list.appendChild(fragment);
-
-      // 保存しておいたトリガー要素を再追加
-      if (existingTrigger) {
-        list.appendChild(existingTrigger);
-      }
-
-      // 新しいプロフィール情報のみを非同期で更新
-      if (newProfileUpdates.length > 0) {
-        // プロフィール情報を即座にロードするように修正
-        for (const { pubkey, element } of newProfileUpdates) {
-          await this.#loadProfileAndUpdate(pubkey, element);
-        }
-      }
-
-    } catch (error) {
-      console.error("Failed to render zap list:", error);
+    if (!list || !zapEventsCache?.length) {
       this.showNoZapsMessage();
+      return;
+    }
+
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    const existingEvents = this.#getExistingEvents(list);
+    const uniqueEvents = [...new Map(zapEventsCache.map(e => [e.id, e])).values()]
+      .sort((a, b) => b.created_at - a.created_at);
+
+    const fragment = document.createDocumentFragment();
+    const profileUpdates = [];
+
+    for (const event of uniqueEvents) {
+      const existingEvent = existingEvents.get(event.id);
+      if (existingEvent) {
+        fragment.appendChild(existingEvent.element);
+        continue;
+      }
+
+      const zapInfo = await this.#handleZapInfo(event);
+      const li = this.#createListItem(zapInfo, event);
+      fragment.appendChild(li);
+
+      if (zapInfo.pubkey) {
+        profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+      }
+    }
+
+    list.innerHTML = '';
+    list.appendChild(fragment);
+    if (existingTrigger) list.appendChild(existingTrigger);
+
+    // Update profiles
+    for (const { pubkey, element } of profileUpdates) {
+      await this.#loadProfileAndUpdate(pubkey, element);
     }
   }
 
@@ -255,16 +159,8 @@ class NostrZapViewDialog extends HTMLElement {
     }
 
     try {
-      const zapInfo = await this.extractZapInfo(event);
-
-      const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
-      const li = document.createElement("li");
-      li.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
-      li.setAttribute("data-pubkey", zapInfo.pubkey);
-      li.innerHTML = this.#createZapHTML(zapInfo);
-
+      const zapInfo = await this.#handleZapInfo(event);
+      const li = this.#createListItem(zapInfo, event);
       list.prepend(li);
 
       // プロフィール情報を非同期で更新
@@ -404,6 +300,62 @@ class NostrZapViewDialog extends HTMLElement {
       list.innerHTML = createNoZapsMessage(DIALOG_CONFIG);
     }
   }
+
+  async #loadProfileAndUpdate(pubkey, element) {
+    if (!pubkey || !element) return;
+  
+    try {
+      await this.profileUI.loadAndUpdate(pubkey, element);
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    }
+  }
+
+  async replacePlaceholderWithZap(event, index) {
+    const placeholder = this.#getElement(`[data-index="${index}"]`);
+    if (!this.#isValidPlaceholder(placeholder)) return;
+
+    try {
+      const zapInfo = await this.#handleZapInfo(event);
+      this.#updatePlaceholderContent(placeholder, zapInfo, event.id);
+      await this.#updateProfileIfNeeded(zapInfo.pubkey, placeholder);
+    } catch (error) {
+      console.error("Failed to replace placeholder:", error);
+      placeholder.remove();
+    }
+  }
+
+  #isValidPlaceholder(element) {
+    return element && element.classList.contains('placeholder');
+  }
+
+  #updatePlaceholderContent(placeholder, zapInfo, eventId) {
+    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    
+    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
+    placeholder.setAttribute("data-event-id", eventId);
+    placeholder.innerHTML = this.#createZapHTML(zapInfo);
+    placeholder.removeAttribute('data-index');
+  }
+
+  async #updateProfileIfNeeded(pubkey, element) {
+    if (pubkey) {
+      await this.#loadProfileAndUpdate(pubkey, element);
+    }
+  }
+
+  #getExistingEvents(list) {
+    return new Map(
+      Array.from(list.children)
+        .filter(li => li.hasAttribute('data-event-id'))
+        .map(li => [li.getAttribute('data-event-id'), {
+          element: li,
+          html: li.innerHTML,
+          classes: li.className
+        }])
+    );
+  }
 }
 
 customElements.define("nzv-dialog", NostrZapViewDialog);
@@ -417,6 +369,15 @@ export const createDialog = (viewId) => {
   }
 };
 
+// Simplified dialog operations
+const dialogOperations = (viewId) => {
+  const getDialog = () => document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+  return (operation, ...args) => {
+    const dialog = getDialog();
+    return dialog?.[operation]?.(...args);
+  };
+};
+
 export const {
   closeDialog,
   showDialog,
@@ -427,38 +388,9 @@ export const {
   prependZap,
   displayZapStats,
   showNoZapsMessage,
-} = (() => {
-  const getDialog = (viewId) =>
-    document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-
-  return {
-    closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),
-    showDialog: (viewId) => getDialog(viewId)?.showDialog(),
-    initializeZapPlaceholders: (maxCount, viewId) =>
-      getDialog(viewId)?.initializeZapPlaceholders(maxCount),
-    initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
-    replacePlaceholderWithZap: (event, index, viewId) =>
-      getDialog(viewId)?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: async (cache, viewId) => {
-      const dialog = getDialog(viewId);
-      if (!dialog) return;
-
-      console.log('[UIManager] キャッシュからの表示開始:', {
-        cacheSize: cache.length,
-        viewId
-      });
-
-      if (cache.length === 0) {
-        dialog.showNoZapsMessage();
-        return;
-      }
-
-      const sortedZaps = [...cache].sort((a, b) => b.created_at - a.created_at);
-      await dialog.renderZapListFromCache(sortedZaps);
-    },
-    prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
-    displayZapStats: (stats, viewId) =>
-      getDialog(viewId)?.displayZapStats(stats),
-    showNoZapsMessage: (viewId) => getDialog(viewId)?.showNoZapsMessage(),
-  };
-})();
+} = Object.fromEntries(
+  ['closeDialog', 'showDialog', 'initializeZapPlaceholders', 'initializeZapStats',
+   'replacePlaceholderWithZap', 'renderZapListFromCache', 'prependZap',
+   'displayZapStats', 'showNoZapsMessage']
+  .map(method => [method, (...args) => dialogOperations(args.pop())(method, ...args)])
+);
