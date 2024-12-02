@@ -243,11 +243,15 @@ class NostrZapViewDialog extends HTMLElement {
       // 既存のトリガー要素を保存
       const existingTrigger = list.querySelector('.load-more-trigger');
 
-      // 既存のイベントIDとその要素のマップを作成
+      // 既存のイベントIDとその要素のマップを作成（HTMLコンテンツと要素自体を保持）
       const existingEvents = new Map(
         Array.from(list.children)
           .filter(li => li.hasAttribute('data-event-id'))
-          .map(li => [li.getAttribute('data-event-id'), li])
+          .map(li => [li.getAttribute('data-event-id'), {
+            element: li,
+            html: li.innerHTML,
+            classes: li.className
+          }])
       );
 
       // 重複のないソート済みのイベントリストを作成
@@ -261,9 +265,14 @@ class NostrZapViewDialog extends HTMLElement {
       Array.from(list.querySelectorAll('.placeholder')).forEach(el => el.remove());
 
       for (const event of uniqueEvents) {
-        // 既存の要素があれば再利用、なければ新規作成
-        let li = existingEvents.get(event.id);
-        if (!li) {
+        const existingEvent = existingEvents.get(event.id);
+        let li;
+
+        if (existingEvent) {
+          // 既存の要素を再利用
+          li = existingEvent.element;
+        } else {
+          // 新規要素を作成
           li = document.createElement("li");
           const zapInfo = await this.extractZapInfo(event);
           const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
@@ -290,13 +299,12 @@ class NostrZapViewDialog extends HTMLElement {
         list.appendChild(existingTrigger);
       }
 
-      // バックグラウンドでプロフィール情報を更新
+      // 新しいプロフィール情報のみを非同期で更新
       if (newProfileUpdates.length > 0) {
-        requestIdleCallback(() => {
-          newProfileUpdates.forEach(({ pubkey, element }) => {
-            this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
-          });
-        });
+        // プロフィール情報を即座にロードするように修正
+        for (const { pubkey, element } of newProfileUpdates) {
+          await this.#loadProfileAndUpdate(pubkey, element);
+        }
       }
 
     } catch (error) {
