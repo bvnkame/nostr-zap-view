@@ -12,10 +12,10 @@ export const APP_CONFIG = {
     maxCount: 5,
     colorMode: true, // Added: Default value for color mode
   },
-  INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 15, // 追加：追加ロード件数
+  INITIAL_LOAD_COUNT: 20, // 追加：初期ロード件数のデフォルト値
+  ADDITIONAL_LOAD_COUNT: 20, // 追加：追加ロード件数
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '400px',
+    ROOT_MARGIN: '500px',
     THRESHOLD: [0.1]
   }
 };

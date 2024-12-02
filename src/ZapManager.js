@@ -222,7 +222,7 @@ class ZapSubscriptionManager {
         lastEventTime: state.lastEventTime
       });
 
-      // リストの更新後���トリガーを再設定
+      // リストの更新後にトリガーを再設定
       if (newEventsCount > 0) {
         this.setupInfiniteScroll(viewId);
       }
@@ -275,21 +275,40 @@ class ZapSubscriptionManager {
 
     console.log('[ZapManager] 無限スクロール設定:', { viewId });
 
+    // デバウンス用のタイマーID��保持
+    let debounceTimer = null;
+    // ロード中フラグ
+    let isLoading = false;
+
     const observer = new IntersectionObserver(
       async (entries) => {
         const entry = entries[0];
         if (entry.isIntersecting && entry.intersectionRatio > 0) {
-          console.log('[ZapManager] スクロールトリガー検知:', {
-            intersectionRatio: entry.intersectionRatio
-          });
-          
-          const loadedCount = await this.loadMoreZaps(viewId);
-          if (loadedCount === 0) {
-            console.log('[ZapManager] これ以上のデータなし');
-            observer.disconnect();
-            trigger.remove();
-            this.observers.delete(viewId);
+          // すでにロード中の場合は何もしない
+          if (isLoading) return;
+
+          // 前のタイマーをクリア
+          if (debounceTimer) {
+            clearTimeout(debounceTimer);
           }
+
+          // デバウンス処理を設定（200ms）
+          debounceTimer = setTimeout(async () => {
+            console.log('[ZapManager] スクロールトリガー検知:', {
+              intersectionRatio: entry.intersectionRatio
+            });
+            
+            isLoading = true;
+            const loadedCount = await this.loadMoreZaps(viewId);
+            isLoading = false;
+
+            if (loadedCount === 0) {
+              console.log('[ZapManager] これ以上のデータなし');
+              observer.disconnect();
+              trigger.remove();
+              this.observers.delete(viewId);
+            }
+          }, 200);
         }
       },
       { 
