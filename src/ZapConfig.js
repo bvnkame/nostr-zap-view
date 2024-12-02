@@ -12,6 +12,8 @@ export const APP_CONFIG = {
     maxCount: 5,
     colorMode: true, // Added: Default value for color mode
   },
+  INITIAL_LOAD_COUNT: 20, // 追加：初期ロード件数のデフォルト値
+  ADDITIONAL_LOAD_COUNT: 30, // 追加：追加ロード件数
 };
 
 // Zap-related settings

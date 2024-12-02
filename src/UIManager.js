@@ -506,11 +506,18 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // Zap display methods
-  initializeZapPlaceholders(maxCount) {
+  initializeZapPlaceholders(count) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    list.innerHTML = Array(maxCount)
+    // デフォルト値とバリデーションを追加
+    const defaultCount = APP_CONFIG.INITIAL_LOAD_COUNT;
+    const validCount = Math.max(1, Math.min(
+      Number.isInteger(parseInt(count)) ? parseInt(count) : defaultCount,
+      50  // 最大表示制限
+    ));
+
+    list.innerHTML = Array(validCount)
       .fill(null)
       .map(
         (_, i) => `

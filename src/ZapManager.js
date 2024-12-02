@@ -3,7 +3,7 @@ import {
   showNoZapsMessage 
 } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./ZapConfig.js";  // APP_CONFIGを追加
 import { statsManager } from "./StatsManager.js";
 import { poolManager } from "./ZapPool.js";
 
@@ -173,6 +173,7 @@ class ZapSubscriptionManager {
       console.log('[ZapManager] 追加ロード開始:', {
         lastEventTime: state.lastEventTime,
         currentCacheSize: state.zapEventsCache.length,
+        loadCount: APP_CONFIG.ADDITIONAL_LOAD_COUNT,
         viewId
       });
 

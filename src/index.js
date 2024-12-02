@@ -44,7 +44,7 @@ async function handleButtonClick(button, viewId) {
         initializeZapStats(viewId);
       }
     } else if (!viewState.isInitialFetchComplete) {
-      initializeZapPlaceholders(config.maxCount, viewId);
+      initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);  // 修正: 設定値を使用
       if (!cachedStats) {
         initializeZapStats(viewId);
       }

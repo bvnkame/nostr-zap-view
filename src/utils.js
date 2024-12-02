@@ -1,4 +1,4 @@
-import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./ZapConfig.js";  // APP_CONFIGを追加
 
 // Define constants
 const CONSTANTS = {
@@ -100,10 +100,9 @@ function createReqFromType(type, data, since) {
 
   const req = reqCreator();
   
-  // 初期ロードもスクロールロードも20件ずつに統一
-  req.limit = 20;
+  // 初期ロードと追加ロードで異なる件数を使用
+  req.limit = since ? APP_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.INITIAL_LOAD_COUNT;
   
-  // sinceが指定されている場合は過去のイベントを取得
   if (since) {
     req.until = since;
   }
