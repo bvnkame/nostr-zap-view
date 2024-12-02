@@ -224,6 +224,12 @@ class NostrZapViewDialog extends HTMLElement {
     if (!list) return;
 
     try {
+      // キャッシュが空の場合は早期リターン
+      if (!zapEventsCache || zapEventsCache.length === 0) {
+        this.showNoZapsMessage();
+        return;
+      }
+
       const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
 
       // Create fragment for batch DOM update
@@ -261,6 +267,7 @@ class NostrZapViewDialog extends HTMLElement {
       });
     } catch (error) {
       console.error("Failed to render zap list:", error);
+      this.showNoZapsMessage();
     }
   }
 
@@ -483,6 +490,8 @@ class NostrZapViewDialog extends HTMLElement {
           title.classList.remove("custom-title");
         }
       }
+
+      // リストをクリアせずにダイアログを表示
       dialog.showModal();
     }
   }

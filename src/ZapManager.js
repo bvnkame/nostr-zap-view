@@ -358,19 +358,18 @@ class ZapSubscriptionManager {
         return;
       }
 
+      // ダイアログを表示
       showDialog(viewId);
 
-      // キャッシュがある場合は即時表示
+      // キャッシュがある場合は即時表示し、初期フェッチ完了フラグをチェック
       if (viewState.zapEventsCache.length > 0) {
-        await renderZapListFromCache(viewState.zapEventsCache, config.maxCount, viewId);
-        return;
-      }
-
-      // キャッシュがない場合のみプレースホルダーを表示
-      if (!viewState.isInitialFetchComplete) {
+        await renderZapListFromCache(viewState.zapEventsCache, viewId);
+      } else if (!viewState.isInitialFetchComplete) {
+        // 初期フェッチが未完了の場合のみプレースホルダーを表示
         initializeZapPlaceholders(config.maxCount, viewId);
         initializeZapStats(viewId);
-      } else if (viewState.zapEventsCache.length === 0) {
+      } else {
+        // キャッシュが空で初期フェッチ完了済みの場合
         showNoZapsMessage(viewId);
       }
     } catch (error) {
