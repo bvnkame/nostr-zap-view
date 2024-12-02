@@ -61,6 +61,7 @@ button {
   color: var(--main-text);
   font-size: medium;
   font-weight: normal;
+  max-height: 700px;
   height: 100dvh;
   width: 360px;
   margin: auto;
