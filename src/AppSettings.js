@@ -13,9 +13,9 @@ export const APP_CONFIG = {
     colorMode: true, // Added: Default value for color mode
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 25, // 追加：追加ロード件数
+  ADDITIONAL_LOAD_COUNT: 15, // 追加：追加ロード件数
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '800px',
+    ROOT_MARGIN: '400px',
     THRESHOLD: [0.1]
   }
 };
