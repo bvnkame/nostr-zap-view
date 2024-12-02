@@ -129,28 +129,35 @@ class NostrZapViewDialog extends HTMLElement {
 
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!placeholder || !placeholder.classList.contains('placeholder')) return;
+    if (!this.#isValidPlaceholder(placeholder)) return;
 
     try {
       const zapInfo = await this.extractZapInfo(event);
-      const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
-
-      // プレースホルダーを実際のZap情報で置き換え
-      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-      placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
-      placeholder.setAttribute("data-event-id", event.id);
-      placeholder.innerHTML = this.#createZapHTML(zapInfo);
-
-      // プレースホルダーマーカーを削除
-      placeholder.removeAttribute('data-index');
-
-      if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, placeholder);
-      }
+      this.#updatePlaceholderContent(placeholder, zapInfo, event.id);
+      await this.#updateProfileIfNeeded(zapInfo.pubkey, placeholder);
     } catch (error) {
       console.error("Failed to replace placeholder:", error);
-      // エラー時はプレースホルダーを削除
       placeholder.remove();
+    }
+  }
+
+  #isValidPlaceholder(element) {
+    return element && element.classList.contains('placeholder');
+  }
+
+  #updatePlaceholderContent(placeholder, zapInfo, eventId) {
+    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    
+    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
+    placeholder.setAttribute("data-event-id", eventId);
+    placeholder.innerHTML = this.#createZapHTML(zapInfo);
+    placeholder.removeAttribute('data-index');
+  }
+
+  async #updateProfileIfNeeded(pubkey, element) {
+    if (pubkey) {
+      await this.#loadProfileAndUpdate(pubkey, element);
     }
   }
 

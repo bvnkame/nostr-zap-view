@@ -1,65 +1,51 @@
-
 import { escapeHTML, isEventIdentifier, encodeNevent } from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 
 export class DialogComponents {
   static createUIComponents(zapInfo, viewId) {
-    const iconComponent = this.createIconComponent(zapInfo);
-    const nameComponent = this.createNameComponent(zapInfo);
-    const pubkeyComponent = this.createPubkeyComponent(zapInfo, viewId);
-    const referenceComponent = this.createReferenceComponent(zapInfo, viewId);
-
     return {
-      iconComponent,
-      nameComponent,
-      pubkeyComponent,
-      referenceComponent,
+      iconComponent: this.createIconComponent(),
+      nameComponent: this.createNameComponent(zapInfo),
+      pubkeyComponent: this.createPubkeyComponent(zapInfo, viewId),
+      referenceComponent: this.createReferenceComponent(zapInfo),
     };
   }
 
-  static createIconComponent({ senderIcon, senderName }) {
-    return `<div class="zap-placeholder-icon skeleton"></div>`;
+  static createIconComponent() {
+    return '<div class="zap-placeholder-icon skeleton"></div>';
   }
 
   static createNameComponent({ senderName }) {
     return senderName
       ? `<span class="sender-name">${escapeHTML(senderName)}</span>`
-      : `<div class="zap-placeholder-name skeleton"></div>`;
+      : '<div class="zap-placeholder-name skeleton"></div>';
   }
 
   static createPubkeyComponent({ pubkey, displayIdentifier, reference }, viewId) {
-    const identifier =
-      document
-        .querySelector(`button[data-zap-view-id="${viewId}"]`)
-        ?.getAttribute("data-nzv-id") || "";
+    const identifier = DialogComponents.getIdentifierFromButton(viewId);
     const shouldShowReference = !isEventIdentifier(identifier);
-
+    const commonAttrs = `class="sender-pubkey" data-pubkey="${pubkey}"`;
+    
     return reference && shouldShowReference
-      ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
-      : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
+      ? `<span ${commonAttrs}>${displayIdentifier}</span>`
+      : `<span ${commonAttrs} data-nip05-target="true">${displayIdentifier}</span>`;
   }
 
-  static createReferenceComponent({ reference }, viewId) {
+  static getIdentifierFromButton(viewId) {
+    return document
+      .querySelector(`button[data-zap-view-id="${viewId}"]`)
+      ?.getAttribute("data-nzv-id") || "";
+  }
+
+  static createReferenceComponent({ reference }) {
     if (!reference) return "";
 
     try {
-      const getLinkUrl = this.getReferenceUrl(reference);
-      const content = this.getReferenceContent(reference);
+      const url = DialogComponents.getReferenceUrl(reference);
+      const content = DialogComponents.getReferenceContent(reference);
 
-      return `
-        <div class="zap-reference">
-          <div class="reference-icon">
-            <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
-          </div>
-          <div class="reference-content">
-            <div class="reference-text">${escapeHTML(content)}</div>
-            <a href="${getLinkUrl}" target="_blank" class="reference-link">
-              <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
-            </a>
-          </div>
-        </div>
-      `;
+      return DialogComponents.createReferenceHTML(url, content);
     } catch (error) {
       console.error("Failed to create reference component:", error);
       return "";
@@ -90,5 +76,21 @@ export class DialogComponents {
     };
 
     return kindContentMap[reference.kind]?.() || reference.content;
+  }
+
+  static createReferenceHTML(url, content) {
+    return `
+      <div class="zap-reference">
+        <div class="reference-icon">
+          <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
+        </div>
+        <div class="reference-content">
+          <div class="reference-text">${escapeHTML(content)}</div>
+          <a href="${url}" target="_blank" class="reference-link">
+            <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
+          </a>
+        </div>
+      </div>
+    `;
   }
 }
