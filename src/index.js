@@ -1,10 +1,17 @@
 import { APP_CONFIG, ZAP_CONFIG } from "./ZapConfig.js";
 import { ZapConfig } from "./ZapConfig.js";
-import { createDialog } from "./UIManager.js";
+import { 
+  createDialog, 
+  showNoZapsMessage, 
+  initializeZapPlaceholders,
+  initializeZapStats,
+  showDialog,
+  renderZapListFromCache // renderZapListFromCacheを追加
+} from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profileManager } from "./ProfileManager.js";
-import { zapPool, poolManager } from "./ZapPool.js";  // poolManagerを追加
+import { poolManager } from "./ZapPool.js";
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
@@ -21,22 +28,31 @@ async function handleButtonClick(button, viewId) {
       existingDialog.remove();
     }
 
-    // 1. 即座にダイアログとスケルトンを表示
+    // 1. ダイアログとスケルトンを表示
     subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);
-    subscriptionManager.handleViewClick(viewId);
 
-    // 2. バックグラウンドでリレー接続とデータ取得を実行
+    // 2. キャッシュチェックとUI初期化
+    const viewState = subscriptionManager.getOrCreateViewState(viewId);
+    showDialog(viewId);
+
+    if (viewState.zapEventsCache.length > 0) {
+      await renderZapListFromCache(viewState.zapEventsCache, viewId);
+    } else if (!viewState.isInitialFetchComplete) {
+      initializeZapPlaceholders(config.maxCount, viewId);
+      initializeZapStats(viewId);
+    } else {
+      showNoZapsMessage(viewId);
+    }
+
+    // 3. バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
       await Promise.all([
         poolManager.connectToRelays(config.relayUrls),
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)
-      ]).catch(error => {
-        console.error("Failed to initialize:", error);
-      });
+      ]);
 
-      // Setup infinite scroll after initial load
       subscriptionManager.setupInfiniteScroll(viewId);
       button.setAttribute('data-initialized', 'true');
     }
@@ -64,5 +80,5 @@ function initializeApp() {
 // Run the application
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-// Public API
-export { ZAP_CONFIG as CONFIG, profileManager, zapPool, APP_CONFIG };
+// Public API - zapPoolをpoolManagerに変更
+export { ZAP_CONFIG as CONFIG, profileManager, poolManager, APP_CONFIG };
