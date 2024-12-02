@@ -1,6 +1,6 @@
 import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
-import { PROFILE_CONFIG } from "./ZapConfig.js";
+import { PROFILE_CONFIG } from "./AppSettings.js";
 import { BatchProcessor } from "./BatchProcessor.js";
 
 /**

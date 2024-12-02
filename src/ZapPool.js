@@ -3,7 +3,7 @@ import {
   ZAP_CONFIG as CONFIG,
   REQUEST_CONFIG,
   PROFILE_CONFIG,
-} from "./ZapConfig.js"; // PROFILE_CONFIGを追加
+} from "./AppSettings.js"; // PROFILE_CONFIGを追加
 import { BatchProcessor } from "./BatchProcessor.js";
 
 class ReferenceProcessor extends BatchProcessor {

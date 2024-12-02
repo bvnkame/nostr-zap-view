@@ -3,7 +3,7 @@ import {
   showNoZapsMessage 
 } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./ZapConfig.js";  // APP_CONFIGを追加
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";  // APP_CONFIGを追加
 import { statsManager } from "./StatsManager.js";
 import { poolManager } from "./ZapPool.js";
 

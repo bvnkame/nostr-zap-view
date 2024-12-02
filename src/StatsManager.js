@@ -1,4 +1,4 @@
-import { API_CONFIG } from "./ZapConfig.js";
+import { API_CONFIG } from "./AppSettings.js";
 import { displayZapStats } from "./UIManager.js";
 import { safeNip19Decode } from "./utils.js"; // Add import
 

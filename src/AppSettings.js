@@ -1,3 +1,4 @@
+
 import { decode as decodeBolt11 } from "light-bolt11-decoder";
 import * as NostrTools from "nostr-tools";
 
@@ -12,8 +13,8 @@ export const APP_CONFIG = {
     maxCount: 5,
     colorMode: true, // Added: Default value for color mode
   },
-  INITIAL_LOAD_COUNT: 20, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 30, // 追加：追加ロード件数
+  INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
+  ADDITIONAL_LOAD_COUNT: 25, // 追加：追加ロード件数
 };
 
 // Zap-related settings
@@ -50,7 +51,7 @@ export const PROFILE_CONFIG = {
   ],
 };
 
-export class ZapConfig {
+export class ViewerConfig {
   constructor(identifier, maxCount, relayUrls) {
     this.identifier = identifier;
     // Use default value if maxCount is invalid
@@ -67,7 +68,7 @@ export class ZapConfig {
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
-    return new ZapConfig(
+    return new ViewerConfig(
       button.getAttribute("data-nzv-id"),
       maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")

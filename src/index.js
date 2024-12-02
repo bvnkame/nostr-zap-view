@@ -1,5 +1,5 @@
-import { APP_CONFIG, ZAP_CONFIG } from "./ZapConfig.js";
-import { ZapConfig } from "./ZapConfig.js";
+import { APP_CONFIG, ZAP_CONFIG } from "./AppSettings.js";
+import { ViewerConfig } from "./AppSettings.js";
 import { 
   createDialog, 
   showNoZapsMessage, 
@@ -20,7 +20,7 @@ import { poolManager } from "./ZapPool.js";
  */
 async function handleButtonClick(button, viewId) {
   try {
-    const config = ZapConfig.fromButton(button);
+    const config = ViewerConfig.fromButton(button);
 
     // 既存のダイアログを削除
     const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
