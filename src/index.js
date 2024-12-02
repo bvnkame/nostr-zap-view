@@ -22,7 +22,7 @@ async function handleButtonClick(button, viewId) {
 
     // 2. バックグラウンドでリレー接続とデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
-      Promise.all([
+      await Promise.all([
         poolManager.connectToRelays(config.relayUrls),
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)
@@ -30,6 +30,8 @@ async function handleButtonClick(button, viewId) {
         console.error("Failed to initialize:", error);
       });
 
+      // Setup infinite scroll after initial load
+      subscriptionManager.setupInfiniteScroll(viewId);
       button.setAttribute('data-initialized', 'true');
     }
   } catch (error) {
@@ -43,19 +45,13 @@ function initializeApp() {
     window[key] = value;
   });
 
-  // 単一ボタンの初期化
-  const fetchButton = document.querySelector("button[data-nzv-id]");
-  if (fetchButton) {
-    const viewId = "nostr-zap-view-0";
-    fetchButton.setAttribute("data-zap-view-id", viewId);
-    fetchButton.addEventListener("click", () => handleButtonClick(fetchButton, viewId));
-  }
-
-  // 複数ボタンの初期化
+  // ボタンの初期化を一本化
   document.querySelectorAll("button[data-nzv-id]").forEach((button, index) => {
-    const viewId = `nostr-zap-view-${index}`;
-    button.setAttribute("data-zap-view-id", viewId);
-    button.addEventListener("click", () => handleButtonClick(button, viewId));
+    if (!button.hasAttribute("data-zap-view-id")) {
+      const viewId = `nostr-zap-view-${index}`;
+      button.setAttribute("data-zap-view-id", viewId);
+      button.addEventListener("click", () => handleButtonClick(button, viewId));
+    }
   });
 }
 

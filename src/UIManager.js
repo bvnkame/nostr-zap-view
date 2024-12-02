@@ -219,27 +219,21 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  async renderZapListFromCache(zapEventsCache, maxCount) {
+  async renderZapListFromCache(zapEventsCache) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     try {
-      const sortedZaps = [...zapEventsCache]
-        .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, maxCount);
+      const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
 
-      // 基本��報のみで表示を即時更新
+      // Create fragment for batch DOM update
       const fragment = document.createDocumentFragment();
       const zapInfoPromises = sortedZaps.map(async (event) => {
         const zapInfo = await this.#extractZapInfo(event);
-        // zapInfo.reference = event.reference; // この行を削除
-
         const li = document.createElement("li");
         const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
 
-        li.className = `zap-list-item ${colorClass}${
-          zapInfo.comment ? " with-comment" : ""
-        }`;
+        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
         li.setAttribute("data-pubkey", zapInfo.pubkey);
         li.innerHTML = this.#createZapHTML(zapInfo);
 
@@ -247,12 +241,19 @@ class NostrZapViewDialog extends HTMLElement {
         return { li, pubkey: zapInfo.pubkey };
       });
 
-      // DOMを一括更新
       const zapElements = await Promise.all(zapInfoPromises);
-      list.innerHTML = "";
+      
+      // Preserve trigger element
+      const existingTrigger = list.querySelector('.load-more-trigger');
+      list.innerHTML = '';
       list.appendChild(fragment);
+      
+      // Re-append trigger element
+      if (existingTrigger) {
+        list.appendChild(existingTrigger);
+      }
 
-      // プロフィール情報を非同期で更新
+      // Update profiles asynchronously
       zapElements.forEach(({ li, pubkey }) => {
         if (pubkey) {
           this.#loadProfileAndUpdate(pubkey, li);
@@ -578,36 +579,32 @@ export const {
     initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
     replacePlaceholderWithZap: (event, index, viewId) =>
       getDialog(viewId)?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: async (cache, max, viewId) => {
+    renderZapListFromCache: async (cache, viewId) => {
       const dialog = getDialog(viewId);
       if (!dialog) return;
 
       console.log('[UIManager] キャッシュからの表示開始:', {
         cacheSize: cache.length,
-        maxDisplay: max,
         viewId
       });
 
       const list = dialog.shadowRoot.querySelector(".dialog-zap-list");
       if (!list) return;
-      list.innerHTML = "";
+
+      if (cache.length === 0) {
+        dialog.showNoZapsMessage();
+        return;
+      }
 
       // キャッシュからデータを即時表示
-      const sortedZaps = [...cache]
-        .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, max);
+      const sortedZaps = [...cache].sort((a, b) => b.created_at - a.created_at);
 
       console.log('[UIManager] 表示するZaps:', {
         count: sortedZaps.length,
         ids: sortedZaps.map(zap => zap.id)
       });
 
-      if (sortedZaps.length === 0) {
-        dialog.showNoZapsMessage();
-        return;
-      }
-
-      await dialog.renderZapListFromCache(sortedZaps, max);
+      await dialog.renderZapListFromCache(sortedZaps);
     },
     prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
     displayZapStats: (stats, viewId) =>

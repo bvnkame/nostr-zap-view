@@ -67,6 +67,10 @@ button {
   border: none;
   border-radius: 10px;
   background: var(--dialog-bg);
+  height: 80vh;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
 }
 
 .close-dialog-button {
@@ -148,6 +152,10 @@ button {
   list-style-type: none;
   margin: 10px 0;
   padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
 }
 
 .zap-list-item {
@@ -397,4 +405,11 @@ button {
 .reference-link img {
   height: 16px;
   width: auto;
+}
+
+.load-more-trigger {
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  visibility: hidden;
 }

@@ -52,21 +52,21 @@ const Validator = {
 };
 
 // Decoding related functions
-export function decodeIdentifier(identifier, maxCount) {
-  const cacheKey = `${identifier}:${maxCount}`;
+export function decodeIdentifier(identifier, since = null) {
+  const cacheKey = `${identifier}:${since}`;
 
   if (decodedCache.has(cacheKey)) {
     return decodedCache.get(cacheKey);
   }
 
-  if (!Validator.isValidIdentifier(identifier) || !Validator.isValidCount(maxCount)) {
+  if (!Validator.isValidIdentifier(identifier)) {
     throw new Error(CONFIG.ERRORS.DECODE_FAILED);
   }
 
   const decoded = safeNip19Decode(identifier);
   if (!decoded) return null;
 
-  const result = createReqFromType(decoded.type, decoded.data, maxCount);
+  const result = createReqFromType(decoded.type, decoded.data, since);
   if (result) {
     decodedCache.set(cacheKey, result);
   }
@@ -84,21 +84,31 @@ export function safeNip19Decode(identifier) {
   }
 }
 
-function createReqFromType(type, data, maxCount) {
-  const reqMap = {
-    npub: () => ({ kinds: [9735], "#p": [data], limit: maxCount }),
-    note: () => ({ kinds: [9735], "#e": [data], limit: maxCount }),
-    nprofile: () => ({ kinds: [9735], "#p": [data.pubkey], limit: maxCount }),
-    nevent: () => ({ kinds: [9735], "#e": [data.id], limit: maxCount }),
+function createReqFromType(type, data, since) {
+  const baseReq = {
+    npub: () => ({ kinds: [9735], "#p": [data] }),
+    note: () => ({ kinds: [9735], "#e": [data] }),
+    nprofile: () => ({ kinds: [9735], "#p": [data.pubkey] }),
+    nevent: () => ({ kinds: [9735], "#e": [data.id] }),
   };
 
-  const reqCreator = reqMap[type];
+  const reqCreator = baseReq[type];
   if (!reqCreator) {
     console.error("Unsupported identifier type:", type);
     return null;
   }
 
-  return { req: reqCreator() };
+  const req = reqCreator();
+  
+  // 初期ロードもスクロールロードも20件ずつに統一
+  req.limit = 20;
+  
+  // sinceが指定されている場合は過去のイベントを取得
+  if (since) {
+    req.until = since;
+  }
+
+  return { req };
 }
 
 // Add helper function for number formatting

@@ -69,10 +69,9 @@ class ZapSubscriptionManager {
    * - リファレンス情報の更新
    * - UIの更新
    * @param {Object} event - Zapイベント
-   * @param {number} maxCount - 表示最大数
    * @param {string} viewId - ビューID
    */
-  async handleZapEvent(event, maxCount, viewId) {
+  async handleZapEvent(event, viewId) {
     const state = this.getOrCreateViewState(viewId);
     console.log('[ZapManager] 受信したZapイベント:', event);
     
@@ -94,22 +93,10 @@ class ZapSubscriptionManager {
 
       // 統計情報を更新
       await statsManager.handleZapEvent(event, state, viewId);
-
-      // 最新のmaxCount分のイベントを表示
-      const displayEvents = state.zapEventsCache.slice(0, maxCount);
-      console.log('[ZapManager] 表示対象イベント:', {
-        displayCount: displayEvents.length,
-        maxCount
-      });
-      await renderZapListFromCache(displayEvents, maxCount, viewId);
     } else {
       console.log('[ZapManager] 重複イベントをスキップ:', event.id);
     }
   }
-
-  // updateEventStats メソッドを削除
-
-  // handleCachedZaps メソッドを削除
 
   /**
    * イベントの参照情報を更新
@@ -187,12 +174,14 @@ class ZapSubscriptionManager {
       config
     });
 
-    const decoded = decodeIdentifier(config.identifier, config.maxCount);
+    const decoded = decodeIdentifier(config.identifier);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
     this.setViewConfig(viewId, config);
     const state = this.getOrCreateViewState(viewId);
     state.isInitialFetchComplete = false;
+    state.lastEventTime = null;
+    state.isLoading = false;
 
     return new Promise((resolve) => {
       const events = [];
@@ -203,19 +192,41 @@ class ZapSubscriptionManager {
             kind: event.kind,
             created_at: event.created_at
           });
-          events.push(event);
-          await this.handleZapEvent(event, config.maxCount, viewId);
+          
+          // イベントがキャッシュに存在しない場合のみ処理
+          if (!state.zapEventsCache.some(e => e.id === event.id)) {
+            await this.updateEventReference(event, viewId);
+            events.push(event);
+
+            // Update last event time
+            if (!state.lastEventTime || event.created_at < state.lastEventTime) {
+              state.lastEventTime = event.created_at;
+            }
+          }
         },
         oneose: async () => {
+          if (events.length > 0) {
+            // バッチでキャッシュに追加
+            state.zapEventsCache.push(...events);
+            state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
+            
+            // 統計情報を更新
+            for (const event of events) {
+              await statsManager.handleZapEvent(event, state, viewId);
+            }
+
+            // UIを更新
+            await renderZapListFromCache(state.zapEventsCache, viewId);
+          }
+
           console.log('[ZapManager] リレー購読完了:', {
-            totalEvents: events.length
+            newEvents: events.length,
+            totalCache: state.zapEventsCache.length
           });
           
-          await this.updateEventReferenceBatch(events, viewId);
           state.isInitialFetchComplete = true;
           
-          // イベントが0件の場合、メッセージを表示
-          if (events.length === 0) {
+          if (state.zapEventsCache.length === 0) {
             showNoZapsMessage(viewId);
           }
           
@@ -223,6 +234,107 @@ class ZapSubscriptionManager {
         }
       });
     });
+  }
+
+  async loadMoreZaps(viewId) {
+    const state = this.getOrCreateViewState(viewId);
+    const config = this.getViewConfig(viewId);
+
+    if (!config || state.isLoading || !state.lastEventTime) {
+      console.log('[ZapManager] 追加ロードをスキップ:', { 
+        hasConfig: !!config, 
+        isLoading: state.isLoading, 
+        lastEventTime: state.lastEventTime 
+      });
+      return 0;
+    }
+
+    try {
+      state.isLoading = true;
+      console.log('[ZapManager] 追加ロード開始:', {
+        lastEventTime: state.lastEventTime,
+        currentCacheSize: state.zapEventsCache.length,
+        viewId
+      });
+
+      const decoded = decodeIdentifier(config.identifier, state.lastEventTime);
+      if (!decoded) return 0;
+
+      let newEventsCount = 0;
+      await new Promise((resolve) => {
+        poolManager.subscribeToZaps(viewId, config, decoded, {
+          onevent: async (event) => {
+            if (event.created_at < state.lastEventTime) {
+              await this.handleZapEvent(event, viewId);
+              newEventsCount++;
+              state.lastEventTime = event.created_at;
+            }
+          },
+          oneose: async () => {
+            if (newEventsCount > 0) {
+              await renderZapListFromCache(state.zapEventsCache, viewId);
+            }
+            resolve();
+          }
+        });
+      });
+
+      console.log('[ZapManager] 追加ロード完了:', {
+        newEventsCount,
+        totalCacheSize: state.zapEventsCache.length,
+        lastEventTime: state.lastEventTime
+      });
+
+      return newEventsCount;
+    } catch (error) {
+      console.error('[ZapManager] 追加ロード失敗:', error);
+      return 0;
+    } finally {
+      state.isLoading = false;
+    }
+  }
+
+  setupInfiniteScroll(viewId) {
+    const dialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+    if (!dialog) return;
+
+    const list = dialog.shadowRoot.querySelector('.dialog-zap-list');
+    if (!list) return;
+
+    // Create new trigger if not exists
+    let trigger = list.querySelector('.load-more-trigger');
+    if (!trigger) {
+      trigger = document.createElement('div');
+      trigger.className = 'load-more-trigger';
+      list.appendChild(trigger);
+    }
+
+    console.log('[ZapManager] 無限スクロール設定:', { viewId });
+
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting && entry.intersectionRatio > 0) {
+          console.log('[ZapManager] スクロールトリガー検知:', {
+            intersectionRatio: entry.intersectionRatio
+          });
+          
+          const loadedCount = await this.loadMoreZaps(viewId);
+          if (loadedCount === 0) {
+            console.log('[ZapManager] これ以上のデータなし');
+            observer.unobserve(trigger);
+            trigger.remove();
+          }
+        }
+      },
+      { 
+        root: list,
+        rootMargin: '200px',
+        threshold: [0, 0.1, 0.5, 1.0]
+      }
+    );
+
+    observer.observe(trigger);
   }
 
   /**
