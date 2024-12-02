@@ -1,11 +1,11 @@
-import { profileManager } from "./ProfileManager.js";
-import defaultIcon from "./assets/nostr-icon.svg";
+import { profileManager } from "../ProfileManager.js";
+import defaultIcon from "../assets/nostr-icon.svg";
 import {
   getProfileDisplayName,
   escapeHTML,
   sanitizeImageUrl,
   encodeNprofile, // Add import
-} from "./utils.js";
+} from "../utils.js";
 
 export class ProfileUI {
   async loadAndUpdate(pubkey, element) {
