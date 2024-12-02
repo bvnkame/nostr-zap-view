@@ -1,4 +1,3 @@
-
 import { decode as decodeBolt11 } from "light-bolt11-decoder";
 import * as NostrTools from "nostr-tools";
 
@@ -15,6 +14,10 @@ export const APP_CONFIG = {
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
   ADDITIONAL_LOAD_COUNT: 25, // 追加：追加ロード件数
+  INFINITE_SCROLL: {
+    ROOT_MARGIN: '800px',
+    THRESHOLD: [0.1]
+  }
 };
 
 // Zap-related settings

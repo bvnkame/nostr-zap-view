@@ -248,8 +248,8 @@ class ZapSubscriptionManager {
       },
       { 
         root: list,
-        rootMargin: '500px',
-        threshold: [0]
+        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
+        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
       }
     );
 
