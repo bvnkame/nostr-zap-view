@@ -205,26 +205,28 @@ class NostrZapViewDialog extends HTMLElement {
 
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!placeholder) return;
+    if (!placeholder || !placeholder.classList.contains('placeholder')) return;
 
     try {
-      // 基本情報を即時表示
       const zapInfo = await this.extractZapInfo(event);
-
       const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
 
-      placeholder.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
+      // プレースホルダーを実際のZap情報で置き換え
+      placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
       placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
+      placeholder.setAttribute("data-event-id", event.id);
       placeholder.innerHTML = this.#createZapHTML(zapInfo);
 
-      // プロフィール情報を非同期で更新
+      // プレースホルダーマーカーを削除
+      placeholder.removeAttribute('data-index');
+
       if (zapInfo.pubkey) {
         this.#loadProfileAndUpdate(zapInfo.pubkey, placeholder);
       }
     } catch (error) {
       console.error("Failed to replace placeholder:", error);
+      // エラー時はプレースホルダーを削除
+      placeholder.remove();
     }
   }
 
@@ -238,49 +240,64 @@ class NostrZapViewDialog extends HTMLElement {
         return;
       }
 
-      // 一時的にリストをクリア
+      // 既存のトリガー要素を保存
       const existingTrigger = list.querySelector('.load-more-trigger');
-      list.innerHTML = '';
 
-      // 高速なレンダリングのためにフラグメントを使用
+      // 既存のイベントIDとその要素のマップを作成
+      const existingEvents = new Map(
+        Array.from(list.children)
+          .filter(li => li.hasAttribute('data-event-id'))
+          .map(li => [li.getAttribute('data-event-id'), li])
+      );
+
+      // 重複のないソート済みのイベントリストを作成
+      const uniqueEvents = [...new Map(zapEventsCache.map(e => [e.id, e])).values()]
+        .sort((a, b) => b.created_at - a.created_at);
+
       const fragment = document.createDocumentFragment();
-      const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
-      const profileUpdates = [];
+      const newProfileUpdates = [];
 
-      for (const event of sortedZaps) {
-        const li = document.createElement("li");
-        const zapInfo = await this.extractZapInfo(event);
-        const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
-        
-        li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-        li.setAttribute("data-pubkey", zapInfo.pubkey);
-        li.setAttribute("data-event-id", event.id);
-        
-        // referenceを含めてHTMLを生成
-        li.innerHTML = this.#createZapHTML({
-          ...zapInfo,
-          reference: event.reference || zapInfo.reference
-        });
-        
-        fragment.appendChild(li);
+      // プレースホルダーを削除
+      Array.from(list.querySelectorAll('.placeholder')).forEach(el => el.remove());
 
-        if (zapInfo.pubkey) {
-          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+      for (const event of uniqueEvents) {
+        // 既存の要素があれば再利用、なければ新規作成
+        let li = existingEvents.get(event.id);
+        if (!li) {
+          li = document.createElement("li");
+          const zapInfo = await this.extractZapInfo(event);
+          const colorClass = getAmountColorClass(zapInfo.satsAmount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
+          
+          li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+          li.setAttribute("data-pubkey", zapInfo.pubkey);
+          li.setAttribute("data-event-id", event.id);
+          
+          li.innerHTML = this.#createZapHTML(zapInfo);
+          
+          if (zapInfo.pubkey) {
+            newProfileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+          }
         }
+        fragment.appendChild(li);
       }
 
-      // DOMの一括更新
+      // リストを一括更新
+      list.innerHTML = '';
       list.appendChild(fragment);
+
+      // 保存しておいたトリガー要素を再追加
       if (existingTrigger) {
         list.appendChild(existingTrigger);
       }
 
-      // バックグラウンドでプロフィール更新
-      requestIdleCallback(() => {
-        profileUpdates.forEach(({ pubkey, element }) => {
-          this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
+      // バックグラウンドでプロフィール情報を更新
+      if (newProfileUpdates.length > 0) {
+        requestIdleCallback(() => {
+          newProfileUpdates.forEach(({ pubkey, element }) => {
+            this.#loadProfileAndUpdate(pubkey, element).catch(console.error);
+          });
         });
-      });
+      }
 
     } catch (error) {
       console.error("Failed to render zap list:", error);
@@ -517,11 +534,12 @@ class NostrZapViewDialog extends HTMLElement {
       DIALOG_CONFIG.MAX_DISPLAY_LIMIT  // 最大表示制限
     ));
 
+    // プレースホルダーにIDを付与して追跡可能にする
     list.innerHTML = Array(validCount)
       .fill(null)
       .map(
         (_, i) => `
-        <li class="zap-list-item" data-index="${i}">
+        <li class="zap-list-item placeholder" data-index="${i}">
           <div class="zap-sender">
             <div class="sender-icon">
               <div class="zap-placeholder-icon skeleton"></div>

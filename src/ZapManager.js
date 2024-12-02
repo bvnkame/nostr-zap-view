@@ -43,12 +43,24 @@ class ZapSubscriptionManager {
     const state = this.getOrCreateViewState(viewId);
     console.log('[ZapManager] 受信したZapイベント:', event);
     
-    if (!state.zapEventsCache.some((e) => e.id === event.id)) {
-      // 即時表示のためにキャッシュに追加
-      state.zapEventsCache.push(event);
-      state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
+    // 厳密な重複チェック
+    const isDuplicate = state.zapEventsCache.some((e) => 
+      e.id === event.id || 
+      (e.kind === event.kind && 
+       e.pubkey === event.pubkey && 
+       e.content === event.content && 
+       e.created_at === event.created_at)
+    );
 
-      // 基本情報の表示を即時実行
+    if (!isDuplicate) {
+      // イベントの追加前に配列のコピーを作成
+      const updatedCache = [...state.zapEventsCache, event];
+      updatedCache.sort((a, b) => b.created_at - a.created_at);
+      
+      // キャッシュを更新
+      state.zapEventsCache = updatedCache;
+
+      // UIの更新
       await renderZapListFromCache(state.zapEventsCache, viewId);
 
       // バックグラウンドでの処理
@@ -61,6 +73,8 @@ class ZapSubscriptionManager {
         totalEvents: state.zapEventsCache.length,
         eventId: event.id
       });
+    } else {
+      console.log('[ZapManager] 重複イベントをスキップ:', event.id);
     }
   }
 
@@ -188,17 +202,14 @@ class ZapSubscriptionManager {
         poolManager.subscribeToZaps(viewId, config, decoded, {
           onevent: async (event) => {
             if (event.created_at < state.lastEventTime) {
+              // リファレンス情報を先に取得してからイベントを処理
+              await this.updateEventReference(event, viewId);
               await this.handleZapEvent(event, viewId);
               newEventsCount++;
               state.lastEventTime = event.created_at;
             }
           },
-          oneose: async () => {
-            if (newEventsCount > 0) {
-              await renderZapListFromCache(state.zapEventsCache, viewId);
-            }
-            resolve();
-          }
+          oneose: resolve
         });
       });
 
@@ -207,6 +218,11 @@ class ZapSubscriptionManager {
         totalCacheSize: state.zapEventsCache.length,
         lastEventTime: state.lastEventTime
       });
+
+      // リストの更新後にトリガーを再設定
+      if (newEventsCount > 0) {
+        this.setupInfiniteScroll(viewId);
+      }
 
       return newEventsCount;
     } catch (error) {
@@ -224,12 +240,25 @@ class ZapSubscriptionManager {
     const list = dialog.shadowRoot.querySelector('.dialog-zap-list');
     if (!list) return;
 
-    let trigger = list.querySelector('.load-more-trigger');
-    if (!trigger) {
-      trigger = document.createElement('div');
-      trigger.className = 'load-more-trigger';
-      list.appendChild(trigger);
+    // 既存のオブザーバーをクリーンアップ
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    if (existingTrigger) {
+      const existingObserver = this.observers?.get(viewId);
+      if (existingObserver) {
+        existingObserver.disconnect();
+        existingTrigger.remove();
+      }
     }
+
+    // オブザーバーを保持するためのMapを初期化
+    if (!this.observers) {
+      this.observers = new Map();
+    }
+
+    // 新しいトリガーを作成
+    const trigger = document.createElement('div');
+    trigger.className = 'load-more-trigger';
+    list.appendChild(trigger);
 
     console.log('[ZapManager] 無限スクロール設定:', { viewId });
 
@@ -244,8 +273,9 @@ class ZapSubscriptionManager {
           const loadedCount = await this.loadMoreZaps(viewId);
           if (loadedCount === 0) {
             console.log('[ZapManager] これ以上のデータなし');
-            observer.unobserve(trigger);
+            observer.disconnect();
             trigger.remove();
+            this.observers.delete(viewId);
           }
         }
       },
@@ -257,6 +287,7 @@ class ZapSubscriptionManager {
     );
 
     observer.observe(trigger);
+    this.observers.set(viewId, observer);
   }
 }
 

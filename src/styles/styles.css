@@ -238,6 +238,21 @@ button {
   min-width: 0;
 }
 
+.sender-icon-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sender-icon-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .sender-name {
   font-size: 0.9375rem;
   font-weight: bold;
