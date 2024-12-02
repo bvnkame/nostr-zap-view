@@ -11,7 +11,7 @@ import {
   encodeNevent,   // Add import
   encodeNpub, // Add import
 } from "./utils.js";
-import { APP_CONFIG } from "./index.js";
+import { APP_CONFIG, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import { StatusUI } from "./StatusUI.js";  // updated import
 import { ProfileUI } from "./ProfileUI.js"; // Add import
 
@@ -307,17 +307,7 @@ class NostrZapViewDialog extends HTMLElement {
   #getAmountColorClass(amount) {
     if (!this.#isColorModeEnabled()) return "";
 
-    const thresholds = [
-      { value: 10000, className: "zap-amount-10k" },
-      { value: 5000, className: "zap-amount-5k" },
-      { value: 2000, className: "zap-amount-2k" },
-      { value: 1000, className: "zap-amount-1k" },
-      { value: 500, className: "zap-amount-500" },
-      { value: 200, className: "zap-amount-200" },
-      { value: 100, className: "zap-amount-100" },
-    ];
-
-    for (const threshold of thresholds) {
+    for (const threshold of ZAP_AMOUNT_CONFIG.THRESHOLDS) {
       if (amount >= threshold.value) return threshold.className;
     }
     return "";
@@ -486,7 +476,7 @@ class NostrZapViewDialog extends HTMLElement {
           title.classList.add("custom-title");
         } else {
           const identifier = fetchButton.getAttribute("data-nzv-id");
-          title.textContent = "To " + formatIdentifier(identifier);
+          title.textContent = DIALOG_CONFIG.DEFAULT_TITLE + formatIdentifier(identifier);
           title.classList.remove("custom-title");
         }
       }
@@ -514,7 +504,7 @@ class NostrZapViewDialog extends HTMLElement {
     const defaultCount = APP_CONFIG.INITIAL_LOAD_COUNT;
     const validCount = Math.max(1, Math.min(
       Number.isInteger(parseInt(count)) ? parseInt(count) : defaultCount,
-      50  // 最大表示制限
+      DIALOG_CONFIG.MAX_DISPLAY_LIMIT  // 最大表示制限
     ));
 
     list.innerHTML = Array(validCount)
@@ -551,11 +541,7 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #createNoZapsMessage() {
-    return `
-      <div class="no-zaps-message">
-        No Zaps yet!<br>Send the first Zap!
-      </div>
-    `;
+    return DIALOG_CONFIG.NO_ZAPS_MESSAGE;
   }
 
   showNoZapsMessage() {

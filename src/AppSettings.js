@@ -30,6 +30,30 @@ export const ZAP_CONFIG = {
   },
 };
 
+// Add new settings for zap amount thresholds
+export const ZAP_AMOUNT_CONFIG = {
+  THRESHOLDS: [
+    { value: 10000, className: "zap-amount-10k" },
+    { value: 5000, className: "zap-amount-5k" },
+    { value: 2000, className: "zap-amount-2k" },
+    { value: 1000, className: "zap-amount-1k" },
+    { value: 500, className: "zap-amount-500" },
+    { value: 200, className: "zap-amount-200" },
+    { value: 100, className: "zap-amount-100" },
+  ]
+};
+
+// Add new settings for zap dialog
+export const DIALOG_CONFIG = {
+  MAX_DISPLAY_LIMIT: 50,
+  DEFAULT_TITLE: "To ",
+  NO_ZAPS_MESSAGE: `
+    <div class="no-zaps-message">
+      No Zaps yet!<br>Send the first Zap!
+    </div>
+  `,
+};
+
 // Timeout settings for metadata requests
 export const REQUEST_CONFIG = {
   METADATA_TIMEOUT: 20000,  // プロフィール、reference、nip05検証用のタイムアウト
