@@ -238,7 +238,11 @@ class NostrZapViewDialog extends HTMLElement {
         return;
       }
 
-      // 高速な初期表示のために最小限の情報でレンダリング
+      // 一時的にリストをクリア
+      const existingTrigger = list.querySelector('.load-more-trigger');
+      list.innerHTML = '';
+
+      // 高速なレンダリングのためにフラグメントを使用
       const fragment = document.createDocumentFragment();
       const sortedZaps = [...zapEventsCache].sort((a, b) => b.created_at - a.created_at);
       const profileUpdates = [];
@@ -251,20 +255,22 @@ class NostrZapViewDialog extends HTMLElement {
         li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
         li.setAttribute("data-pubkey", zapInfo.pubkey);
         li.setAttribute("data-event-id", event.id);
-        li.innerHTML = this.#createZapHTML(zapInfo);
+        
+        // referenceを含めてHTMLを生成
+        li.innerHTML = this.#createZapHTML({
+          ...zapInfo,
+          reference: event.reference || zapInfo.reference
+        });
+        
         fragment.appendChild(li);
 
-        // プロフィール更新を後回し
         if (zapInfo.pubkey) {
           profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
         }
       }
 
       // DOMの一括更新
-      const existingTrigger = list.querySelector('.load-more-trigger');
-      list.innerHTML = '';
       list.appendChild(fragment);
-      
       if (existingTrigger) {
         list.appendChild(existingTrigger);
       }

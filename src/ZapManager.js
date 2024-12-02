@@ -129,8 +129,10 @@ class ZapSubscriptionManager {
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
           if (!state.zapEventsCache.some(e => e.id === event.id)) {
+            // 即時表示のために参照情報も同時に取得
+            await this.updateEventReference(event, viewId);
             events.push(event);
-            // 即時表示のために都度レンダリング
+            
             state.zapEventsCache.push(event);
             state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
             await renderZapListFromCache(state.zapEventsCache, viewId);
@@ -141,12 +143,9 @@ class ZapSubscriptionManager {
           }
         },
         oneose: async () => {
-          // バックグラウンドで参照情報とプロフィールを更新
+          // プロフィール情報のみバックグラウンドで更新
           Promise.all(events.map(event => {
-            return Promise.all([
-              this.updateEventReference(event, viewId),
-              statsManager.handleZapEvent(event, state, viewId)
-            ]);
+            return statsManager.handleZapEvent(event, state, viewId);
           })).catch(console.error);
 
           state.isInitialFetchComplete = true;
