@@ -165,6 +165,9 @@ class ZapSubscriptionManager {
           state.isInitialFetchComplete = true;
           if (state.zapEventsCache.length === 0) {
             showNoZapsMessage(viewId);
+          } else if (state.zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+            // 十分な数のイベントがある場合のみ無限スクロールを設定
+            this.setupInfiniteScroll(viewId);
           }
           resolve();
         }
@@ -219,7 +222,7 @@ class ZapSubscriptionManager {
         lastEventTime: state.lastEventTime
       });
 
-      // リストの更新後にトリガーを再設定
+      // リストの更新後���トリガーを再設定
       if (newEventsCount > 0) {
         this.setupInfiniteScroll(viewId);
       }
@@ -234,6 +237,16 @@ class ZapSubscriptionManager {
   }
 
   setupInfiniteScroll(viewId) {
+    const state = this.getOrCreateViewState(viewId);
+    // データが不十分な場合は設定しない
+    if (state.zapEventsCache.length < APP_CONFIG.INITIAL_LOAD_COUNT) {
+      console.log('[ZapManager] データ不足のため無限スクロール設定をスキップ:', {
+        currentCount: state.zapEventsCache.length,
+        requiredCount: APP_CONFIG.INITIAL_LOAD_COUNT
+      });
+      return;
+    }
+
     const dialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
     if (!dialog) return;
 

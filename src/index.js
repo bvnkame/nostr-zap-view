@@ -37,7 +37,13 @@ async function handleButtonClick(button, viewId) {
     const [cachedStats] = await Promise.all([
       statsManager.handleCachedStats(viewId, config.identifier),
       viewState.zapEventsCache.length > 0 
-        ? renderZapListFromCache(viewState.zapEventsCache, viewId)
+        ? (async () => {
+            await renderZapListFromCache(viewState.zapEventsCache, viewId);
+            // キャッシュからの表示後、十分なデータがある場合は無限スクロールを設定
+            if (viewState.zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+              subscriptionManager.setupInfiniteScroll(viewId);
+            }
+          })()
         : viewState.isInitialFetchComplete
           ? showNoZapsMessage(viewId)
           : initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId)
@@ -47,9 +53,6 @@ async function handleButtonClick(button, viewId) {
       initializeZapStats(viewId);
     }
 
-    // キャッシュからの表示後に無限スクロールをセットアップ
-    subscriptionManager.setupInfiniteScroll(viewId);
-
     // 2. バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
       Promise.all([
@@ -57,7 +60,6 @@ async function handleButtonClick(button, viewId) {
         statsManager.initializeStats(config.identifier, viewId),
         subscriptionManager.initializeSubscriptions(config, viewId)
       ]).then(() => {
-        subscriptionManager.setupInfiniteScroll(viewId);
         button.setAttribute('data-initialized', 'true');
       }).catch(error => {
         console.error('Failed to initialize:', error);
