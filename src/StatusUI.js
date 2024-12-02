@@ -11,13 +11,13 @@ export class StatusUI {
     if (!statsDiv) return;
 
     // デフォルトのスケルトン表示を行う
-    this.#showSkeletonStats(statsDiv);
+    this.showSkeletonStats(statsDiv);
 
     // タイムアウト用のタイマーを設定
     setTimeout(() => {
       // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
       if (statsDiv.querySelector(".stats-skeleton")) {
-        statsDiv.innerHTML = this.#createTimeoutStats();
+        statsDiv.innerHTML = this.createTimeoutStats();
       }
     }, API_CONFIG.REQUEST_TIMEOUT);
   }
@@ -33,18 +33,18 @@ export class StatusUI {
       (!stats.hasOwnProperty("count") && !stats.hasOwnProperty("msats"));
 
     statsDiv.innerHTML = isTimeout
-      ? this.#createTimeoutStats()
-      : this.#createNormalStats(stats);
+      ? this.createTimeoutStats()
+      : this.createNormalStats(stats);
   }
 
   showNoZaps() {
     const list = this.root.querySelector(".dialog-zap-list");
     if (list) {
-      list.innerHTML = this.#createNoZapsMessage();
+      list.innerHTML = this.createNoZapsMessage();
     }
   }
 
-  #showSkeletonStats(statsDiv) {
+  showSkeletonStats(statsDiv) {
     statsDiv.innerHTML = `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
@@ -58,7 +58,7 @@ export class StatusUI {
     `;
   }
 
-  #createTimeoutStats() {
+  createTimeoutStats() {
     return `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number text-muted">nostr.band</span></div>
@@ -72,7 +72,7 @@ export class StatusUI {
     `;
   }
 
-  #createNormalStats(stats) {
+  createNormalStats(stats) {
     return `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number">${formatNumber(

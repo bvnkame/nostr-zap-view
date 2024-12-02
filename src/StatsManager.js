@@ -5,6 +5,7 @@ import { safeNip19Decode } from "./utils.js"; // Add import
 export class StatsManager {
   constructor() {
     this.viewStatsCache = new Map();
+    this.viewStates = new Map();
   }
 
   getOrCreateViewCache(viewId) {
@@ -12,6 +13,15 @@ export class StatsManager {
       this.viewStatsCache.set(viewId, new Map());
     }
     return this.viewStatsCache.get(viewId);
+  }
+
+  getOrCreateViewState(viewId) {
+    if (!this.viewStates.has(viewId)) {
+      this.viewStates.set(viewId, {
+        currentStats: null
+      });
+    }
+    return this.viewStates.get(viewId);
   }
 
   async getZapStats(identifier, viewId) {
@@ -127,11 +137,38 @@ export class StatsManager {
     }
   }
 
+  async handleCachedStats(viewId, identifier) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    const cached = viewCache.get(identifier);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
+      // キャッシュが有効な場合、状態を更新してUIに反映
+      const viewState = this.getOrCreateViewState(viewId);
+      viewState.currentStats = cached.stats;
+      displayZapStats(cached.stats, viewId);
+      return cached.stats;
+    }
+
+    return null;
+  }
+
   async initializeStats(identifier, viewId) {
     try {
+      // 既存のキャッシュをチェック
+      const cached = await this.handleCachedStats(viewId, identifier);
+      if (cached) return cached;
+
+      // キャッシュがない場合は新規取得
       const stats = await this.getZapStats(identifier, viewId);
       const initialStats = stats?.error ? { timeout: true } : stats;
+      
+      // キャッシュとUIを更新
+      if (!stats?.error) {
+        this.updateCache(viewId, identifier, initialStats);
+      }
       this.displayStats(initialStats, viewId);
+      
       return initialStats;
     } catch (error) {
       console.error("Failed to fetch initial stats:", error);

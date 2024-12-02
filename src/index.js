@@ -32,15 +32,22 @@ async function handleButtonClick(button, viewId) {
     subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);
 
-    // 2. キャッシュチェックとUI初期化
+    // キャッシュの確認とUI初期化の順序を修正
     const viewState = subscriptionManager.getOrCreateViewState(viewId);
+    const cachedStats = await statsManager.handleCachedStats(viewId, config.identifier);
+    
     showDialog(viewId);
 
     if (viewState.zapEventsCache.length > 0) {
       await renderZapListFromCache(viewState.zapEventsCache, viewId);
+      if (!cachedStats) {
+        initializeZapStats(viewId);
+      }
     } else if (!viewState.isInitialFetchComplete) {
       initializeZapPlaceholders(config.maxCount, viewId);
-      initializeZapStats(viewId);
+      if (!cachedStats) {
+        initializeZapStats(viewId);
+      }
     } else {
       showNoZapsMessage(viewId);
     }
