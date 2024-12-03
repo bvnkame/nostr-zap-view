@@ -4,17 +4,42 @@ import { ProfileUI } from "./ProfileUI.js";
 import { 
   getAmountColorClass, 
   createNoZapsMessage,
-  isColorModeEnabled  // 追加
+  isColorModeEnabled 
 } from "../utils.js";
 import { APP_CONFIG, ZAP_AMOUNT_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
+class ZapItemBuilder {
+  constructor(viewId, isColorModeEnabled) {
+    this.viewId = viewId;
+    this.isColorModeEnabled = isColorModeEnabled;
+  }
+
+  createListItem(zapInfo, event) {
+    const li = document.createElement("li");
+    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    
+    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    li.setAttribute("data-pubkey", zapInfo.pubkey);
+    if (event?.id) li.setAttribute("data-event-id", event.id);
+    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+
+    return li;
+  }
+
+  #getAmountColorClass(amount) {
+    if (!this.isColorModeEnabled) return "";
+    return getAmountColorClass(amount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
+  }
+}
+
 export class ZapListUI {
-  constructor(shadowRoot, profileUI, viewId) {  // viewIdを追加
+  constructor(shadowRoot, profileUI, viewId) {
     this.shadowRoot = shadowRoot;
     this.profileUI = profileUI || new ProfileUI();
-    this.viewId = viewId;  // viewIdを保存
+    this.viewId = viewId;
+    this.itemBuilder = new ZapItemBuilder(viewId, this.#isColorModeEnabled());
   }
 
   #getElement(selector) {
@@ -28,37 +53,26 @@ export class ZapListUI {
       return;
     }
 
-    const existingTrigger = list.querySelector('.load-more-trigger');
-    const existingEvents = cacheManager.getExistingEvents(list);
-    const uniqueEvents = [...new Map(zapEventsCache.map(e => [e.id, e])).values()]
-      .sort((a, b) => b.created_at - a.created_at);
+    try {
+      const fragment = document.createDocumentFragment();
+      const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
+      const profileUpdates = [];
 
-    const fragment = document.createDocumentFragment();
-    const profileUpdates = [];
+      for (const event of uniqueEvents) {
+        const zapInfo = await this.#handleZapInfo(event);
+        const li = this.itemBuilder.createListItem(zapInfo, event);
+        fragment.appendChild(li);
 
-    for (const event of uniqueEvents) {
-      const existingEvent = existingEvents.get(event.id);
-      if (existingEvent) {
-        fragment.appendChild(existingEvent.element);
-        continue;
+        if (zapInfo.pubkey) {
+          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+        }
       }
 
-      const zapInfo = await this.#handleZapInfo(event);
-      const li = this.#createListItem(zapInfo, event);
-      fragment.appendChild(li);
-
-      if (zapInfo.pubkey) {
-        profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
-      }
-    }
-
-    list.innerHTML = '';
-    list.appendChild(fragment);
-    if (existingTrigger) list.appendChild(existingTrigger);
-
-    // Update profiles
-    for (const { pubkey, element } of profileUpdates) {
-      await this.#loadProfileAndUpdate(pubkey, element);
+      this.#updateList(list, fragment);
+      await this.#updateProfiles(profileUpdates);
+    } catch (error) {
+      console.error("Failed to render zap list:", error);
+      this.showNoZapsMessage();
     }
   }
 
@@ -66,21 +80,12 @@ export class ZapListUI {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    // "No Zaps" メッセージが存在する場合、メッセージのみを削除
-    const noZapsMessage = list.querySelector(".no-zaps-message");
-    if (noZapsMessage) {
-      noZapsMessage.remove();
-    }
-
     try {
+      this.#removeNoZapsMessage(list);
       const zapInfo = await this.#handleZapInfo(event);
-      const li = this.#createListItem(zapInfo, event);
+      const li = this.itemBuilder.createListItem(zapInfo, event);
       list.prepend(li);
-
-      // プロフィール情報を非同期で更新
-      if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, li).catch(console.error);
-      }
+      await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
     } catch (error) {
       console.error("Failed to prepend zap:", error);
     }
@@ -107,16 +112,28 @@ export class ZapListUI {
     }
   }
 
-  #createListItem(zapInfo, event) {
-    const li = document.createElement("li");
-    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-    
-    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-    li.setAttribute("data-pubkey", zapInfo.pubkey);
-    if (event?.id) li.setAttribute("data-event-id", event.id);
-    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+  #getUniqueEvents(events) {
+    return [...new Map(events.map(e => [e.id, e])).values()]
+      .sort((a, b) => b.created_at - a.created_at);
+  }
 
-    return li;
+  #updateList(list, fragment) {
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    list.innerHTML = '';
+    list.appendChild(fragment);
+    if (existingTrigger) list.appendChild(existingTrigger);
+  }
+
+  #removeNoZapsMessage(list) {
+    const noZapsMessage = list.querySelector(".no-zaps-message");
+    if (noZapsMessage) noZapsMessage.remove();
+  }
+
+  async #updateProfiles(profileUpdates) {
+    const updates = profileUpdates.map(({ pubkey, element }) => 
+      this.#updateProfileIfNeeded(pubkey, element)
+    );
+    await Promise.allSettled(updates);
   }
 
   async #handleZapInfo(event) {
@@ -124,12 +141,6 @@ export class ZapListUI {
     const extractedInfo = await zapInfo.extractInfo();
     cacheManager.updateZapCache(event, extractedInfo);
     return extractedInfo;
-  }
-
-  #getAmountColorClass(amount) {
-    if (!this.#isColorModeEnabled()) return "";
-
-    return getAmountColorClass(amount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
   }
 
   #isColorModeEnabled() {
@@ -144,7 +155,7 @@ export class ZapListUI {
   }
 
   #updatePlaceholderContent(placeholder, zapInfo, eventId) {
-    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
+    const colorClass = this.itemBuilder.getAmountColorClass(zapInfo.satsAmount);
     
     placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
