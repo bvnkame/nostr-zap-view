@@ -1,10 +1,10 @@
 import { StatusUI } from "./ui/StatusUI.js";
 import { ProfileUI } from "./ui/ProfileUI.js";
 import { ZapListUI } from "./ui/ZapListUI.js";
-import { DialogComponents } from "./DialogComponents.js";  // 追加
+import { DialogComponents } from "./DialogComponents.js";
 import { APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
-import { formatIdentifier } from "./utils.js";
+import { formatIdentifier, isValidCount } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
 
 class NostrZapViewDialog extends HTMLElement {
@@ -49,7 +49,7 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #updateMaxCount(count) {
-    if (TypeChecker.isValidCount(count)) {
+    if (isValidCount(count)) {
       cacheManager.updateThemeState(this.viewId, { maxCount: count });
     }
   }
@@ -144,38 +144,68 @@ class NostrZapViewDialog extends HTMLElement {
       title.classList.remove("custom-title");
     }
   }
+
+  // UI操作メソッド
+  getOperations() {
+    return {
+      closeDialog: () => this.closeDialog(),
+      showDialog: () => this.showDialog(),
+      initializeZapPlaceholders: (count) => this.zapListUI.initializeZapPlaceholders(count),
+      initializeZapStats: () => this.initializeZapStats(),
+      replacePlaceholderWithZap: (event, index) => this.zapListUI.replacePlaceholder(event, index),
+      renderZapListFromCache: (cache) => this.renderZapListFromCache(cache),
+      prependZap: (event) => this.zapListUI.prependZap(event),
+      displayZapStats: (stats) => this.displayZapStats(stats),
+      showNoZapsMessage: () => this.zapListUI.showNoZapsMessage()
+    };
+  }
 }
 
 customElements.define("nzv-dialog", NostrZapViewDialog);
 
-// Export API methods
-export const createDialog = (viewId) => {
-  if (!document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)) {
-    const dialog = document.createElement("nzv-dialog");
-    dialog.setAttribute("data-view-id", viewId);
-    document.body.appendChild(dialog);
-    return dialog;
-  }
-  return null;
-};
+// ダイアログ操作のヘルパー関数
+const createDialogAPI = () => {
+  const getDialog = (viewId) => 
+    document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
 
-const dialogOperations = (viewId) => {
-  const getDialog = () => document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-  return (operation, ...args) => {
-    const dialog = getDialog();
-    if (dialog) {
-      return dialog[operation]?.(...args);
+  const executeOperation = (viewId, operation, ...args) => {
+    const dialog = getDialog(viewId);
+    return dialog?.getOperations()[operation]?.(...args) ?? null;
+  };
+
+  const createDialogIfNotExists = (viewId) => {
+    if (!getDialog(viewId)) {
+      const dialog = document.createElement("nzv-dialog");
+      dialog.setAttribute("data-view-id", viewId);
+      document.body.appendChild(dialog);
+      return dialog;
     }
     return null;
   };
+
+  return {
+    create: createDialogIfNotExists,
+    execute: executeOperation
+  };
 };
 
-export const closeDialog = (viewId) => dialogOperations(viewId)('closeDialog');
-export const showDialog = (viewId) => dialogOperations(viewId)('showDialog');
-export const initializeZapPlaceholders = (count, viewId) => dialogOperations(viewId)('initializeZapPlaceholders', count);
-export const initializeZapStats = (viewId) => dialogOperations(viewId)('initializeZapStats');
-export const replacePlaceholderWithZap = (event, index, viewId) => dialogOperations(viewId)('replacePlaceholderWithZap', event, index);
-export const renderZapListFromCache = (zapEventsCache, viewId) => dialogOperations(viewId)('renderZapListFromCache', zapEventsCache);
-export const prependZap = (event, viewId) => dialogOperations(viewId)('prependZap', event);
-export const displayZapStats = (stats, viewId) => dialogOperations(viewId)('displayZapStats', stats);
-export const showNoZapsMessage = (viewId) => dialogOperations(viewId)('showNoZapsMessage');
+const dialogAPI = createDialogAPI();
+
+// 公開API
+export const createDialog = (viewId) => dialogAPI.create(viewId);
+export const closeDialog = (viewId) => dialogAPI.execute(viewId, 'closeDialog');
+export const showDialog = (viewId) => dialogAPI.execute(viewId, 'showDialog');
+export const initializeZapPlaceholders = (count, viewId) => 
+  dialogAPI.execute(viewId, 'initializeZapPlaceholders', count);
+export const initializeZapStats = (viewId) => 
+  dialogAPI.execute(viewId, 'initializeZapStats');
+export const replacePlaceholderWithZap = (event, index, viewId) => 
+  dialogAPI.execute(viewId, 'replacePlaceholderWithZap', event, index);
+export const renderZapListFromCache = (cache, viewId) => 
+  dialogAPI.execute(viewId, 'renderZapListFromCache', cache);
+export const prependZap = (event, viewId) => 
+  dialogAPI.execute(viewId, 'prependZap', event);
+export const displayZapStats = (stats, viewId) => 
+  dialogAPI.execute(viewId, 'displayZapStats', stats);
+export const showNoZapsMessage = (viewId) => 
+  dialogAPI.execute(viewId, 'showNoZapsMessage');

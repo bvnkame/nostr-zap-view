@@ -179,4 +179,8 @@ export class ZapListUI {
       console.error("Failed to load profile:", error);
     }
   }
+
+  initializeZapPlaceholders(count) {  // メソッド名を統一
+    // プレースホルダー初期化のロジック
+  }
 }

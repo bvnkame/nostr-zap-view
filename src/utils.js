@@ -9,7 +9,8 @@ const CONSTANTS = {
 
 // Validation utilities
 const Validator = {
-  isValidIdentifier: (identifier) => typeof identifier === "string" && identifier.length > 0,
+  isValidIdentifier: (identifier) =>
+    typeof identifier === "string" && identifier.length > 0,
   isValidCount: (count) => typeof count === "number" && count > 0,
   isValidUrl: (url) => {
     try {
@@ -52,7 +53,7 @@ export function safeNip19Decode(identifier) {
   try {
     return window.NostrTools.nip19.decode(identifier);
   } catch (error) {
-    console.debug('Failed to decode identifier:', error);
+    console.debug("Failed to decode identifier:", error);
     return null;
   }
 }
@@ -72,10 +73,12 @@ function createReqFromType(type, data, since) {
   }
 
   const req = reqCreator();
-  
+
   // 初期ロードと追加ロードで異なる件数を使用
-  req.limit = since ? APP_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.INITIAL_LOAD_COUNT;
-  
+  req.limit = since
+    ? APP_CONFIG.ADDITIONAL_LOAD_COUNT
+    : APP_CONFIG.INITIAL_LOAD_COUNT;
+
   if (since) {
     req.until = since;
   }
@@ -97,29 +100,32 @@ export function isWithin24Hours(timestamp) {
 
 // Change formatNpub function to a generic function
 export function formatIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') {
-    return 'unknown';
+  if (!identifier || typeof identifier !== "string") {
+    return "unknown";
   }
 
   try {
     const decoded = window.NostrTools.nip19.decode(identifier);
     const { type } = decoded;
-    return `${type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
+    return `${type.toLowerCase()}1${identifier.slice(
+      5,
+      11
+    )}...${identifier.slice(-4)}`;
   } catch (error) {
-    console.debug('Failed to format identifier:', error);
-    return 'unknown';
+    console.debug("Failed to format identifier:", error);
+    return "unknown";
   }
 }
 
 // Add function to check identifier type
 export function isProfileIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') return false;
-  return identifier.startsWith('npub1') || identifier.startsWith('nprofile1');
+  if (!identifier || typeof identifier !== "string") return false;
+  return identifier.startsWith("npub1") || identifier.startsWith("nprofile1");
 }
 
 export function isEventIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') return false;
-  return identifier.startsWith('note1') || identifier.startsWith('nevent1');
+  if (!identifier || typeof identifier !== "string") return false;
+  return identifier.startsWith("note1") || identifier.startsWith("nevent1");
 }
 
 export function getProfileDisplayName(profile) {
@@ -138,42 +144,53 @@ export async function parseZapEvent(event) {
 }
 
 export function parseDescriptionTag(event) {
-  const descriptionTag = event.tags.find((tag) => tag[0] === "description")?.[1];
+  const descriptionTag = event.tags.find(
+    (tag) => tag[0] === "description"
+  )?.[1];
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
     // 制御文字の除去と不正なエスケープシーケンスの修正
     const sanitizedDescription = descriptionTag
       .replace(/[\u0000-\u001F\u007F]/g, "") // 制御文字の除去
-      .replace(/\\([^"\\\/bfnrtu])/g, '$1'); // 不正なエスケープシーケンスの修正
+      .replace(/\\([^"\\\/bfnrtu])/g, "$1"); // 不正なエスケープシーケンスの修正
 
     const parsed = JSON.parse(sanitizedDescription);
-    
+
     // pubkeyの型チェックと正規化
-    const pubkey = typeof parsed.pubkey === 'string' 
-      ? parsed.pubkey 
-      : typeof parsed.pubkey === 'object' && parsed.pubkey !== null
+    const pubkey =
+      typeof parsed.pubkey === "string"
+        ? parsed.pubkey
+        : typeof parsed.pubkey === "object" && parsed.pubkey !== null
         ? parsed.pubkey.toString()
         : null;
 
-    return { 
+    return {
       pubkey: pubkey,
-      content: typeof parsed.content === 'string' ? parsed.content : "" 
+      content: typeof parsed.content === "string" ? parsed.content : "",
     };
   } catch (error) {
-    console.warn("Description tag parse warning:", error, { tag: descriptionTag });
+    console.warn("Description tag parse warning:", error, {
+      tag: descriptionTag,
+    });
     return { pubkey: null, content: "" };
   }
 }
 
 export async function parseBolt11(event) {
-  const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+  const bolt11Tag = event.tags.find(
+    (tag) => tag[0].toLowerCase() === "bolt11"
+  )?.[1];
   if (!bolt11Tag) return "Amount: Unknown";
 
   try {
     const decoded = window.decodeBolt11(bolt11Tag);
-    const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
-    return amountMsat ? `${formatNumber(Math.floor(amountMsat / 1000))} sats` : "Amount: Unknown";
+    const amountMsat = decoded.sections.find(
+      (section) => section.name === "amount"
+    )?.value;
+    return amountMsat
+      ? `${formatNumber(Math.floor(amountMsat / 1000))} sats`
+      : "Amount: Unknown";
   } catch (error) {
     console.error("BOLT11 decode error:", error);
     return "Amount: Unknown";
@@ -201,12 +218,12 @@ export async function verifyNip05(nip05, pubkey) {
 
 // Add secure URL sanitization function
 export function sanitizeImageUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  
+  if (!url || typeof url !== "string") return null;
+
   try {
     const parsed = new URL(url);
     // Allow only http and https protocols
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
+    if (!["http:", "https:"].includes(parsed.protocol)) {
       return null;
     }
     // パラメータとハッシュは保持するように変更
@@ -221,7 +238,7 @@ export function encodeNpub(pubkey) {
   try {
     return window.NostrTools.nip19.npubEncode(pubkey);
   } catch (error) {
-    console.debug('Failed to encode npub:', error);
+    console.debug("Failed to encode npub:", error);
     return null;
   }
 }
@@ -230,10 +247,10 @@ export function encodeNprofile(pubkey, relays = []) {
   try {
     return window.NostrTools.nip19.nprofileEncode({
       pubkey,
-      relays
+      relays,
     });
   } catch (error) {
-    console.debug('Failed to encode nprofile:', error);
+    console.debug("Failed to encode nprofile:", error);
     return null;
   }
 }
@@ -244,10 +261,10 @@ export function encodeNevent(id, kind, pubkey, relays = []) {
       id,
       kind,
       pubkey,
-      relays
+      relays,
     });
   } catch (error) {
-    console.debug('Failed to encode nevent:', error);
+    console.debug("Failed to encode nevent:", error);
     return null;
   }
 }
@@ -255,10 +272,10 @@ export function encodeNevent(id, kind, pubkey, relays = []) {
 // Add function to extract reference from tags
 export function extractReferenceFromTags(event) {
   if (!event.tags) return null;
-  
+
   const eTag = event.tags.find((tag) => tag[0] === "e");
   const pTag = event.tags.find((tag) => tag[0] === "p");
-  
+
   if (!eTag) return null;
 
   return {
@@ -305,3 +322,5 @@ export function isColorModeEnabled(button, defaultColorMode) {
 export function createNoZapsMessage(dialogConfig) {
   return dialogConfig.NO_ZAPS_MESSAGE;
 }
+
+export const isValidCount = (count) => Number.isInteger(count) && count > 0;
