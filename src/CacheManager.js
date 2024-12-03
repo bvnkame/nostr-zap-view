@@ -1,126 +1,117 @@
 import { APP_CONFIG } from "./AppSettings.js";
 
-const CACHE_MAX_SIZE = 1000;
+class BaseCache {
+  constructor(maxSize = 1000) {
+    this.cache = new Map();
+    this.maxSize = maxSize;
+  }
+
+  set(key, value) {
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    this.cache.set(key, value);
+  }
+
+  get(key) { return this.cache.get(key); }
+  has(key) { return this.cache.has(key); }
+  delete(key) { this.cache.delete(key); }
+  clear() { this.cache.clear(); }
+}
 
 export class CacheManager {
-  static instance = null;
-  
+  #instance = null;
+
   constructor() {
-    if (CacheManager.instance) {
-      return CacheManager.instance;
-    }
-    this.referenceCache = new Map();
-    this.zapInfoCache = new Map();
-    this.uiComponentCache = new Map();
-    this.decodedCache = new Map();
-    this.viewStatsCache = new Map();
+    if (this.#instance) return this.#instance;
+
+    this.reference = new BaseCache();
+    this.zapInfo = new BaseCache();
+    this.uiComponent = new BaseCache();
+    this.decoded = new BaseCache();
+    this.viewStats = new Map();
     this.viewStates = new Map();
-    this.profileCache = new Map();
-    this.nip05Cache = new Map();
-    this.nip05PendingFetches = new Map();
-    this.zapEventsCache = new Map();
-    this.zapLoadStates = new Map();
-    this.maxSize = CACHE_MAX_SIZE;
-    CacheManager.instance = this;
+    this.profile = new BaseCache();
+    this.nip05 = new BaseCache();
+    this.nip05PendingFetches = new BaseCache();
+    this.zapEvents = new BaseCache();
+    this.zapLoadStates = new BaseCache();
+
+    this.#instance = this;
   }
 
-  // Reference cache methods
-  setReference(eventId, reference) {
-    this.referenceCache.set(eventId, reference);
-  }
+  // Reference methods
+  setReference(eventId, reference) { this.reference.set(eventId, reference); }
+  getReference(eventId) { return this.reference.get(eventId); }
+  clearReference(eventId) { this.reference.delete(eventId); }
 
-  getReference(eventId) {
-    return this.referenceCache.get(eventId);
-  }
+  // ZapInfo methods
+  setZapInfo(eventId, info) { this.zapInfo.set(eventId, info); }
+  getZapInfo(eventId) { return this.zapInfo.get(eventId); }
+  clearZapInfo(eventId) { this.zapInfo.delete(eventId); }
 
   // Reference component cache methods
   setReferenceComponent(referenceId, html) {
-    if (!this.uiComponentCache.has(referenceId)) {
-      this.uiComponentCache.set(referenceId, html);
+    if (!this.uiComponent.has(referenceId)) {
+      this.uiComponent.set(referenceId, html);
     }
   }
 
   getReferenceComponent(referenceId) {
-    return this.uiComponentCache.get(referenceId);
+    return this.uiComponent.get(referenceId);
   }
 
   clearReferenceComponent(referenceId) {
-    this.uiComponentCache.delete(referenceId);
+    this.uiComponent.delete(referenceId);
   }
 
   clearAllReferenceComponents() {
-    this.uiComponentCache.clear();
-  }
-
-  // ZapInfo cache methods
-  setZapInfo(eventId, info) {
-    this.zapInfoCache.set(eventId, info);
-  }
-
-  getZapInfo(eventId) {
-    return this.zapInfoCache.get(eventId);
+    this.uiComponent.clear();
   }
 
   // UI Component cache methods
   setUIComponent(referenceId, html) {
-    this.uiComponentCache.set(referenceId, html);
+    this.uiComponent.set(referenceId, html);
   }
 
   getUIComponent(referenceId) {
-    return this.uiComponentCache.get(referenceId);
+    return this.uiComponent.get(referenceId);
   }
 
   // Clear methods
   clearAll() {
-    this.referenceCache.clear();
-    this.zapInfoCache.clear();
-    this.uiComponentCache.clear();
-    this.profileCache.clear();
-    this.nip05Cache.clear();
-    this.nip05PendingFetches.clear();
-    this.zapEventsCache.clear();
-    this.zapLoadStates.clear();
-  }
-
-  clearReference(eventId) {
-    this.referenceCache.delete(eventId);
-  }
-
-  clearZapInfo(eventId) {
-    this.zapInfoCache.delete(eventId);
-  }
-
-  clearUIComponent(referenceId) {
-    this.uiComponentCache.delete(referenceId);
+    [this.reference, this.zapInfo, this.uiComponent, this.profile,
+     this.nip05, this.nip05PendingFetches, this.zapEvents, 
+     this.zapLoadStates].forEach(cache => cache.clear());
+    
+    this.viewStats.clear();
+    this.viewStates.clear();
   }
 
   // Decoded cache methods
   setDecoded(key, value) {
-    if (this.decodedCache.size >= this.maxSize) {
-      const firstKey = this.decodedCache.keys().next().value;
-      this.decodedCache.delete(firstKey);
-    }
-    this.decodedCache.set(key, value);
+    this.decoded.set(key, value);
   }
 
   getDecoded(key) {
-    return this.decodedCache.get(key);
+    return this.decoded.get(key);
   }
 
   hasDecoded(key) {
-    return this.decodedCache.has(key);
+    return this.decoded.has(key);
   }
 
   clearDecoded() {
-    this.decodedCache.clear();
+    this.decoded.clear();
   }
 
   // View stats cache methods
   getOrCreateViewCache(viewId) {
-    if (!this.viewStatsCache.has(viewId)) {
-      this.viewStatsCache.set(viewId, new Map());
+    if (!this.viewStats.has(viewId)) {
+      this.viewStats.set(viewId, new Map());
     }
-    return this.viewStatsCache.get(viewId);
+    return this.viewStats.get(viewId);
   }
 
   getOrCreateViewState(viewId) {
@@ -152,24 +143,24 @@ export class CacheManager {
 
   // Profile cache methods
   setProfile(pubkey, profile) {
-    this.profileCache.set(pubkey, profile);
+    this.profile.set(pubkey, profile);
   }
 
   getProfile(pubkey) {
-    return this.profileCache.get(pubkey);
+    return this.profile.get(pubkey);
   }
 
   hasProfile(pubkey) {
-    return this.profileCache.has(pubkey);
+    return this.profile.has(pubkey);
   }
 
   // NIP-05 cache methods
   setNip05(pubkey, nip05) {
-    this.nip05Cache.set(pubkey, nip05);
+    this.nip05.set(pubkey, nip05);
   }
 
   getNip05(pubkey) {
-    return this.nip05Cache.get(pubkey);
+    return this.nip05.get(pubkey);
   }
 
   setNip05PendingFetch(pubkey, promise) {
@@ -186,11 +177,11 @@ export class CacheManager {
 
   // Zap events cache methods
   getZapEvents(viewId) {
-    return this.zapEventsCache.get(viewId) || [];
+    return this.zapEvents.get(viewId) || [];
   }
 
   setZapEvents(viewId, events) {
-    this.zapEventsCache.set(viewId, events);
+    this.zapEvents.set(viewId, events);
   }
 
   addZapEvent(viewId, event) {
@@ -230,28 +221,36 @@ export class CacheManager {
   }
 
   clearViewCache(viewId) {
-    this.zapEventsCache.delete(viewId);
+    this.zapEvents.delete(viewId);
     this.zapLoadStates.delete(viewId);
-    this.viewStatsCache.delete(viewId);
+    this.viewStats.delete(viewId);
     this.viewStates.delete(viewId);
   }
 
-  // Theme cache methods
-  getThemeState(viewId) {
+  getViewState(viewId, defaultState = {}) {
     if (!this.viewStates.has(viewId)) {
-      this.viewStates.set(viewId, {
-        theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
-        maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
-        isInitialized: false
-      });
+      this.viewStates.set(viewId, defaultState);
     }
     return this.viewStates.get(viewId);
   }
 
-  updateThemeState(viewId, updates) {
-    const currentState = this.getThemeState(viewId);
+  updateViewState(viewId, updates) {
+    const currentState = this.getViewState(viewId);
     this.viewStates.set(viewId, { ...currentState, ...updates });
     return this.viewStates.get(viewId);
+  }
+
+  // Theme state methods are now using the generic view state methods
+  getThemeState(viewId) {
+    return this.getViewState(viewId, {
+      theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
+      maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
+      isInitialized: false
+    });
+  }
+
+  updateThemeState(viewId, updates) {
+    return this.updateViewState(viewId, updates);
   }
 
   getExistingEvents(list) {
