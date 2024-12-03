@@ -3,8 +3,8 @@ import {
   ZAP_CONFIG as CONFIG,
   REQUEST_CONFIG,
   PROFILE_CONFIG,
-  BATCH_CONFIG, // Add this import
-} from "./AppSettings.js"; // PROFILE_CONFIGを追加
+  BATCH_CONFIG,
+} from "./AppSettings.js";
 import { BatchProcessor } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
 
@@ -16,73 +16,67 @@ class ReferenceProcessor extends BatchProcessor {
     });
     this.pool = pool;
     this.config = config;
-    this.relayUrls = null; // Add: relayUrlsを保持するプロパティ
+    this.relayUrls = [];
   }
 
   setRelayUrls(urls) {
-    // Add: relayUrlsを設定するメソッド
-    this.relayUrls = urls;
+    this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
   async onBatchProcess(items) {
-    return new Promise((resolve) => {
-      if (!this.relayUrls || !Array.isArray(this.relayUrls)) {
-        console.error("No relay URLs provided");
-        items.forEach((id) => this.resolveItem(id, null));
-        resolve();
-        return;
-      }
+    if (!this.relayUrls.length) {
+      console.error("リレーURLが設定されていません");
+      items.forEach(id => this.resolveItem(id, null));
+      return Promise.resolve();
+    }
 
+    return new Promise((resolve) => {
+      const processedEvents = new Set();
       let timeoutId;
-      let processedEvents = new Set();
 
       const sub = this.pool.zapPool.subscribeMany(
         this.relayUrls,
-        [
-          {
-            kinds: BATCH_CONFIG.SUPPORTED_EVENT_KINDS,
-            ids: items,
-          },
-        ],
+        [{
+          kinds: BATCH_CONFIG.SUPPORTED_EVENT_KINDS,
+          ids: items,
+        }],
         {
           onevent: (event) => {
             processedEvents.add(event.id);
             this.resolveItem(event.id, event);
 
-            // 全てのイベントを受信したらサブスクリプションを終了
-            if (items.every((id) => processedEvents.has(id))) {
-              clearTimeout(timeoutId);
-              sub.close();
+            if (items.every(id => processedEvents.has(id))) {
+              this._cleanup(timeoutId, sub, items, processedEvents);
               resolve();
             }
           },
           oneose: () => {
-            // 未解決のアイテムを処理
-            items.forEach((id) => {
-              if (!processedEvents.has(id) && this.resolvers.has(id)) {
-                this.resolveItem(id, null);
-              }
-            });
+            this._cleanup(timeoutId, sub, items, processedEvents);
             resolve();
           },
         }
       );
 
-      // タイムアウト処理の改善
       timeoutId = setTimeout(() => {
-        sub.close();
-        items.forEach((id) => {
-          if (!processedEvents.has(id) && this.resolvers.has(id)) {
-            this.resolveItem(id, null);
-          }
-        });
+        this._cleanup(timeoutId, sub, items, processedEvents);
         resolve();
-      }, REQUEST_CONFIG.METADATA_TIMEOUT); // 変更: メタデータ用のタイムアウトを使用
+      }, REQUEST_CONFIG.METADATA_TIMEOUT);
+    });
+  }
+
+  _cleanup(timeoutId, sub, items, processedEvents) {
+    clearTimeout(timeoutId);
+    sub.close();
+    items.forEach(id => {
+      if (!processedEvents.has(id) && this.resolvers.has(id)) {
+        this.resolveItem(id, null);
+      }
     });
   }
 
   onBatchError(items, error) {
-    items.forEach((id) => this.resolveItem(id, null));
+    console.error("バッチ処理エラー:", error);
+    items.forEach(id => this.resolveItem(id, null));
   }
 }
 
@@ -90,24 +84,20 @@ class ZapPoolManager {
   constructor() {
     this.zapPool = new SimplePool();
     this.profilePool = new SimplePool();
-    this.subscriptions = new Map(); // 複数のビューをサポートするためにMapに変更
-    this.state = new Map(); // 状態も複数管理
-    // referencePoolを削除
+    this.subscriptions = new Map();
+    this.state = new Map();
     this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
-    this.isConnected = false; // Add: リレー接続状態フラグ
+    this.isConnected = false;
   }
 
-  // Add: リレーへの事前接続を行うメソッド
   async connectToRelays(zapRelayUrls) {
     if (this.isConnected) return;
 
     try {
-      // プロフィール用リレーに接続
       await Promise.allSettled(
         PROFILE_CONFIG.RELAYS.map((url) => this.profilePool.ensureRelay(url))
       );
 
-      // Zapリレーに接続
       await Promise.allSettled(
         zapRelayUrls.map((url) => this.zapPool.ensureRelay(url))
       );
@@ -140,7 +130,7 @@ class ZapPoolManager {
     const subs = this.subscriptions.get(viewId);
     subs.zap = this.zapPool.subscribeMany(
       config.relayUrls,
-      [{ ...decoded.req }], // Fix: Make sure decoded.req is an array
+      [{ ...decoded.req }],
       {
         ...handlers,
         onevent: (event) => {
@@ -154,26 +144,23 @@ class ZapPoolManager {
     );
   }
 
-  // subscribeToRealTimeメソッドを削除
-
   async fetchReference(relayUrls, eventId) {
-    if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
-      return null;
-    }
+    if (!eventId) return null;
+
     try {
-      const cachedReference = cacheManager.getReference(eventId);
-      if (cachedReference) return cachedReference;
+      const cachedRef = cacheManager.getReference(eventId);
+      if (cachedRef) return cachedRef;
 
       this.referenceProcessor.setRelayUrls(relayUrls);
-      const reference = await this.referenceProcessor.getOrCreateFetchPromise(
-        eventId
-      );
+      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
+      
       if (reference) {
         cacheManager.setReference(eventId, reference);
       }
+      
       return reference;
     } catch (error) {
-      console.error("Error fetching reference:", error);
+      console.error("参照取得エラー:", error);
       return cacheManager.getReference(eventId);
     }
   }
