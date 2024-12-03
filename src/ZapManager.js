@@ -7,6 +7,7 @@ import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
 import { poolManager } from "./ZapPool.js";
 import { cacheManager } from "./CacheManager.js";
+import { profileManager } from "./ProfileManager.js"; // 追加: ProfileManagerからprofileManagerをインポート
 
 class ZapSubscriptionManager {
   constructor() {
@@ -110,8 +111,6 @@ class ZapSubscriptionManager {
     return new Promise((resolve) => {
       const events = [];
       let lastEventTime = null;
-      let pendingProfiles = new Set();
-      let pendingReferences = new Set();
 
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
@@ -119,28 +118,32 @@ class ZapSubscriptionManager {
             lastEventTime = event.created_at;
           }
           
-          // reference情報を先に取得
-          await this.updateEventReference(event, viewId);
-          
+          // 1. まずZapイベントをキャッシュに追加し即時表示
           if (cacheManager.addZapEvent(viewId, event)) {
             events.push(event);
-
-            // プロフィール取得を非同期で開始
-            if (!pendingProfiles.has(event.pubkey)) {
-              pendingProfiles.add(event.pubkey);
-              statsManager.handleZapEvent(event, viewId)
-                .then(() => {
-                  pendingProfiles.delete(event.pubkey);
-                  renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
-                })
-                .catch(console.error);
-            }
-
-            // reference情報を含めた状態でUIを更新
             renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+
+            // 2. reference情報の非同期取得を開始
+            this.updateEventReference(event, viewId)
+              .then(() => {
+                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+              });
+
+            // 3. プロフィール情報の非同期取得を開始
+            statsManager.handleZapEvent(event, viewId)
+              .then(() => {
+                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+                
+                // 4. プロフィールに基づくNIP-05検証を開始
+                return profileManager.verifyNip05Async(event.pubkey);
+              })
+              .then(() => {
+                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+              })
+              .catch(console.error);
           }
         },
-        oneose: async () => {
+        oneose: () => {
           cacheManager.updateLoadState(viewId, { 
             isInitialFetchComplete: true,
             lastEventTime 
@@ -153,25 +156,7 @@ class ZapSubscriptionManager {
             this.setupInfiniteScroll(viewId);
           }
 
-          // 残りのプロフィール取得を待たずに完了
           resolve();
-
-          // バックグラウンドで残りの処理を継続
-          const [referencePromises, profilePromises] = [
-            Promise.all([...pendingReferences].map(eventId => {
-              const event = events.find(e => e.id === eventId);
-              return event ? this.updateEventReference(event, viewId) : Promise.resolve();
-            })),
-            Promise.all([...pendingProfiles].map(pubkey => {
-              const event = events.find(e => e.pubkey === pubkey);
-              return event ? statsManager.handleZapEvent(event, viewId) : Promise.resolve();
-            }))
-          ];
-
-          // 両方の処理完了後に最終更新
-          Promise.all([referencePromises, profilePromises])
-            .then(() => renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId))
-            .catch(console.error);
         }
       });
     });

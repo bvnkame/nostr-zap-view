@@ -21,21 +21,15 @@ import { cacheManager } from "./CacheManager.js";
 async function handleButtonClick(button, viewId) {
   try {
     const config = ViewerConfig.fromButton(button);
-    
-    // 既存のダイアログを削除
-    const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-    if (existingDialog) {
-      existingDialog.remove();
-    }
-
-    // まず最低限のUIを表示
     subscriptionManager.setViewConfig(viewId, config);
+
+    // 1. ��イアログとスケルトンUIの表示
     createDialog(viewId);
     showDialog(viewId);
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
     initializeZapStats(viewId);
 
-    // キャッシュ処理を実行
+    // 2. キャッシュされたデータの表示（あれば）
     const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
       viewId, 
       config, 
@@ -46,17 +40,24 @@ async function handleButtonClick(button, viewId) {
       subscriptionManager.setupInfiniteScroll(viewId);
     }
 
-    // バックグラウンドでデータ取得を実行
+    // 3. 非同期でデータ取得を開始
     if (!button.hasAttribute('data-initialized')) {
-      Promise.all([
+      const initTasks = [
+        // リレー接続
         poolManager.connectToRelays(config.relayUrls),
+        // 統計情報の取得
         statsManager.initializeStats(config.identifier, viewId),
+        // Zapイベントの購読開始
         subscriptionManager.initializeSubscriptions(config, viewId)
-      ]).then(() => {
-        button.setAttribute('data-initialized', 'true');
-      }).catch(error => {
-        console.error('Failed to initialize:', error);
-      });
+      ];
+
+      Promise.all(initTasks)
+        .then(() => {
+          button.setAttribute('data-initialized', 'true');
+        })
+        .catch(error => {
+          console.error('Failed to initialize:', error);
+        });
     }
   } catch (error) {
     console.error(`Failed to handle click for viewId ${viewId}:`, error);
