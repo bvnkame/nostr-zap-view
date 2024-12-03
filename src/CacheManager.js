@@ -29,6 +29,25 @@ export class CacheManager {
     return this.referenceCache.get(eventId);
   }
 
+  // Reference component cache methods
+  setReferenceComponent(referenceId, html) {
+    if (!this.uiComponentCache.has(referenceId)) {
+      this.uiComponentCache.set(referenceId, html);
+    }
+  }
+
+  getReferenceComponent(referenceId) {
+    return this.uiComponentCache.get(referenceId);
+  }
+
+  clearReferenceComponent(referenceId) {
+    this.uiComponentCache.delete(referenceId);
+  }
+
+  clearAllReferenceComponents() {
+    this.uiComponentCache.clear();
+  }
+
   // ZapInfo cache methods
   setZapInfo(eventId, info) {
     this.zapInfoCache.set(eventId, info);

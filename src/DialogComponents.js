@@ -4,9 +4,6 @@ import quickReferenceIcon from "./assets/link.svg";
 import { cacheManager } from "./CacheManager.js";
 
 export class DialogComponents {
-  // 静的キャッシュの追加
-  static referenceCache = new Map();
-
   static createUIComponents(zapInfo, viewId) {
     return {
       iconComponent: this.createIconComponent(),
@@ -46,7 +43,7 @@ export class DialogComponents {
     if (!reference) return "";
 
     const cacheKey = reference.id;
-    const cachedComponent = cacheManager.getUIComponent(cacheKey);
+    const cachedComponent = cacheManager.getReferenceComponent(cacheKey);
     if (cachedComponent) {
       return cachedComponent;
     }
@@ -57,21 +54,12 @@ export class DialogComponents {
       const content = DialogComponents.getReferenceContent(reference);
       
       const html = DialogComponents.createReferenceHTML(url, content);
-      cacheManager.setUIComponent(cacheKey, html);
+      cacheManager.setReferenceComponent(cacheKey, html);
       return html;
     } catch (error) {
       console.error("Failed to create reference component:", error);
       return "";
     }
-  }
-
-  // キャッシュ制御メソッドの追加
-  static clearReferenceCache() {
-    this.referenceCache.clear();
-  }
-
-  static clearSingleReferenceCache(referenceId) {
-    this.referenceCache.delete(referenceId);
   }
 
   static getReferenceUrl(reference) {
