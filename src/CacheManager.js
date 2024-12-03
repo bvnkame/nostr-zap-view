@@ -251,6 +251,25 @@ export class CacheManager {
     this.viewStates.set(viewId, { ...currentState, ...updates });
     return this.viewStates.get(viewId);
   }
+
+  getExistingEvents(list) {
+    if (!list) return new Map();
+    
+    return new Map(
+      Array.from(list.children)
+        .filter(li => li.hasAttribute('data-event-id'))
+        .map(li => [li.getAttribute('data-event-id'), {
+          element: li,
+          html: li.innerHTML,
+          classes: li.className
+        }])
+    );
+  }
+
+  updateZapCache(event, zapInfo) {
+    if (!event?.id) return;
+    this.setZapInfo(event.id, zapInfo);
+  }
 }
 
 export const cacheManager = new CacheManager();

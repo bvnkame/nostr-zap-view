@@ -10,6 +10,7 @@ import {
 } from "../utils.js";
 import { APP_CONFIG, ZAP_AMOUNT_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
+import { cacheManager } from "../CacheManager.js";
 
 export class ZapListUI {
   constructor(shadowRoot, profileUI, viewId) {  // viewIdを追加
@@ -30,7 +31,7 @@ export class ZapListUI {
     }
 
     const existingTrigger = list.querySelector('.load-more-trigger');
-    const existingEvents = this.#getExistingEvents(list);
+    const existingEvents = cacheManager.getExistingEvents(list);
     const uniqueEvents = [...new Map(zapEventsCache.map(e => [e.id, e])).values()]
       .sort((a, b) => b.created_at - a.created_at);
 
@@ -122,7 +123,9 @@ export class ZapListUI {
 
   async #handleZapInfo(event) {
     const zapInfo = new ZapInfo(event, defaultIcon);
-    return await zapInfo.extractInfo();
+    const extractedInfo = await zapInfo.extractInfo();
+    cacheManager.updateZapCache(event, extractedInfo);
+    return extractedInfo;
   }
 
   #getAmountColorClass(amount) {
@@ -191,17 +194,5 @@ export class ZapListUI {
     } catch (error) {
       console.error("Failed to load profile:", error);
     }
-  }
-
-  #getExistingEvents(list) {
-    return new Map(
-      Array.from(list.children)
-        .filter(li => li.hasAttribute('data-event-id'))
-        .map(li => [li.getAttribute('data-event-id'), {
-          element: li,
-          html: li.innerHTML,
-          classes: li.className
-        }])
-    );
   }
 }
