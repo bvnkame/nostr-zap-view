@@ -16,6 +16,8 @@ export class CacheManager {
     this.profileCache = new Map();
     this.nip05Cache = new Map();
     this.nip05PendingFetches = new Map();
+    this.zapEventsCache = new Map();
+    this.zapLoadStates = new Map();
     this.maxSize = CACHE_MAX_SIZE;
     CacheManager.instance = this;
   }
@@ -74,6 +76,8 @@ export class CacheManager {
     this.profileCache.clear();
     this.nip05Cache.clear();
     this.nip05PendingFetches.clear();
+    this.zapEventsCache.clear();
+    this.zapLoadStates.clear();
   }
 
   clearReference(eventId) {
@@ -176,6 +180,58 @@ export class CacheManager {
 
   deleteNip05PendingFetch(pubkey) {
     this.nip05PendingFetches.delete(pubkey);
+  }
+
+  // Zap events cache methods
+  getZapEvents(viewId) {
+    return this.zapEventsCache.get(viewId) || [];
+  }
+
+  setZapEvents(viewId, events) {
+    this.zapEventsCache.set(viewId, events);
+  }
+
+  addZapEvent(viewId, event) {
+    const events = this.getZapEvents(viewId);
+    const isDuplicate = events.some((e) => 
+      e.id === event.id || 
+      (e.kind === event.kind && 
+       e.pubkey === event.pubkey && 
+       e.content === event.content && 
+       e.created_at === event.created_at)
+    );
+
+    if (!isDuplicate) {
+      const updatedEvents = [...events, event];
+      updatedEvents.sort((a, b) => b.created_at - a.created_at);
+      this.setZapEvents(viewId, updatedEvents);
+      return true;
+    }
+    return false;
+  }
+
+  // Load state management
+  getLoadState(viewId) {
+    if (!this.zapLoadStates.has(viewId)) {
+      this.zapLoadStates.set(viewId, {
+        isInitialFetchComplete: false,
+        isLoading: false,
+        lastEventTime: null
+      });
+    }
+    return this.zapLoadStates.get(viewId);
+  }
+
+  updateLoadState(viewId, updates) {
+    const currentState = this.getLoadState(viewId);
+    this.zapLoadStates.set(viewId, { ...currentState, ...updates });
+  }
+
+  clearViewCache(viewId) {
+    this.zapEventsCache.delete(viewId);
+    this.zapLoadStates.delete(viewId);
+    this.viewStatsCache.delete(viewId);
+    this.viewStates.delete(viewId);
   }
 }
 

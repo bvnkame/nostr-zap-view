@@ -3,26 +3,15 @@ import {
   showNoZapsMessage 
 } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";  // APP_CONFIGを追加
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
 import { poolManager } from "./ZapPool.js";
+import { cacheManager } from "./CacheManager.js";
 
 class ZapSubscriptionManager {
   constructor() {
-    this.viewStates = new Map();
     this.configStore = new Map();
-  }
-
-  getOrCreateViewState(viewId) {
-    if (!this.viewStates.has(viewId)) {
-      this.viewStates.set(viewId, {
-        zapEventsCache: [],
-        zapStatsCache: new Map(),
-        isInitialFetchComplete: false,
-        currentStats: null
-      });
-    }
-    return this.viewStates.get(viewId);
+    this.observers = new Map();
   }
 
   setViewConfig(viewId, config) {
@@ -33,51 +22,16 @@ class ZapSubscriptionManager {
     return this.configStore.get(viewId);
   }
 
-  clearCache(viewId) {
-    const state = this.getOrCreateViewState(viewId);
-    state.zapEventsCache = [];
-    state.currentStats = null;
-  }
-
   async handleZapEvent(event, viewId) {
-    const state = this.getOrCreateViewState(viewId);
-    console.log('[ZapManager] 受信したZapイベント:', event);
-    
-    // 厳密な重複チェック
-    const isDuplicate = state.zapEventsCache.some((e) => 
-      e.id === event.id || 
-      (e.kind === event.kind && 
-       e.pubkey === event.pubkey && 
-       e.content === event.content && 
-       e.created_at === event.created_at)
-    );
-
-    if (!isDuplicate) {
-      // イベントの追加前に配列のコピーを作成
-      const updatedCache = [...state.zapEventsCache, event];
-      updatedCache.sort((a, b) => b.created_at - a.created_at);
-      
-      // キャッシュを更新
-      state.zapEventsCache = updatedCache;
-
-      // UIの更新
-      await renderZapListFromCache(state.zapEventsCache, viewId);
-      console.log('[ZapManager] UI更新後のイベント:', event);
+    if (cacheManager.addZapEvent(viewId, event)) {
+      const events = cacheManager.getZapEvents(viewId);
+      await renderZapListFromCache(events, viewId);
 
       // バックグラウンドでの処理
       Promise.all([
         this.updateEventReference(event, viewId),
-        statsManager.handleZapEvent(event, state, viewId)
-      ]).then(() => {
-        console.log('[ZapManager] reference更新後のイベント:', event);
-      }).catch(console.error);
-
-      console.log('[ZapManager] キャッシュ更新後の状態:', {
-        totalEvents: state.zapEventsCache.length,
-        eventId: event.id
-      });
-    } else {
-      console.log('[ZapManager] 重複イベントをスキップ:', event.id);
+        statsManager.handleZapEvent(event, viewId)
+      ]).catch(console.error);
     }
   }
 
@@ -138,42 +92,68 @@ class ZapSubscriptionManager {
     const decoded = decodeIdentifier(config.identifier);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
 
-    const state = this.getOrCreateViewState(viewId);
-    state.isInitialFetchComplete = false;
-    state.lastEventTime = null;
-    state.isLoading = false;
+    cacheManager.updateLoadState(viewId, {
+      isInitialFetchComplete: false,
+      lastEventTime: null,
+      isLoading: false
+    });
 
     return new Promise((resolve) => {
       const events = [];
+      let lastEventTime = null;
+      let batchSize = 0;
+      const BATCH_SIZE = 5; // リファレンス取得のバッチサイズ
+
+      const processBatch = async () => {
+        // 現在のバッチのリファレンスを並列で取得
+        const currentBatch = events.slice(events.length - batchSize);
+        await Promise.all(currentBatch.map(event => 
+          this.updateEventReference(event, viewId)
+        ));
+        // バッチ処理後にUIを更新
+        await renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+        batchSize = 0;
+      };
+
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
-          if (!state.zapEventsCache.some(e => e.id === event.id)) {
-            // 即時表示のために参照情報も同時に取得
-            await this.updateEventReference(event, viewId);
+          if (!lastEventTime || event.created_at < lastEventTime) {
+            lastEventTime = event.created_at;
+          }
+          
+          if (cacheManager.addZapEvent(viewId, event)) {
             events.push(event);
-            
-            state.zapEventsCache.push(event);
-            state.zapEventsCache.sort((a, b) => b.created_at - a.created_at);
-            await renderZapListFromCache(state.zapEventsCache, viewId);
-            
-            if (!state.lastEventTime || event.created_at < state.lastEventTime) {
-              state.lastEventTime = event.created_at;
+            batchSize++;
+
+            // バッチサイズに達したらリファレンスを取得
+            if (batchSize >= BATCH_SIZE) {
+              await processBatch();
             }
           }
         },
         oneose: async () => {
-          // プロフィール情報のみバックグラウンドで更新
-          Promise.all(events.map(event => {
-            return statsManager.handleZapEvent(event, state, viewId);
-          })).catch(console.error);
+          // 残りのバッチを処理
+          if (batchSize > 0) {
+            await processBatch();
+          }
 
-          state.isInitialFetchComplete = true;
-          if (state.zapEventsCache.length === 0) {
+          cacheManager.updateLoadState(viewId, { 
+            isInitialFetchComplete: true,
+            lastEventTime 
+          });
+          
+          const cachedEvents = cacheManager.getZapEvents(viewId);
+          if (cachedEvents.length === 0) {
             showNoZapsMessage(viewId);
-          } else if (state.zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-            // 十分な数のイベントがある場合のみ無限スクロールを設定
+          } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
             this.setupInfiniteScroll(viewId);
           }
+
+          // プロフィール情報のバッチ更新
+          Promise.all(events.map(event => 
+            statsManager.handleZapEvent(event, viewId)
+          )).catch(console.error);
+
           resolve();
         }
       });
@@ -181,7 +161,7 @@ class ZapSubscriptionManager {
   }
 
   async loadMoreZaps(viewId) {
-    const state = this.getOrCreateViewState(viewId);
+    const state = cacheManager.getLoadState(viewId);
     const config = this.getViewConfig(viewId);
 
     if (!config || state.isLoading || !state.lastEventTime) {
@@ -197,7 +177,7 @@ class ZapSubscriptionManager {
       state.isLoading = true;
       console.log('[ZapManager] 追加ロード開始:', {
         lastEventTime: state.lastEventTime,
-        currentCacheSize: state.zapEventsCache.length,
+        currentCacheSize: cacheManager.getZapEvents(viewId).length,
         loadCount: APP_CONFIG.ADDITIONAL_LOAD_COUNT,
         viewId
       });
@@ -223,7 +203,7 @@ class ZapSubscriptionManager {
 
       console.log('[ZapManager] 追加ロード完了:', {
         newEventsCount,
-        totalCacheSize: state.zapEventsCache.length,
+        totalCacheSize: cacheManager.getZapEvents(viewId).length,
         lastEventTime: state.lastEventTime
       });
 
@@ -242,13 +222,8 @@ class ZapSubscriptionManager {
   }
 
   setupInfiniteScroll(viewId) {
-    const state = this.getOrCreateViewState(viewId);
-    // データが不十分な場合は設定しない
-    if (state.zapEventsCache.length < APP_CONFIG.INITIAL_LOAD_COUNT) {
-      console.log('[ZapManager] データ不足のため無限スクロール設定をスキップ:', {
-        currentCount: state.zapEventsCache.length,
-        requiredCount: APP_CONFIG.INITIAL_LOAD_COUNT
-      });
+    const cachedEvents = cacheManager.getZapEvents(viewId);
+    if (cachedEvents.length < APP_CONFIG.INITIAL_LOAD_COUNT) {
       return;
     }
 

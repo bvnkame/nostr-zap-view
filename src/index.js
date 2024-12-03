@@ -12,6 +12,7 @@ import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profileManager } from "./ProfileManager.js";
 import { poolManager } from "./ZapPool.js";
+import { cacheManager } from "./CacheManager.js";
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
@@ -21,39 +22,35 @@ import { poolManager } from "./ZapPool.js";
 async function handleButtonClick(button, viewId) {
   try {
     const config = ViewerConfig.fromButton(button);
-
+    
     // 既存のダイアログを削除
     const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
     if (existingDialog) {
       existingDialog.remove();
     }
 
-    // 1. UIの初期化とキャッシュの確認を同時に実行
+    // まず最低限のUIを表示
     subscriptionManager.setViewConfig(viewId, config);
     createDialog(viewId);
     showDialog(viewId);
+    initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
+    initializeZapStats(viewId);
 
-    const viewState = subscriptionManager.getOrCreateViewState(viewId);
-    const [cachedStats] = await Promise.all([
+    // キャッシュの確認は非同期で実行
+    Promise.all([
       statsManager.handleCachedStats(viewId, config.identifier),
-      viewState.zapEventsCache.length > 0 
-        ? (async () => {
-            await renderZapListFromCache(viewState.zapEventsCache, viewId);
-            // キャッシュからの表示後、十分なデータがある場合は無限スクロールを設定
-            if (viewState.zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-              subscriptionManager.setupInfiniteScroll(viewId);
-            }
-          })()
-        : viewState.isInitialFetchComplete
-          ? showNoZapsMessage(viewId)
-          : initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId)
-    ]);
+      (async () => {
+        const cachedEvents = cacheManager.getZapEvents(viewId);
+        if (cachedEvents.length > 0) {
+          await renderZapListFromCache(cachedEvents, viewId);
+          if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+            subscriptionManager.setupInfiniteScroll(viewId);
+          }
+        }
+      })()
+    ]).catch(console.error);
 
-    if (!cachedStats) {
-      initializeZapStats(viewId);
-    }
-
-    // 2. バックグラウンドでデータ取得を実行
+    // バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {
       Promise.all([
         poolManager.connectToRelays(config.relayUrls),
