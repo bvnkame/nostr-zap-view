@@ -1,7 +1,6 @@
 import { 
   renderZapListFromCache, 
-  showNoZapsMessage 
-} from "./UIManager.js";
+  showNoZapsMessage} from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
 import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
@@ -13,6 +12,10 @@ class ZapSubscriptionManager {
   constructor() {
     this.configStore = new Map();
     this.observers = new Map();
+  }
+
+  setZapListUI(zapListUI) {
+    this.zapListUI = zapListUI;
   }
 
   setViewConfig(viewId, config) {
@@ -31,15 +34,29 @@ class ZapSubscriptionManager {
         statsManager.handleZapEvent(event, viewId)
       ];
 
-      // UIの即時更新（初期表示）
-      const events = cacheManager.getZapEvents(viewId);
-      await renderZapListFromCache(events, viewId);
+      // UIの即時更新（新しいイベントのみ追加）
+      if (this.zapListUI) {
+        const existingEvent = this.zapListUI.getElementByEventId(event.id);
+        if (!existingEvent) {
+          await this.zapListUI.appendZap(event); // 変更: prependZap から appendZap に変更
+        }
+      }
 
       // バックグラウンドで両方の処理を完了
       Promise.all([referencePromise, profilePromise])
         .then(() => {
-          // 両方の情報が揃った後で再度UIを更新
-          renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+          // プロフィールに基づくNIP-05検証のみ実行
+          profileManager.verifyNip05Async(event.pubkey)
+            .then(() => {
+              // 新しいイベントのみ再レンダリング
+              if (this.zapListUI) {
+                const existingEvent = this.zapListUI.getElementByEventId(event.id);
+                if (!existingEvent) {
+                  this.zapListUI.appendZap(event); // 変更: prependZap から appendZap に変更
+                }
+              }
+            })
+            .catch(console.error);
         })
         .catch(console.error);
     }
@@ -305,5 +322,6 @@ class ZapSubscriptionManager {
   }
 }
 
+// ZapSubscriptionManager を初期化する際に zapListUI を設定
 const subscriptionManager = new ZapSubscriptionManager();
 export { subscriptionManager };

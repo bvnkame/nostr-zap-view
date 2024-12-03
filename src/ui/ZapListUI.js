@@ -91,6 +91,25 @@ export class ZapListUI {
     }
   }
 
+  getElementByEventId(eventId) {
+    return this.#getElement(`.zap-list-item[data-event-id="${eventId}"]`);
+  }
+
+  async appendZap(event) {
+    const list = this.#getElement(".dialog-zap-list");
+    if (!list) return;
+
+    try {
+      this.#removeNoZapsMessage(list);
+      const zapInfo = await this.#handleZapInfo(event);
+      const li = this.itemBuilder.createListItem(zapInfo, event);
+      list.appendChild(li); // 変更: prepend から append に変更
+      await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
+    } catch (error) {
+      console.error("Failed to append zap:", error);
+    }
+  }
+
   async replacePlaceholderWithZap(event, index) {
     const placeholder = this.#getElement(`[data-index="${index}"]`);
     if (!this.#isValidPlaceholder(placeholder)) return;

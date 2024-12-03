@@ -6,6 +6,7 @@ import { APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
 import { formatIdentifier, isValidCount } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
+import { subscriptionManager } from "./ZapManager.js"; // 追加: ZapSubscriptionManager をインポート
 
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
@@ -26,6 +27,9 @@ class NostrZapViewDialog extends HTMLElement {
     const viewId = this.getAttribute("data-view-id");
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, viewId);
     this.viewId = viewId;
+
+    // ZapSubscriptionManager に zapListUI を設定
+    subscriptionManager.setZapListUI(this.zapListUI);
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
