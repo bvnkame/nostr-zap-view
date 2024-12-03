@@ -135,6 +135,8 @@ class ZapSubscriptionManager {
           try {
             // 1. まずreferenceを取得
             await this.updateEventReference(event, viewId);
+            
+            console.log('[ZapManager] イベント処理:', event);
 
             // 2. Zapイベントをキャッシュに追加
             if (cacheManager.addZapEvent(viewId, event)) {

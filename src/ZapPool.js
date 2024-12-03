@@ -128,6 +128,13 @@ class ZapPoolManager {
     state.isZapClosed = false;
 
     const subs = this.subscriptions.get(viewId);
+
+    // コンソールログを追加して、リレーに送信されるREQを確認
+    console.log("[ZapPool] REQ送信:", {
+      relayUrls: config.relayUrls,
+      req: decoded.req,
+    });
+
     subs.zap = this.zapPool.subscribeMany(
       config.relayUrls,
       [{ ...decoded.req }],
