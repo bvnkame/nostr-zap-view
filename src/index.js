@@ -2,7 +2,6 @@ import { APP_CONFIG, ZAP_CONFIG } from "./AppSettings.js";
 import { ViewerConfig } from "./AppSettings.js";
 import { 
   createDialog, 
-  showNoZapsMessage, 
   initializeZapPlaceholders,
   initializeZapStats,
   showDialog,
@@ -36,19 +35,16 @@ async function handleButtonClick(button, viewId) {
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
     initializeZapStats(viewId);
 
-    // キャッシュの確認は非同期で実行
-    Promise.all([
-      statsManager.handleCachedStats(viewId, config.identifier),
-      (async () => {
-        const cachedEvents = cacheManager.getZapEvents(viewId);
-        if (cachedEvents.length > 0) {
-          await renderZapListFromCache(cachedEvents, viewId);
-          if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-            subscriptionManager.setupInfiniteScroll(viewId);
-          }
-        }
-      })()
-    ]).catch(console.error);
+    // キャッシュ処理を実行
+    const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
+      viewId, 
+      config, 
+      renderZapListFromCache
+    );
+
+    if (hasEnoughCachedEvents) {
+      subscriptionManager.setupInfiniteScroll(viewId);
+    }
 
     // バックグラウンドでデータ取得を実行
     if (!button.hasAttribute('data-initialized')) {

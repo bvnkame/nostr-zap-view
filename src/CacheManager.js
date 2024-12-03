@@ -1,3 +1,5 @@
+import { APP_CONFIG } from "./AppSettings.js";
+
 const CACHE_MAX_SIZE = 1000;
 
 export class CacheManager {
@@ -269,6 +271,19 @@ export class CacheManager {
   updateZapCache(event, zapInfo) {
     if (!event?.id) return;
     this.setZapInfo(event.id, zapInfo);
+  }
+
+  async processCachedData(viewId, config, renderCallback) {
+    const cachedEvents = this.getZapEvents(viewId);
+    const results = await Promise.all([
+      this.getCachedStats(viewId, config.identifier),
+      cachedEvents.length > 0 ? renderCallback(cachedEvents, viewId) : null
+    ]);
+    
+    return {
+      stats: results[0],
+      hasEnoughCachedEvents: cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT
+    };
   }
 }
 
