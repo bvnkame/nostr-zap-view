@@ -36,6 +36,7 @@ export class CacheManager {
       nip05PendingFetches: new BaseCache(),
       zapEvents: new BaseCache(),
       zapLoadStates: new BaseCache(),
+      profileFetching: new BaseCache(), // Add: プロフィール取得中のPromiseを保持
     };
 
     this.viewStats = new Map();
@@ -135,6 +136,37 @@ export class CacheManager {
   setProfile(pubkey, profile) { this.setCache('profile', pubkey, profile); }
   getProfile(pubkey) { return this.getCache('profile', pubkey); }
   hasProfile(pubkey) { return this.caches.profile.has(pubkey); }
+
+  setProfileFetching(pubkey, promise) {
+    this.setCache('profileFetching', pubkey, promise);
+  }
+
+  getProfileFetching(pubkey) {
+    return this.getCache('profileFetching', pubkey);
+  }
+
+  clearProfileFetching(pubkey) {
+    this.deleteCache('profileFetching', pubkey);
+  }
+
+  async getOrFetchProfile(pubkey, fetchFn) {
+    const cached = this.getProfile(pubkey);
+    if (cached) return cached;
+
+    // 既に取得中のPromiseがあればそれを返す
+    const fetching = this.getProfileFetching(pubkey);
+    if (fetching) return fetching;
+
+    // 新しく取得を開始
+    const promise = fetchFn(pubkey).then(profile => {
+      if (profile) this.setProfile(pubkey, profile);
+      this.clearProfileFetching(pubkey);
+      return profile;
+    });
+
+    this.setProfileFetching(pubkey, promise);
+    return promise;
+  }
 
   // NIP-05 cache methods
   setNip05(pubkey, nip05) { this.setCache('nip05', pubkey, nip05); }

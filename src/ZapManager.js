@@ -24,14 +24,23 @@ class ZapSubscriptionManager {
 
   async handleZapEvent(event, viewId) {
     if (cacheManager.addZapEvent(viewId, event)) {
+      // reference取得とプロフィール取得を並行して実行
+      const [referencePromise, profilePromise] = [
+        this.updateEventReference(event, viewId),
+        statsManager.handleZapEvent(event, viewId)
+      ];
+
+      // UIの即時更新（初期表示）
       const events = cacheManager.getZapEvents(viewId);
       await renderZapListFromCache(events, viewId);
 
-      // バックグラウンドでの処理
-      Promise.all([
-        this.updateEventReference(event, viewId),
-        statsManager.handleZapEvent(event, viewId)
-      ]).catch(console.error);
+      // バックグラウンドで両方の処理を完了
+      Promise.all([referencePromise, profilePromise])
+        .then(() => {
+          // 両方の情報が揃った後で再度UIを更新
+          renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+        })
+        .catch(console.error);
     }
   }
 
@@ -101,19 +110,8 @@ class ZapSubscriptionManager {
     return new Promise((resolve) => {
       const events = [];
       let lastEventTime = null;
-      let batchSize = 0;
-      const BATCH_SIZE = 5; // リファレンス取得のバッチサイズ
-
-      const processBatch = async () => {
-        // 現在のバッチのリファレンスを並列で取得
-        const currentBatch = events.slice(events.length - batchSize);
-        await Promise.all(currentBatch.map(event => 
-          this.updateEventReference(event, viewId)
-        ));
-        // バッチ処理後にUIを更新
-        await renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
-        batchSize = 0;
-      };
+      let pendingProfiles = new Set();
+      let pendingReferences = new Set();
 
       poolManager.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
@@ -121,27 +119,33 @@ class ZapSubscriptionManager {
             lastEventTime = event.created_at;
           }
           
+          // reference情報を先に取得
+          await this.updateEventReference(event, viewId);
+          
           if (cacheManager.addZapEvent(viewId, event)) {
             events.push(event);
-            batchSize++;
 
-            // バッチサイズに達したらリファレンスを取得
-            if (batchSize >= BATCH_SIZE) {
-              await processBatch();
+            // プロフィール取得を非同期で開始
+            if (!pendingProfiles.has(event.pubkey)) {
+              pendingProfiles.add(event.pubkey);
+              statsManager.handleZapEvent(event, viewId)
+                .then(() => {
+                  pendingProfiles.delete(event.pubkey);
+                  renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+                })
+                .catch(console.error);
             }
+
+            // reference情報を含めた状態でUIを更新
+            renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
           }
         },
         oneose: async () => {
-          // 残りのバッチを処理
-          if (batchSize > 0) {
-            await processBatch();
-          }
-
           cacheManager.updateLoadState(viewId, { 
             isInitialFetchComplete: true,
             lastEventTime 
           });
-          
+
           const cachedEvents = cacheManager.getZapEvents(viewId);
           if (cachedEvents.length === 0) {
             showNoZapsMessage(viewId);
@@ -149,12 +153,25 @@ class ZapSubscriptionManager {
             this.setupInfiniteScroll(viewId);
           }
 
-          // プロフィール情報のバッチ更新
-          Promise.all(events.map(event => 
-            statsManager.handleZapEvent(event, viewId)
-          )).catch(console.error);
-
+          // 残りのプロフィール取得を待たずに完了
           resolve();
+
+          // バックグラウンドで残りの処理を継続
+          const [referencePromises, profilePromises] = [
+            Promise.all([...pendingReferences].map(eventId => {
+              const event = events.find(e => e.id === eventId);
+              return event ? this.updateEventReference(event, viewId) : Promise.resolve();
+            })),
+            Promise.all([...pendingProfiles].map(pubkey => {
+              const event = events.find(e => e.pubkey === pubkey);
+              return event ? statsManager.handleZapEvent(event, viewId) : Promise.resolve();
+            }))
+          ];
+
+          // 両方の処理完了後に最終更新
+          Promise.all([referencePromises, profilePromises])
+            .then(() => renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId))
+            .catch(console.error);
         }
       });
     });
@@ -274,7 +291,7 @@ class ZapSubscriptionManager {
 
           // デバウンス処理を設定（200ms）
           debounceTimer = setTimeout(async () => {
-            console.log('[ZapManager] スクロールトリガー検知:', {
+            console.log('[ZapManager] スクロールトリガー検出:', {
               intersectionRatio: entry.intersectionRatio
             });
             
