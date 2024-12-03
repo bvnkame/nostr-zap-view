@@ -7,6 +7,7 @@ import styles from "./styles/styles.css";
 import { formatIdentifier, isValidCount } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
 import { subscriptionManager } from "./ZapManager.js"; // 追加: ZapSubscriptionManager をインポート
+import { statsManager } from "./StatsManager.js"; // 追加: statsManager をインポート
 
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
@@ -70,7 +71,7 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // Initialization methods
-  #initializeDialog() {
+  async #initializeDialog() {
     const styleSheet = document.createElement("style");
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
@@ -78,6 +79,14 @@ class NostrZapViewDialog extends HTMLElement {
     const template = document.createElement("template");
     template.innerHTML = DialogComponents.getDialogTemplate();
     this.shadowRoot.appendChild(template.content.cloneNode(true));
+
+    // キャッシュされた統計情報を確認
+    const viewId = this.getAttribute("data-view-id");
+    const identifier = this.getAttribute("data-nzv-id");
+    const cached = await statsManager.handleCachedStats(viewId, identifier);
+    if (cached) {
+      this.statusUI.displayStats(cached);
+    }
 
     this.#setupEventListeners();
   }
@@ -181,6 +190,12 @@ const createDialogAPI = () => {
     if (!getDialog(viewId)) {
       const dialog = document.createElement("nzv-dialog");
       dialog.setAttribute("data-view-id", viewId);
+      // 追加: data-nzv-id属性を設定
+      const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+      const identifier = button?.getAttribute("data-nzv-id");
+      if (identifier) {
+        dialog.setAttribute("data-nzv-id", identifier);
+      }
       document.body.appendChild(dialog);
       return dialog;
     }

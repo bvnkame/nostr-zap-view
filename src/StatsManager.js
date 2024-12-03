@@ -9,16 +9,16 @@ export class StatsManager {
   }
 
   async getZapStats(identifier, viewId) {
-    const cached = cacheManager.getCachedStats(viewId, identifier);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
-      return cached.stats;
+    const cached = await this.handleCachedStats(viewId, identifier);
+    if (cached) {
+      return cached;
     }
 
     const stats = await this.fetchStats(identifier);
     if (stats) {
       cacheManager.updateStatsCache(viewId, identifier, stats);
+      // viewStateも更新
+      cacheManager.updateViewState(viewId, { currentStats: stats });
     }
     return stats;
   }
@@ -28,6 +28,7 @@ export class StatsManager {
   async fetchStats(identifier) {
     try {
       const response = await this._fetchFromApi(identifier);
+      console.log("Fetched Zap stats:", response);
       const stats = this._formatStats(response);
       return stats || this.createTimeoutError();
     } catch (error) {
@@ -119,9 +120,10 @@ export class StatsManager {
     const now = Date.now();
 
     if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
+      // viewStateを更新
       const viewState = cacheManager.getOrCreateViewState(viewId);
       viewState.currentStats = cached.stats;
-      displayZapStats(cached.stats, viewId);
+      cacheManager.updateViewState(viewId, { currentStats: cached.stats });
       return cached.stats;
     }
 
@@ -130,24 +132,28 @@ export class StatsManager {
 
   async initializeStats(identifier, viewId) {
     try {
-      // 既存のキャッシュをチェック
+      // キャッシュをチェック
       const cached = await this.handleCachedStats(viewId, identifier);
-      if (cached) return cached;
+      if (cached) {
+        displayZapStats(cached, viewId);
+        return cached;
+      }
 
       // キャッシュがない場合は新規取得
       const stats = await this.getZapStats(identifier, viewId);
-      const initialStats = stats?.error ? { timeout: true } : stats;
+      const initialStats = stats?.error ? { timeout: stats.timeout } : stats;
       
-      // updateCacheの呼び出しを変更
       if (!stats?.error) {
+        const viewState = cacheManager.getOrCreateViewState(viewId);
+        viewState.currentStats = initialStats;
         cacheManager.updateStatsCache(viewId, identifier, initialStats);
       }
-      this.displayStats(initialStats, viewId);
+      displayZapStats(initialStats, viewId);
       
       return initialStats;
     } catch (error) {
       console.error("Failed to fetch initial stats:", error);
-      this.displayStats({ timeout: true }, viewId);
+      displayZapStats({ timeout: true }, viewId);
       return { error: true, timeout: true };
     }
   }

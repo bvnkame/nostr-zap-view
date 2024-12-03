@@ -10,16 +10,19 @@ export class StatusUI {
     const statsDiv = this.root.querySelector(".zap-stats");
     if (!statsDiv) return;
 
-    // デフォルトのスケルトン表示を行う
-    this.showSkeletonStats(statsDiv);
+    // キャッシュが存在しない場合のみスケルトン表示を行う
+    const currentStats = statsDiv.innerHTML.trim();
+    if (!currentStats || currentStats === "") {
+      this.showSkeletonStats(statsDiv);
 
-    // タイムアウト用のタイマーを設定
-    setTimeout(() => {
-      // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
-      if (statsDiv.querySelector(".stats-skeleton")) {
-        statsDiv.innerHTML = this.createTimeoutStats();
-      }
-    }, API_CONFIG.REQUEST_TIMEOUT);
+      // タイムアウト用のタイマーを設定
+      setTimeout(() => {
+        // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
+        if (statsDiv.querySelector(".stats-skeleton")) {
+          statsDiv.innerHTML = this.createTimeoutStats();
+        }
+      }, API_CONFIG.REQUEST_TIMEOUT);
+    }
   }
 
   displayStats(stats) {
