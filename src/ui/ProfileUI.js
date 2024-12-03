@@ -6,6 +6,7 @@ import {
   sanitizeImageUrl,
   encodeNprofile, // Add import
 } from "../utils.js";
+import { cacheManager } from "../CacheManager.js";  // 追加
 
 export class ProfileUI {
   async loadAndUpdate(pubkey, element) {
@@ -50,6 +51,7 @@ export class ProfileUI {
   }
 
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
+    console.log("アイコン画像を更新します。");
     if (skeleton && iconContainer) {
       const updateIcon = (src) => {
         skeleton.remove();
@@ -77,8 +79,21 @@ export class ProfileUI {
       };
 
       if (senderIcon) {
+        // キャッシュをチェック
+        const cachedImage = cacheManager.getImageCache(senderIcon);
+        if (cachedImage) {
+          console.log("アイコン画像はキャッシュから読みだされました。");
+          updateIcon(senderIcon);
+          return;
+        } else {
+          console.log("アイコン画像はキャッシュに存在しません。");
+        }
+
         const img = new Image();
-        img.onload = () => updateIcon(senderIcon);
+        img.onload = () => {
+          cacheManager.setImageCache(senderIcon, img);
+          updateIcon(senderIcon);
+        };
         img.onerror = () => updateIcon(defaultIcon);
         img.src = senderIcon;
       } else {

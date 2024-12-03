@@ -37,6 +37,7 @@ export class CacheManager {
       zapEvents: new BaseCache(),
       zapLoadStates: new BaseCache(),
       profileFetching: new BaseCache(), // Add: プロフィール取得中のPromiseを保持
+      imageCache: new BaseCache(), // 画像キャッシュを追加
     };
 
     this.viewStats = new Map();
@@ -257,6 +258,19 @@ export class CacheManager {
       stats: results[0],
       hasEnoughCachedEvents: cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT
     };
+  }
+
+  // 画像キャッシュ用メソッドを追加
+  setImageCache(url, img) {
+    this.setCache('imageCache', url, img);
+  }
+
+  getImageCache(url) {
+    return this.getCache('imageCache', url);
+  }
+
+  hasImageCache(url) {
+    return this.caches.imageCache.has(url);
   }
 }
 
