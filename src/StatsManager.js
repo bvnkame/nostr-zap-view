@@ -1,32 +1,15 @@
 import { API_CONFIG } from "./AppSettings.js";
 import { displayZapStats } from "./UIManager.js";
-import { safeNip19Decode } from "./utils.js"; // Add import
+import { safeNip19Decode } from "./utils.js";
+import { cacheManager } from "./CacheManager.js"; // Add import
 
 export class StatsManager {
   constructor() {
-    this.viewStatsCache = new Map();
-    this.viewStates = new Map();
-  }
-
-  getOrCreateViewCache(viewId) {
-    if (!this.viewStatsCache.has(viewId)) {
-      this.viewStatsCache.set(viewId, new Map());
-    }
-    return this.viewStatsCache.get(viewId);
-  }
-
-  getOrCreateViewState(viewId) {
-    if (!this.viewStates.has(viewId)) {
-      this.viewStates.set(viewId, {
-        currentStats: null
-      });
-    }
-    return this.viewStates.get(viewId);
+    // キャッシュ関連のプロパティを削除
   }
 
   async getZapStats(identifier, viewId) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    const cached = viewCache.get(identifier);
+    const cached = cacheManager.getCachedStats(viewId, identifier);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
@@ -35,18 +18,12 @@ export class StatsManager {
 
     const stats = await this.fetchStats(identifier);
     if (stats) {
-      this.updateCache(viewId, identifier, stats);
+      cacheManager.updateStatsCache(viewId, identifier, stats);
     }
     return stats;
   }
 
-  updateCache(viewId, identifier, stats) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    viewCache.set(identifier, {
-      stats,
-      timestamp: Date.now(),
-    });
-  }
+  // updateCacheメソッドを削除（代わりにcacheManager.updateStatsCacheを使用）
 
   async fetchStats(identifier) {
     try {
@@ -138,13 +115,11 @@ export class StatsManager {
   }
 
   async handleCachedStats(viewId, identifier) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    const cached = viewCache.get(identifier);
+    const cached = cacheManager.getCachedStats(viewId, identifier);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
-      // キャッシュが有効な場合、状態を更新してUIに反映
-      const viewState = this.getOrCreateViewState(viewId);
+      const viewState = cacheManager.getOrCreateViewState(viewId);
       viewState.currentStats = cached.stats;
       displayZapStats(cached.stats, viewId);
       return cached.stats;
@@ -163,9 +138,9 @@ export class StatsManager {
       const stats = await this.getZapStats(identifier, viewId);
       const initialStats = stats?.error ? { timeout: true } : stats;
       
-      // キャッシュとUIを更新
+      // updateCacheの呼び出しを変更
       if (!stats?.error) {
-        this.updateCache(viewId, identifier, initialStats);
+        cacheManager.updateStatsCache(viewId, identifier, initialStats);
       }
       this.displayStats(initialStats, viewId);
       
@@ -188,7 +163,7 @@ export class StatsManager {
     if (event.isRealTimeEvent) {
       // 統計情報が未初期化の場合は初期化
       if (!state.currentStats || state.currentStats.error) {
-        state.currentStats = await this.getZapStats(this.getViewIdentifier(viewId), viewId) || {
+        state.currentStats = await this.getZapStats(cacheManager.getViewIdentifier(viewId), viewId) || {
           count: 0,
           msats: 0,
           maxMsats: 0
@@ -203,7 +178,7 @@ export class StatsManager {
       };
 
       // キャッシュとUIを更新
-      this.updateCache(viewId, this.getViewIdentifier(viewId), state.currentStats);
+      cacheManager.updateStatsCache(viewId, cacheManager.getViewIdentifier(viewId), state.currentStats);
       this.displayStats(state.currentStats, viewId);
     }
 
@@ -211,18 +186,11 @@ export class StatsManager {
     event.amountMsats = amountMsats;
   }
 
-  // 新しくビューの識別子を取得するメソッドを追加
-  getViewIdentifier(viewId) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    return Array.from(viewCache.keys())[0];
-  }
-
   extractAmountFromBolt11(bolt11) {
     try {
       const decoded = window.decodeBolt11(bolt11);
       return parseInt(
-        decoded.sections.find((section) => section.name === "amount")?.value ??
-          "0",
+        decoded.sections.find((section) => section.name === "amount")?.value ?? "0",
         10
       );
     } catch (error) {

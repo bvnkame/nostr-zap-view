@@ -11,6 +11,8 @@ export class CacheManager {
     this.zapInfoCache = new Map();
     this.uiComponentCache = new Map();
     this.decodedCache = new Map();
+    this.viewStatsCache = new Map();
+    this.viewStates = new Map();
     this.maxSize = CACHE_MAX_SIZE;
     CacheManager.instance = this;
   }
@@ -80,6 +82,41 @@ export class CacheManager {
 
   clearDecoded() {
     this.decodedCache.clear();
+  }
+
+  // View stats cache methods
+  getOrCreateViewCache(viewId) {
+    if (!this.viewStatsCache.has(viewId)) {
+      this.viewStatsCache.set(viewId, new Map());
+    }
+    return this.viewStatsCache.get(viewId);
+  }
+
+  getOrCreateViewState(viewId) {
+    if (!this.viewStates.has(viewId)) {
+      this.viewStates.set(viewId, {
+        currentStats: null
+      });
+    }
+    return this.viewStates.get(viewId);
+  }
+
+  getCachedStats(viewId, identifier) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    return viewCache.get(identifier);
+  }
+
+  updateStatsCache(viewId, identifier, stats) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    viewCache.set(identifier, {
+      stats,
+      timestamp: Date.now(),
+    });
+  }
+
+  getViewIdentifier(viewId) {
+    const viewCache = this.getOrCreateViewCache(viewId);
+    return Array.from(viewCache.keys())[0];
   }
 }
 
