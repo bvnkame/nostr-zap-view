@@ -42,8 +42,12 @@ export class DialogComponents {
     if (!reference) return "";
 
     try {
+      console.log("Reference object:", reference); // Add this line
       const url = DialogComponents.getReferenceUrl(reference);
       const content = DialogComponents.getReferenceContent(reference);
+
+      console.log("Reference URL:", url);
+      console.log("Reference content:", content);
 
       return DialogComponents.createReferenceHTML(url, content);
     } catch (error) {
@@ -67,6 +71,7 @@ export class DialogComponents {
 
   static getReferenceContent(reference) {
     const kindContentMap = {
+      1: () => reference.content, // kind 1 の場合、contentをそのまま使用
       30023: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
       30030: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
       30009: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
@@ -75,10 +80,15 @@ export class DialogComponents {
       31990: () => reference.tags.find((t) => t[0] === "alt")?.[1] || reference.content,
     };
 
+    console.log("Reference kind:", reference.kind);
+    console.log("Reference content map function:", kindContentMap[reference.kind]);
+
     return kindContentMap[reference.kind]?.() || reference.content;
   }
 
   static createReferenceHTML(url, content) {
+    console.log("Creating reference HTML with URL:", url);
+    console.log("Creating reference HTML with content:", content);
     return `
       <div class="zap-reference">
         <div class="reference-icon">

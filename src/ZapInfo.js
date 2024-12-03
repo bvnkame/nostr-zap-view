@@ -12,8 +12,9 @@ export class ZapInfo {
       const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
       const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
 
-      // referenceの抽出を単純化
-      const reference = extractReferenceFromTags(this.event);
+      // イベントから直接referenceを取得
+      const reference = this.event.reference || null;
+      console.log("[extractInfo] Reference:", reference);
 
       return {
         satsText,

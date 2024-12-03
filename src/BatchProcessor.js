@@ -11,6 +11,7 @@ export class BatchProcessor {
 
   getOrCreateFetchPromise(key) {
     if (this.pendingFetches.has(key)) {
+      console.log("[BatchProcessor] Returning existing fetch promise for key:", key);
       return this.pendingFetches.get(key);
     }
 
@@ -19,6 +20,7 @@ export class BatchProcessor {
     });
     this.pendingFetches.set(key, promise);
     this.batchQueue.add(key);
+    console.log("[BatchProcessor] Created new fetch promise for key:", key);
     this._scheduleBatchProcess();
     return promise;
   }

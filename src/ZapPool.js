@@ -32,6 +32,8 @@ class ReferenceProcessor extends BatchProcessor {
         return;
       }
 
+      console.log("Sending REQ for references:", items); // Add: コンソールログを追加
+
       let timeoutId;
       let processedEvents = new Set();
 
@@ -173,7 +175,7 @@ class ZapPoolManager {
     if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
       return null;
     }
-
+    console.log("[ZapPool] Fetching reference:", { eventId, relayUrls });
     try {
       this.referenceProcessor.setRelayUrls(relayUrls);
       const reference = await this.referenceProcessor.getOrCreateFetchPromise(
@@ -182,6 +184,7 @@ class ZapPoolManager {
       // キャッシュのために参照を保持
       if (reference) {
         this.referenceCache.set(eventId, reference);
+        console.log("[ZapPool] Fetched reference:", { eventId, reference });
       }
       return reference || this.referenceCache.get(eventId);
     } catch (error) {

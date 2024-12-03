@@ -62,12 +62,15 @@ class ZapSubscriptionManager {
 
       // UIの更新
       await renderZapListFromCache(state.zapEventsCache, viewId);
+      console.log('[ZapManager] UI更新後のイベント:', event);
 
       // バックグラウンドでの処理
       Promise.all([
         this.updateEventReference(event, viewId),
         statsManager.handleZapEvent(event, state, viewId)
-      ]).catch(console.error);
+      ]).then(() => {
+        console.log('[ZapManager] reference更新後のイベント:', event);
+      }).catch(console.error);
 
       console.log('[ZapManager] キャッシュ更新後の状態:', {
         totalEvents: state.zapEventsCache.length,
@@ -89,9 +92,11 @@ class ZapSubscriptionManager {
 
     if (eTag && config?.relayUrls) {
       try {
+        console.log("Fetching reference for event:", eTag[1]); // Add: コンソールログを追加
         const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
         if (reference) {
           event.reference = reference;
+          console.log("Reference fetched:", reference); // Add: コンソールログを追加
           return true;
         }
       } catch (error) {
@@ -275,7 +280,7 @@ class ZapSubscriptionManager {
 
     console.log('[ZapManager] 無限スクロール設定:', { viewId });
 
-    // デバウンス用のタイマーID��保持
+    // デバウンス用のタイマーIDを保持
     let debounceTimer = null;
     // ロード中フラグ
     let isLoading = false;
