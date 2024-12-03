@@ -1,4 +1,9 @@
-import { escapeHTML, isEventIdentifier, encodeNevent } from "./utils.js";
+import { 
+  escapeHTML, 
+  isEventIdentifier, 
+  encodeNevent,
+  isWithin24Hours  // 追加
+} from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 import { cacheManager } from "./CacheManager.js";
@@ -6,18 +11,18 @@ import { cacheManager } from "./CacheManager.js";
 export class DialogComponents {
   static createUIComponents(zapInfo, viewId) {
     return {
-      iconComponent: this.createIconComponent(),
-      nameComponent: this.createNameComponent(zapInfo),
+      iconComponent: this.#createIconComponent(),
+      nameComponent: this.#createNameComponent(zapInfo),
       pubkeyComponent: this.createPubkeyComponent(zapInfo, viewId),
       referenceComponent: this.createReferenceComponent(zapInfo),
     };
   }
 
-  static createIconComponent() {
+  static #createIconComponent() {
     return '<div class="zap-placeholder-icon skeleton"></div>';
   }
 
-  static createNameComponent({ senderName }) {
+  static #createNameComponent({ senderName }) {
     return senderName
       ? `<span class="sender-name">${escapeHTML(senderName)}</span>`
       : '<div class="zap-placeholder-name skeleton"></div>';
@@ -118,6 +123,27 @@ export class DialogComponents {
         <div class="zap-stats"></div>
         <ul class="dialog-zap-list"></ul>
       </dialog>
+    `;
+  }
+
+  static createZapItemHTML(zapInfo, colorClass, viewId) {
+    const components = this.createUIComponents(zapInfo, viewId);
+    const [amount, unit] = zapInfo.satsText.split(" ");
+    const isNew = isWithin24Hours(zapInfo.created_at);
+
+    return `
+      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
+        <div class="sender-icon${isNew ? " is-new" : ""}">
+          ${components.iconComponent}
+        </div>
+        <div class="sender-info">
+          ${components.nameComponent}
+          ${components.pubkeyComponent}
+        </div>
+        <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
+      </div>
+      ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
+      ${components.referenceComponent}
     `;
   }
 }

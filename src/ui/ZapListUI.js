@@ -2,9 +2,7 @@ import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
 import { ProfileUI } from "./ProfileUI.js";
 import { 
-  isWithin24Hours, 
   getAmountColorClass, 
-  escapeHTML, 
   createNoZapsMessage,
   isColorModeEnabled  // 追加
 } from "../utils.js";
@@ -116,7 +114,7 @@ export class ZapListUI {
     li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     li.setAttribute("data-pubkey", zapInfo.pubkey);
     if (event?.id) li.setAttribute("data-event-id", event.id);
-    li.innerHTML = this.#createZapHTML(zapInfo);
+    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
 
     return li;
   }
@@ -141,31 +139,6 @@ export class ZapListUI {
     return isColorModeEnabled(button, APP_CONFIG.DEFAULT_OPTIONS.colorMode);
   }
 
-  #createZapHTML(zapInfo) {
-    const components = DialogComponents.createUIComponents(
-      zapInfo,
-      this.viewId  // this.getAttributeの代わりにthis.viewIdを使用
-    );
-    
-    const [amount, unit] = zapInfo.satsText.split(" ");
-    const isNew = isWithin24Hours(zapInfo.created_at);
-
-    return `
-      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
-        <div class="sender-icon${isNew ? " is-new" : ""}">
-          ${components.iconComponent}
-        </div>
-        <div class="sender-info">
-          ${components.nameComponent}
-          ${components.pubkeyComponent}
-        </div>
-        <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
-      </div>
-      ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
-      ${components.referenceComponent}
-    `;
-  }
-
   #isValidPlaceholder(element) {
     return element && element.classList.contains('placeholder');
   }
@@ -176,7 +149,7 @@ export class ZapListUI {
     placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
     placeholder.setAttribute("data-event-id", eventId);
-    placeholder.innerHTML = this.#createZapHTML(zapInfo);
+    placeholder.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
     placeholder.removeAttribute('data-index');
   }
 
