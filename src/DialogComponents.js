@@ -3,6 +3,9 @@ import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 
 export class DialogComponents {
+  // 静的キャッシュの追加
+  static referenceCache = new Map();
+
   static createUIComponents(zapInfo, viewId) {
     return {
       iconComponent: this.createIconComponent(),
@@ -41,6 +44,14 @@ export class DialogComponents {
   static createReferenceComponent({ reference }) {
     if (!reference) return "";
 
+    // キャッシュキーの生成（referenceのIDを使用）
+    const cacheKey = reference.id;
+
+    // キャッシュにある場合はそれを返す
+    if (this.referenceCache.has(cacheKey)) {
+      return this.referenceCache.get(cacheKey);
+    }
+
     try {
       console.log("Reference object:", reference); // Add this line
       const url = DialogComponents.getReferenceUrl(reference);
@@ -49,11 +60,24 @@ export class DialogComponents {
       console.log("Reference URL:", url);
       console.log("Reference content:", content);
 
-      return DialogComponents.createReferenceHTML(url, content);
+      const html = DialogComponents.createReferenceHTML(url, content);
+
+      // 生成したHTMLをキャッシュに保存
+      this.referenceCache.set(cacheKey, html);
+      return html;
     } catch (error) {
       console.error("Failed to create reference component:", error);
       return "";
     }
+  }
+
+  // キャッシュ制御メソッドの追加
+  static clearReferenceCache() {
+    this.referenceCache.clear();
+  }
+
+  static clearSingleReferenceCache(referenceId) {
+    this.referenceCache.delete(referenceId);
   }
 
   static getReferenceUrl(reference) {
