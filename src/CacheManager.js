@@ -13,6 +13,9 @@ export class CacheManager {
     this.decodedCache = new Map();
     this.viewStatsCache = new Map();
     this.viewStates = new Map();
+    this.profileCache = new Map();
+    this.nip05Cache = new Map();
+    this.nip05PendingFetches = new Map();
     this.maxSize = CACHE_MAX_SIZE;
     CacheManager.instance = this;
   }
@@ -49,6 +52,9 @@ export class CacheManager {
     this.referenceCache.clear();
     this.zapInfoCache.clear();
     this.uiComponentCache.clear();
+    this.profileCache.clear();
+    this.nip05Cache.clear();
+    this.nip05PendingFetches.clear();
   }
 
   clearReference(eventId) {
@@ -117,6 +123,40 @@ export class CacheManager {
   getViewIdentifier(viewId) {
     const viewCache = this.getOrCreateViewCache(viewId);
     return Array.from(viewCache.keys())[0];
+  }
+
+  // Profile cache methods
+  setProfile(pubkey, profile) {
+    this.profileCache.set(pubkey, profile);
+  }
+
+  getProfile(pubkey) {
+    return this.profileCache.get(pubkey);
+  }
+
+  hasProfile(pubkey) {
+    return this.profileCache.has(pubkey);
+  }
+
+  // NIP-05 cache methods
+  setNip05(pubkey, nip05) {
+    this.nip05Cache.set(pubkey, nip05);
+  }
+
+  getNip05(pubkey) {
+    return this.nip05Cache.get(pubkey);
+  }
+
+  setNip05PendingFetch(pubkey, promise) {
+    this.nip05PendingFetches.set(pubkey, promise);
+  }
+
+  getNip05PendingFetch(pubkey) {
+    return this.nip05PendingFetches.get(pubkey);
+  }
+
+  deleteNip05PendingFetch(pubkey) {
+    this.nip05PendingFetches.delete(pubkey);
   }
 }
 

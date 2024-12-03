@@ -2,6 +2,7 @@ import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./AppSettings.js";
 import { BatchProcessor } from "./BatchProcessor.js";
+import { cacheManager } from "./CacheManager.js";
 
 /**
  * @typedef {Object} ProfileResult
@@ -51,11 +52,11 @@ class ProfileBatchProcessor extends BatchProcessor {
             name: getProfileDisplayName(content) || "nameless",
             _lastUpdated: Date.now()
           };
-          this.profileManager.profileCache.set(profile.pubkey, processedProfile);
+          cacheManager.setProfile(profile.pubkey, processedProfile);
           this.resolveItem(profile.pubkey, processedProfile);
         } catch (error) {
           const defaultProfile = this.profileManager._createDefaultProfile();
-          this.profileManager.profileCache.set(pubkey, defaultProfile);
+          cacheManager.setProfile(pubkey, defaultProfile);
           this.resolveItem(pubkey, defaultProfile);
         }
       })
@@ -63,9 +64,9 @@ class ProfileBatchProcessor extends BatchProcessor {
 
     // 未取得のプロフィールにデフォルト値を設定
     pubkeys.forEach(pubkey => {
-      if (!this.profileManager.profileCache.has(pubkey)) {
+      if (!cacheManager.hasProfile(pubkey)) {
         const defaultProfile = this.profileManager._createDefaultProfile();
-        this.profileManager.profileCache.set(pubkey, defaultProfile);
+        cacheManager.setProfile(pubkey, defaultProfile);
         this.resolveItem(pubkey, defaultProfile);
       }
     });
@@ -74,7 +75,7 @@ class ProfileBatchProcessor extends BatchProcessor {
   onBatchError(pubkeys, error) {
     pubkeys.forEach(pubkey => {
       const defaultProfile = this.profileManager._createDefaultProfile();
-      this.profileManager.profileCache.set(pubkey, defaultProfile);
+      cacheManager.setProfile(pubkey, defaultProfile);
       this.resolveItem(pubkey, defaultProfile);
     });
   }
@@ -93,41 +94,36 @@ export class ProfileManager {
   }
 
   _initialize() {
-    // Initialize cache and queue
-    this.profileCache = new Map();
-    this.nip05Cache = new Map();
-    this.nip05PendingFetches = new Map();
     this.batchProcessor = new ProfileBatchProcessor(this, this._config);
   }
 
   async fetchProfiles(pubkeys) {
-    // Filter uncached public keys
-    const uncachedPubkeys = pubkeys.filter(pubkey => !this.profileCache.has(pubkey));
+    const uncachedPubkeys = pubkeys.filter(pubkey => !cacheManager.hasProfile(pubkey));
 
     if (uncachedPubkeys.length === 0) {
-      return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+      return pubkeys.map(pubkey => cacheManager.getProfile(pubkey) || this._createDefaultProfile());
     }
 
-    // Schedule fetch for uncached public keys
-    const fetchPromises = uncachedPubkeys.map(pubkey => this.batchProcessor.getOrCreateFetchPromise(pubkey));
+    const fetchPromises = uncachedPubkeys.map(pubkey => 
+      this.batchProcessor.getOrCreateFetchPromise(pubkey)
+    );
 
-    // Wait for fetch to complete
     await Promise.all(fetchPromises);
 
-    // Return results
-    return pubkeys.map(pubkey => this.profileCache.get(pubkey) || this._createDefaultProfile());
+    return pubkeys.map(pubkey => 
+      cacheManager.getProfile(pubkey) || this._createDefaultProfile()
+    );
   }
 
   async verifyNip05Async(pubkey) {
-    // キャッシュチェックを最適化
-    const cachedNip05 = this.nip05Cache.get(pubkey);
+    const cachedNip05 = cacheManager.getNip05(pubkey);
     if (cachedNip05 !== undefined) return cachedNip05;
 
-    const pendingFetch = this.nip05PendingFetches.get(pubkey);
+    const pendingFetch = cacheManager.getNip05PendingFetch(pubkey);
     if (pendingFetch) return pendingFetch;
 
     const fetchPromise = this.#processNip05Verification(pubkey);
-    this.nip05PendingFetches.set(pubkey, fetchPromise);
+    cacheManager.setNip05PendingFetch(pubkey, fetchPromise);
     return fetchPromise;
   }
 
@@ -135,7 +131,7 @@ export class ProfileManager {
     try {
       const [profile] = await this.fetchProfiles([pubkey]);
       if (!profile?.nip05) {
-        this.nip05Cache.set(pubkey, null);
+        cacheManager.setNip05(pubkey, null);
         return null;
       }
 
@@ -147,22 +143,22 @@ export class ProfileManager {
       ]);
 
       if (!nip05Result) {
-        this.nip05Cache.set(pubkey, null);
+        cacheManager.setNip05(pubkey, null);
         return null;
       }
 
       const formattedNip05 = nip05Result.startsWith("_@") ? 
         nip05Result.slice(1) : nip05Result;
       const escapedNip05 = escapeHTML(formattedNip05);
-      this.nip05Cache.set(pubkey, escapedNip05);
+      cacheManager.setNip05(pubkey, escapedNip05);
       return escapedNip05;
 
     } catch (error) {
       console.debug('NIP-05 verification failed:', error);
-      this.nip05Cache.set(pubkey, null);
+      cacheManager.setNip05(pubkey, null);
       return null;
     } finally {
-      this.nip05PendingFetches.delete(pubkey);
+      cacheManager.deleteNip05PendingFetch(pubkey);
     }
   }
 
@@ -177,7 +173,7 @@ export class ProfileManager {
   _handleFetchError(pubkeys) {
     pubkeys.forEach(pubkey => {
       const defaultProfile = this._createDefaultProfile();
-      this.profileCache.set(pubkey, defaultProfile);
+      cacheManager.setProfile(pubkey, defaultProfile);
       this._resolvePromise(pubkey, defaultProfile);
     });
   }
@@ -190,12 +186,7 @@ export class ProfileManager {
   }
 
   clearCache() {
-    // Clear cache
-    this.profileCache.clear();
-    this.nip05Cache.clear();
-    this.pendingFetches.clear();
-    this.nip05PendingFetches.clear();
-    this.resolvers.clear();
+    cacheManager.clearAll();
   }
 
   /**
@@ -205,11 +196,7 @@ export class ProfileManager {
    * @returns {string|null} Verified and escaped NIP-05 address
    */
   getNip05(pubkey) {
-    const nip05 = this.nip05Cache.get(pubkey);
-    if (!nip05) return null;
-
-    // キャッシュに保存時点でエスケープ済みなので、そのまま返す
-    return nip05;
+    return cacheManager.getNip05(pubkey);
   }
 }
 
