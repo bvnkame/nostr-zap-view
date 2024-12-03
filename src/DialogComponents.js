@@ -2,13 +2,25 @@ import {
   escapeHTML, 
   isEventIdentifier, 
   encodeNevent,
-  isWithin24Hours  // 追加
+  isWithin24Hours 
 } from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 import { cacheManager } from "./CacheManager.js";
 
+// 定数定義
+const REFERENCE_KIND_MAPPING = {
+  1: 'content',
+  30023: 'title',
+  30030: 'title',
+  30009: 'name',
+  40: 'name',
+  41: 'name',
+  31990: 'alt'
+};
+
 export class DialogComponents {
+  // UI Components
   static createUIComponents(zapInfo, viewId) {
     return {
       iconComponent: this.#createIconComponent(),
@@ -44,35 +56,41 @@ export class DialogComponents {
       ?.getAttribute("data-nzv-id") || "";
   }
 
+  // Reference Handling
   static createReferenceComponent({ reference }) {
     if (!reference) return "";
-
+    
     const cacheKey = reference.id;
     const cachedComponent = cacheManager.getReferenceComponent(cacheKey);
-    if (cachedComponent) {
-      return cachedComponent;
-    }
+    if (cachedComponent) return cachedComponent;
 
     try {
-      console.log("Reference object:", reference);
-      const url = DialogComponents.getReferenceUrl(reference);
-      const content = DialogComponents.getReferenceContent(reference);
+      const url = this.#getReferenceUrl(reference);
+      const content = this.#getReferenceContent(reference);
+      const html = this.#buildReferenceHTML(url, content);
       
-      const html = DialogComponents.createReferenceHTML(url, content);
       cacheManager.setReferenceComponent(cacheKey, html);
       return html;
     } catch (error) {
-      console.error("Failed to create reference component:", error);
+      console.error("Reference component creation failed:", error);
       return "";
     }
   }
 
-  static getReferenceUrl(reference) {
+  static #getReferenceUrl(reference) {
     if (reference.kind === 31990) {
-      const rTags = reference.tags.filter((t) => t[0] === "r");
-      const nonSourceTag = rTags.find((t) => !t.includes("source")) || rTags[0];
-      return nonSourceTag?.[1];
+      return this.#extractRTagUrl(reference) || '';
     }
+    return this.#createNeventUrl(reference);
+  }
+
+  static #extractRTagUrl(reference) {
+    const rTags = reference.tags.filter(t => t[0] === "r");
+    const nonSourceTag = rTags.find(t => !t.includes("source")) || rTags[0];
+    return nonSourceTag?.[1];
+  }
+
+  static #createNeventUrl(reference) {
     return `https://njump.me/${encodeNevent(
       reference.id,
       reference.kind,
@@ -80,26 +98,15 @@ export class DialogComponents {
     )}`;
   }
 
-  static getReferenceContent(reference) {
-    const kindContentMap = {
-      1: () => reference.content, // kind 1 の場合、contentをそのまま使用
-      30023: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30030: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30009: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      40: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      41: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      31990: () => reference.tags.find((t) => t[0] === "alt")?.[1] || reference.content,
-    };
+  static #getReferenceContent(reference) {
+    const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
+    if (!tagKey) return reference.content;
 
-    console.log("Reference kind:", reference.kind);
-    console.log("Reference content map function:", kindContentMap[reference.kind]);
-
-    return kindContentMap[reference.kind]?.() || reference.content;
+    if (tagKey === 'content') return reference.content;
+    return reference.tags.find(t => t[0] === tagKey)?.[1] || reference.content;
   }
 
-  static createReferenceHTML(url, content) {
-    console.log("Creating reference HTML with URL:", url);
-    console.log("Creating reference HTML with content:", content);
+  static #buildReferenceHTML(url, content) {
     return `
       <div class="zap-reference">
         <div class="reference-icon">
