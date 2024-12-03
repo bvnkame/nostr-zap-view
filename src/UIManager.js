@@ -5,6 +5,7 @@ import { DialogComponents } from "./DialogComponents.js";  // 追加
 import { APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
 import { formatIdentifier } from "./utils.js";
+import { cacheManager } from "./CacheManager.js";
 
 class NostrZapViewDialog extends HTMLElement {
   static get observedAttributes() {
@@ -22,11 +23,9 @@ class NostrZapViewDialog extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
-    this.zapListUI = new ZapListUI(
-      this.shadowRoot, 
-      this.profileUI,
-      this.getAttribute("data-view-id")  // viewIdを渡す
-    );
+    const viewId = this.getAttribute("data-view-id");
+    this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, viewId);
+    this.viewId = viewId;
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -43,22 +42,21 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   #updateTheme(theme) {
-    this.#state.theme = theme;
-    if (this.#state.isInitialized) {
+    const state = cacheManager.updateThemeState(this.viewId, { theme });
+    if (state.isInitialized) {
       this.#applyTheme();
     }
   }
 
   #updateMaxCount(count) {
     if (TypeChecker.isValidCount(count)) {
-      this.#state.maxCount = count;
+      cacheManager.updateThemeState(this.viewId, { maxCount: count });
     }
   }
 
   #applyTheme() {
-    // Implement the theme application logic here
-    const themeClass =
-      this.#state.theme === "dark" ? "dark-theme" : "light-theme";
+    const state = cacheManager.getThemeState(this.viewId);
+    const themeClass = state.theme === "dark" ? "dark-theme" : "light-theme";
     this.shadowRoot.host.classList.add(themeClass);
   }
 

@@ -233,6 +233,24 @@ export class CacheManager {
     this.viewStatsCache.delete(viewId);
     this.viewStates.delete(viewId);
   }
+
+  // Theme cache methods
+  getThemeState(viewId) {
+    if (!this.viewStates.has(viewId)) {
+      this.viewStates.set(viewId, {
+        theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
+        maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
+        isInitialized: false
+      });
+    }
+    return this.viewStates.get(viewId);
+  }
+
+  updateThemeState(viewId, updates) {
+    const currentState = this.getThemeState(viewId);
+    this.viewStates.set(viewId, { ...currentState, ...updates });
+    return this.viewStates.get(viewId);
+  }
 }
 
 export const cacheManager = new CacheManager();
