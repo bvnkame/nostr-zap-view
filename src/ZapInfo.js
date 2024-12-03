@@ -21,7 +21,6 @@ export class ZapInfo {
       const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
 
       const reference = this.event.reference || null;
-      console.log("[extractInfo] Reference:", reference);
       
       const info = {
         satsText,

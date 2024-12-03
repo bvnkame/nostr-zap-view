@@ -56,11 +56,9 @@ class ZapSubscriptionManager {
 
     if (eTag && config?.relayUrls) {
       try {
-        console.log("Fetching reference for event:", eTag[1]); // Add: コンソールログを追加
         const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
         if (reference) {
           event.reference = reference;
-          console.log("Reference fetched:", reference); // Add: コンソールログを追加
           return true;
         }
       } catch (error) {
@@ -97,7 +95,6 @@ class ZapSubscriptionManager {
   }
 
   async initializeSubscriptions(config, viewId) {
-    console.log('[ZapManager] サブスクリプション初期化開始:', { viewId, config });
 
     const decoded = decodeIdentifier(config.identifier);
     if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);

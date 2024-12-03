@@ -33,8 +33,6 @@ class ReferenceProcessor extends BatchProcessor {
         return;
       }
 
-      console.log("Sending REQ for references:", items); // Add: コンソールログを追加
-
       let timeoutId;
       let processedEvents = new Set();
 
@@ -115,10 +113,7 @@ class ZapPoolManager {
       );
 
       this.isConnected = true;
-      console.log("[ZapPool] Connected to relays");
-    } catch (error) {
-      console.error("[ZapPool] Failed to connect to relays:", error);
-    }
+    } catch (error) {}
   }
 
   closeSubscription(viewId) {
@@ -132,12 +127,6 @@ class ZapPoolManager {
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {
-    console.log("[ZapPool] Zap購読開始:", {
-      viewId,
-      relayUrls: config.relayUrls,
-      filter: decoded.req,
-    });
-
     this.closeSubscription(viewId);
 
     if (!this.subscriptions.has(viewId)) {
@@ -155,10 +144,6 @@ class ZapPoolManager {
       {
         ...handlers,
         onevent: (event) => {
-          console.log("[ZapPool] イベント受信:", {
-            eventId: event.id,
-            relayUrl: event.relay,
-          });
           handlers.onevent(event);
         },
         oneose: () => {
@@ -175,16 +160,16 @@ class ZapPoolManager {
     if (!eventId || !relayUrls || !Array.isArray(relayUrls)) {
       return null;
     }
-    console.log("[ZapPool] Fetching reference:", { eventId, relayUrls });
     try {
       const cachedReference = cacheManager.getReference(eventId);
       if (cachedReference) return cachedReference;
 
       this.referenceProcessor.setRelayUrls(relayUrls);
-      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
+      const reference = await this.referenceProcessor.getOrCreateFetchPromise(
+        eventId
+      );
       if (reference) {
         cacheManager.setReference(eventId, reference);
-        console.log("[ZapPool] Fetched reference:", { eventId, reference });
       }
       return reference;
     } catch (error) {
