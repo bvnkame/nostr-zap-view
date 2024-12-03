@@ -117,30 +117,33 @@ class ZapSubscriptionManager {
           if (!lastEventTime || event.created_at < lastEventTime) {
             lastEventTime = event.created_at;
           }
-          
-          // 1. まずZapイベントをキャッシュに追加し即時表示
-          if (cacheManager.addZapEvent(viewId, event)) {
-            events.push(event);
-            renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
 
-            // 2. reference情報の非同期取得を開始
-            this.updateEventReference(event, viewId)
-              .then(() => {
-                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
-              });
+          try {
+            // 1. まずreferenceを取得
+            await this.updateEventReference(event, viewId);
 
-            // 3. プロフィール情報の非同期取得を開始
-            statsManager.handleZapEvent(event, viewId)
-              .then(() => {
-                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
-                
-                // 4. プロフィールに基づくNIP-05検証を開始
-                return profileManager.verifyNip05Async(event.pubkey);
-              })
-              .then(() => {
-                renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
-              })
-              .catch(console.error);
+            // 2. Zapイベントをキャッシュに追加
+            if (cacheManager.addZapEvent(viewId, event)) {
+              events.push(event);
+
+              // 3. UI更新（reference情報を含む状態で表示）
+              renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+
+              // 4. プロフィール情報の非同期取得
+              statsManager.handleZapEvent(event, viewId)
+                .then(() => {
+                  renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+                  
+                  // 5. プロフィールに基づくNIP-05検証
+                  return profileManager.verifyNip05Async(event.pubkey);
+                })
+                .then(() => {
+                  renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
+                })
+                .catch(console.error);
+            }
+          } catch (error) {
+            console.error("Failed to process event:", error);
           }
         },
         oneose: () => {
