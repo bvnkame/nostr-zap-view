@@ -1,6 +1,7 @@
 import { escapeHTML, isEventIdentifier, encodeNevent } from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
+import { cacheManager } from "./CacheManager.js";
 
 export class DialogComponents {
   // 静的キャッシュの追加
@@ -44,26 +45,19 @@ export class DialogComponents {
   static createReferenceComponent({ reference }) {
     if (!reference) return "";
 
-    // キャッシュキーの生成（referenceのIDを使用）
     const cacheKey = reference.id;
-
-    // キャッシュにある場合はそれを返す
-    if (this.referenceCache.has(cacheKey)) {
-      return this.referenceCache.get(cacheKey);
+    const cachedComponent = cacheManager.getUIComponent(cacheKey);
+    if (cachedComponent) {
+      return cachedComponent;
     }
 
     try {
-      console.log("Reference object:", reference); // Add this line
+      console.log("Reference object:", reference);
       const url = DialogComponents.getReferenceUrl(reference);
       const content = DialogComponents.getReferenceContent(reference);
-
-      console.log("Reference URL:", url);
-      console.log("Reference content:", content);
-
+      
       const html = DialogComponents.createReferenceHTML(url, content);
-
-      // 生成したHTMLをキャッシュに保存
-      this.referenceCache.set(cacheKey, html);
+      cacheManager.setUIComponent(cacheKey, html);
       return html;
     } catch (error) {
       console.error("Failed to create reference component:", error);

@@ -6,6 +6,7 @@ import {
   BATCH_CONFIG, // Add this import
 } from "./AppSettings.js"; // PROFILE_CONFIGを追加
 import { BatchProcessor } from "./BatchProcessor.js";
+import { cacheManager } from "./CacheManager.js";
 
 class ReferenceProcessor extends BatchProcessor {
   constructor(pool, config) {
@@ -95,7 +96,6 @@ class ZapPoolManager {
     this.state = new Map(); // 状態も複数管理
     // referencePoolを削除
     this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
-    this.referenceCache = new Map(); // リファレンスキャッシュを追加
     this.isConnected = false; // Add: リレー接続状態フラグ
   }
 
@@ -177,19 +177,19 @@ class ZapPoolManager {
     }
     console.log("[ZapPool] Fetching reference:", { eventId, relayUrls });
     try {
+      const cachedReference = cacheManager.getReference(eventId);
+      if (cachedReference) return cachedReference;
+
       this.referenceProcessor.setRelayUrls(relayUrls);
-      const reference = await this.referenceProcessor.getOrCreateFetchPromise(
-        eventId
-      );
-      // キャッシュのために参照を保持
+      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
       if (reference) {
-        this.referenceCache.set(eventId, reference);
+        cacheManager.setReference(eventId, reference);
         console.log("[ZapPool] Fetched reference:", { eventId, reference });
       }
-      return reference || this.referenceCache.get(eventId);
+      return reference;
     } catch (error) {
       console.error("Error fetching reference:", error);
-      return this.referenceCache.get(eventId);
+      return cacheManager.getReference(eventId);
     }
   }
 }
