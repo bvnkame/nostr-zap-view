@@ -1,38 +1,11 @@
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";  // APP_CONFIGを追加
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
+import { cacheManager } from "./CacheManager.js";
 
 // Define constants
 const CONSTANTS = {
-  CACHE_MAX_SIZE: 1000,
   DEFAULT_ERROR_MESSAGE: "Processing failed",
   SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent"],
 };
-
-// Cache manager
-class CacheManager {
-  constructor(maxSize = CONSTANTS.CACHE_MAX_SIZE) {
-    this.cache = new Map();
-    this.maxSize = maxSize;
-  }
-
-  get(key) {
-    return this.cache.get(key);
-  }
-
-  set(key, value) {
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-    }
-    this.cache.set(key, value);
-  }
-
-  has(key) {
-    return this.cache.has(key);
-  }
-}
-
-// Shared cache instances
-const decodedCache = new CacheManager();
 
 // Validation utilities
 const Validator = {
@@ -55,8 +28,8 @@ const Validator = {
 export function decodeIdentifier(identifier, since = null) {
   const cacheKey = `${identifier}:${since}`;
 
-  if (decodedCache.has(cacheKey)) {
-    return decodedCache.get(cacheKey);
+  if (cacheManager.hasDecoded(cacheKey)) {
+    return cacheManager.getDecoded(cacheKey);
   }
 
   if (!Validator.isValidIdentifier(identifier)) {
@@ -68,7 +41,7 @@ export function decodeIdentifier(identifier, since = null) {
 
   const result = createReqFromType(decoded.type, decoded.data, since);
   if (result) {
-    decodedCache.set(cacheKey, result);
+    cacheManager.setDecoded(cacheKey, result);
   }
 
   return result;
