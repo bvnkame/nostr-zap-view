@@ -29,25 +29,27 @@ class ZapSubscriptionManager {
   // イベント処理を最適化した新しいメソッド
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
-      // プロフィール取得を最初に開始
+      // リファレンス取得とプロフィール取得を先に開始
+      const referencePromise = this.updateEventReference(event, viewId);
       const profilePromise = profilePool.fetchProfiles([event.pubkey]);
 
-      // まずイベントを表示
+      // UIの更新を並列で実行
       if (shouldUpdateUI && this.zapListUI) {
         await this.zapListUI.appendZap(event);
       }
 
-      // 参���情報とプロフィールは並列で取得
-      Promise.all([
-        this.updateEventReference(event, viewId),
+      // 他の処理を並列実行
+      const [hasReference] = await Promise.all([
+        referencePromise,
         statsManager.handleZapEvent(event, viewId),
         profilePromise,
         profilePool.verifyNip05Async(event.pubkey)
-      ]).then(() => {
-        if (shouldUpdateUI && this.zapListUI && event.reference) {
-          this.zapListUI.updateZapReference(event);
-        }
-      });
+      ]);
+
+      // リファレンス情報が取得できたらUIを更新
+      if (hasReference && shouldUpdateUI && this.zapListUI && event.reference) {
+        this.zapListUI.updateZapReference(event);
+      }
 
       return true;
     } catch (error) {
@@ -225,42 +227,41 @@ class ZapSubscriptionManager {
   // processBatchメソッドを最適化
   async processBatch(events, viewId) {
     try {
-      // プロフィール取得を先に開始
+      // プロフィール取得とリファレンス取得を先に開始
       const pubkeys = [...new Set(events.map(event => event.pubkey))];
       const profilePromise = profilePool.fetchProfiles(pubkeys);
+      const referencePromises = events.map(event => 
+        this.updateEventReference(event, viewId)
+      );
 
-      // イベントを作成時刻でソート
+      // イベントをソートしてキャッシュに追加
       const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
-      
-      // キャッシュに追加（順序を維持）
-      sortedEvents.forEach(event => {
-        cacheManager.addZapEvent(viewId, event);
-      });
+      sortedEvents.forEach(event => cacheManager.addZapEvent(viewId, event));
 
-      // UIを更新（キャッシュから全イベントを取得して表示）
+      // UIを更新
       if (this.zapListUI) {
         const allEvents = cacheManager.getZapEvents(viewId);
         await this.zapListUI.batchUpdate(allEvents);
       }
 
-      // 非同期処理を並列実行
+      // 他の処理を並列実行
       await Promise.all([
-        this.updateEventReferenceBatch(sortedEvents, viewId),
+        Promise.all(referencePromises),
         profilePromise,
-        Promise.all(sortedEvents.map(event => {
-          return Promise.all([
-            statsManager.handleZapEvent(event, viewId),
-            profilePool.verifyNip05Async(event.pubkey)
-          ]);
-        }))
+        ...sortedEvents.flatMap(event => [
+          statsManager.handleZapEvent(event, viewId),
+          profilePool.verifyNip05Async(event.pubkey)
+        ])
       ]);
 
       // リファレンス情報の更新
-      sortedEvents.forEach(event => {
-        if (event.reference && this.zapListUI) {
-          this.zapListUI.updateZapReference(event);
-        }
-      });
+      if (this.zapListUI) {
+        sortedEvents.forEach(event => {
+          if (event.reference) {
+            this.zapListUI.updateZapReference(event);
+          }
+        });
+      }
     } catch (error) {
       console.error("Failed to process batch:", error);
     }
