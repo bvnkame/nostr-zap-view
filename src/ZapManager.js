@@ -4,9 +4,9 @@ import {
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
 import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
-import { poolManager } from "./PoolManager.js";  // パスを更新
+import { eventPool } from "./EventPool.js";  // パスを更新
 import { cacheManager } from "./CacheManager.js";
-import { profileManager } from "./ProfileManager.js"; // 追加: ProfileManagerからprofileManagerをインポート
+import { profilePool } from "./ProfilePool.js"; // 追加: ProfilePoolからprofilePoolをインポート
 
 class ZapSubscriptionManager {
   constructor() {
@@ -46,7 +46,7 @@ class ZapSubscriptionManager {
       Promise.all([referencePromise, profilePromise])
         .then(() => {
           // プロフィールに基づ��NIP-05検証のみ実行
-          profileManager.verifyNip05Async(event.pubkey)
+          profilePool.verifyNip05Async(event.pubkey)
             .then(() => {
               // 新しいイベントのみ再レンダリング
               if (this.zapListUI) {
@@ -81,11 +81,11 @@ class ZapSubscriptionManager {
       let reference = null;
       
       if (aTag) {
-        reference = await poolManager.fetchATagReference(config.relayUrls, aTag[1]);
+        reference = await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
       }
       
       if (!reference && eTag) {
-        reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+        reference = await eventPool.fetchReference(config.relayUrls, eTag[1]);
       }
 
       if (reference) {
@@ -117,7 +117,7 @@ class ZapSubscriptionManager {
     await Promise.all(
       eventIds.map(async (eventId) => {
         try {
-          const reference = await poolManager.fetchReference(config.relayUrls, eventId);
+          const reference = await eventPool.fetchReference(config.relayUrls, eventId);
           const event = events.find(e => {
             const aTag = e.tags.find(t => t[0] === 'a')?.[1] === eventId;
             const eTag = e.tags.find(t => t[0] === 'e')?.[1] === eventId;
@@ -150,7 +150,7 @@ class ZapSubscriptionManager {
       const events = [];
       let lastEventTime = null;
 
-      poolManager.subscribeToZaps(viewId, config, decoded, {
+      eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: async (event) => {
           if (!lastEventTime || event.created_at < lastEventTime) {
             lastEventTime = event.created_at;
@@ -173,7 +173,7 @@ class ZapSubscriptionManager {
                   renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
                   
                   // 5. プロフィールに基づくNIP-05検証
-                  return profileManager.verifyNip05Async(event.pubkey);
+                  return profilePool.verifyNip05Async(event.pubkey);
                 })
                 .then(() => {
                   renderZapListFromCache(cacheManager.getZapEvents(viewId), viewId);
@@ -230,7 +230,7 @@ class ZapSubscriptionManager {
 
       let newEventsCount = 0;
       await new Promise((resolve) => {
-        poolManager.subscribeToZaps(viewId, config, decoded, {
+        eventPool.subscribeToZaps(viewId, config, decoded, {
           onevent: async (event) => {
             if (event.created_at < state.lastEventTime) {
               // リファレンス情報を先に取得してからイベントを処理

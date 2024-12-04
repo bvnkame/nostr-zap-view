@@ -1,4 +1,3 @@
-
 import { SimplePool } from "nostr-tools/pool";
 import { PROFILE_CONFIG, BATCH_CONFIG } from "./AppSettings.js";
 import {
@@ -6,11 +5,14 @@ import {
   ATagReferenceProcessor,
 } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
+import { ProfilePool } from "./ProfilePool.js";
 
-class PoolManager {
+class EventPool {
   constructor() {
     this.zapPool = new SimplePool();
-    this.profilePool = new SimplePool();
+    this.simpleProfilePool = new SimplePool();  // プロフィール取得用のSimplePoolを追加
+    this.profilePool = new ProfilePool();
+    this.profilePool.setEventPool(this); // EventPoolインスタンスを設定
     this.subscriptions = new Map();
     this.state = new Map();
 
@@ -31,16 +33,21 @@ class PoolManager {
     if (this.isConnected) return;
 
     try {
+      console.log("Connecting to profile relays...", PROFILE_CONFIG.RELAYS);
       await Promise.allSettled(
-        PROFILE_CONFIG.RELAYS.map((url) => this.profilePool.ensureRelay(url))
+        PROFILE_CONFIG.RELAYS.map((url) => this.simpleProfilePool.ensureRelay(url))
       );
 
+      console.log("Connecting to zap relays...", zapRelayUrls);
       await Promise.allSettled(
         zapRelayUrls.map((url) => this.zapPool.ensureRelay(url))
       );
 
       this.isConnected = true;
-    } catch (error) {}
+      console.log("All relays connected");
+    } catch (error) {
+      console.error("Relay connection error:", error);
+    }
   }
 
   closeSubscription(viewId) {
@@ -125,5 +132,5 @@ class PoolManager {
   }
 }
 
-export const poolManager = new PoolManager();
-export const { zapPool, profilePool } = poolManager;
+export const eventPool = new EventPool();
+export const { zapPool, profilePool } = eventPool;

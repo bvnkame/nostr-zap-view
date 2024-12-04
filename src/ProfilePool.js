@@ -1,4 +1,3 @@
-import { profilePool } from "./PoolManager.js";  // パスを更新
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./AppSettings.js";
 import { ProfileProcessor } from "./BatchProcessor.js";  // 明示的にProfileProcessorをインポート
@@ -16,21 +15,28 @@ import { cacheManager } from "./CacheManager.js";
  * Class to manage Nostr profile information
  * Singleton pattern is adopted to share one instance throughout the application
  */
-export class ProfileManager {
+export class ProfilePool {
   static instance = null;
 
   constructor() {
-    if (!ProfileManager.instance) {
+    if (!ProfilePool.instance) {
       this._config = PROFILE_CONFIG;
+      this._pool = null; // EventPool参照用
       this._initialize();
-      ProfileManager.instance = this;
+      ProfilePool.instance = this;
     }
-    return ProfileManager.instance;
+    return ProfilePool.instance;
+  }
+
+  setEventPool(pool) {
+    this._pool = pool;
+    // ProfileProcessorを再初期化
+    this._initialize();
   }
 
   _initialize() {
     this.profileProcessor = new ProfileProcessor({ 
-      profilePool,
+      profilePool: this,
       config: this._config 
     });
   }
@@ -157,4 +163,4 @@ export class ProfileManager {
   }
 }
 
-export const profileManager = new ProfileManager();
+export const profilePool = new ProfilePool();

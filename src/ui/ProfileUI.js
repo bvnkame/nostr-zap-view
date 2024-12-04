@@ -1,4 +1,4 @@
-import { profileManager } from "../ProfileManager.js";
+import { profilePool } from "../ProfilePool.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import {
   getProfileDisplayName,
@@ -19,7 +19,7 @@ export class ProfileUI {
       const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
 
-      const [profile] = await profileManager.fetchProfiles([pubkey]);
+      const [profile] = await profilePool.fetchProfiles([pubkey]);
 
       const senderName = profile
         ? getProfileDisplayName(profile) || "nameless"
@@ -93,12 +93,12 @@ export class ProfileUI {
 
   #updateNip05(pubkeyElement, pubkey) {
     if (pubkeyElement && !pubkeyElement.getAttribute("data-nip05-updated")) {
-      const cachedNip05 = profileManager.getNip05(pubkey);
+      const cachedNip05 = profilePool.getNip05(pubkey);
       if (cachedNip05) {
         pubkeyElement.textContent = cachedNip05;
         pubkeyElement.setAttribute("data-nip05-updated", "true");
       } else {
-        profileManager.verifyNip05Async(pubkey).then((nip05) => {
+        profilePool.verifyNip05Async(pubkey).then((nip05) => {
           if (nip05) {
             pubkeyElement.textContent = nip05;
             pubkeyElement.setAttribute("data-nip05-updated", "true");

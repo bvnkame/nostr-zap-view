@@ -263,21 +263,55 @@ export class ProfileProcessor extends BatchProcessor {
   }
 
   _getSubscriptionPool() {
-    return this.profilePool;
+    return this.profilePool?._pool?.simpleProfilePool;
   }
 
   async onBatchProcess(items) {
-    const filter = [{
-      kinds: [0],
-      authors: items
-    }];
+    const pool = this._getSubscriptionPool();
+    if (!pool) {
+      console.error("SimplePool not available");
+      items.forEach(item => this.resolveItem(item, null));
+      return;
+    }
 
-    const eventHandler = (event, processedItems) => {
-      this.resolveItem(event.pubkey, event);
-      processedItems.add(event.pubkey);
-    };
+    try {
+      const filter = [{
+        kinds: [0],
+        authors: items
+      }];
 
-    return this._createSubscriptionPromise(items, this.config.RELAYS, filter, eventHandler);
+      return new Promise((resolve) => {
+        const processedItems = new Set();
+        let timeoutId;
+
+        const sub = pool.subscribeMany(
+          this.config.RELAYS,
+          filter,
+          {
+            onevent: (event) => {
+              try {
+                this.resolveItem(event.pubkey, event);
+                processedItems.add(event.pubkey);
+              } catch (error) {
+                console.error("Profile event processing error:", error);
+              }
+            },
+            oneose: () => {
+              this._cleanup(timeoutId, sub, items, processedItems);
+              resolve();
+            }
+          }
+        );
+
+        timeoutId = setTimeout(() => {
+          this._cleanup(timeoutId, sub, items, processedItems);
+          resolve();
+        }, 5000);
+      });
+    } catch (error) {
+      console.error("Profile batch processing error:", error);
+      items.forEach(item => this.resolveItem(item, null));
+    }
   }
 
   onBatchError(items, error) {

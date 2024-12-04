@@ -9,8 +9,8 @@ import {
 } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
-import { profileManager } from "./ProfileManager.js";
-import { poolManager } from "./PoolManager.js";  // パスを更新
+import { profilePool } from "./ProfilePool.js";
+import { eventPool } from "./EventPool.js";  // パスを更新
 import { cacheManager } from "./CacheManager.js";
 
 /**
@@ -44,7 +44,7 @@ async function handleButtonClick(button, viewId) {
     if (!button.hasAttribute('data-initialized')) {
       const initTasks = [
         // リレー接続
-        poolManager.connectToRelays(config.relayUrls),
+        eventPool.connectToRelays(config.relayUrls),
         // 統計情報の取得
         statsManager.initializeStats(config.identifier, viewId),
         // Zapイベントの購読開始
@@ -83,5 +83,5 @@ function initializeApp() {
 // Run the application
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-// Public API - zapPoolをpoolManagerに変更
-export { ZAP_CONFIG as CONFIG, profileManager, poolManager, APP_CONFIG };
+// Public API - zapPoolをeventPoolに変更
+export { ZAP_CONFIG as CONFIG, profilePool, eventPool, APP_CONFIG };
