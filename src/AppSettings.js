@@ -13,12 +13,12 @@ export const APP_CONFIG = {
     colorMode: true, // Added: Default value for color mode
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 20, // 追加：追加ロード件数
-  LOAD_TIMEOUT: 10000, // 追加ロードのタイムアウト時間（ミリ秒）
+  ADDITIONAL_LOAD_COUNT: 25, // 一度に読み込む件数を減らす
+  LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '400px',
-    THRESHOLD: [0.1],
-    DEBOUNCE_TIME: 300 // デバウンス時間を設定として追加
+    ROOT_MARGIN: '500px', // スクロール検知の余裕を調整
+    THRESHOLD: 0.1,
+    DEBOUNCE_TIME: 500 // デバウンス時間を増やす
   }
 };
 

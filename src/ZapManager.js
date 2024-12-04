@@ -272,10 +272,24 @@ class ZapSubscriptionManager {
 
     const trigger = document.createElement('div');
     trigger.className = 'load-more-trigger';
+    trigger.style.cssText = 'height: 10px; margin-top: 20px;'; // トリガー要素の視認性を改善
     list.appendChild(trigger);
 
     const observer = new IntersectionObserver(
-      this._createIntersectionCallback(viewId),
+      entries => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          // ローディング状態をチェック
+          const state = cacheManager.getLoadState(viewId);
+          if (!state.isLoading) {
+            this.loadMoreZaps(viewId).then(count => {
+              if (count === 0) {
+                this._cleanupInfiniteScroll(viewId);
+              }
+            });
+          }
+        }
+      },
       {
         root: list,
         rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
@@ -388,10 +402,14 @@ class ZapSubscriptionManager {
     if (!decoded) return 0;
 
     const batchEvents = [];
-    const batchSize = APP_CONFIG.BATCH_SIZE || 20;
+    const loadTimeout = setTimeout(() => {
+      if (batchEvents.length === 0) {
+        this._cleanupInfiniteScroll(viewId);
+      }
+    }, APP_CONFIG.LOAD_TIMEOUT);
 
     try {
-      await this._collectEvents(viewId, config, decoded, batchEvents, batchSize, state);
+      await this._collectEvents(viewId, config, decoded, batchEvents, APP_CONFIG.ADDITIONAL_LOAD_COUNT, state);
       if (batchEvents.length > 0) {
         await this._processBatchEvents(batchEvents, viewId);
       }
@@ -399,6 +417,8 @@ class ZapSubscriptionManager {
     } catch (error) {
       console.error('Load more events failed:', error);
       return 0;
+    } finally {
+      clearTimeout(loadTimeout);
     }
   }
 
