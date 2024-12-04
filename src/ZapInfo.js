@@ -1,6 +1,6 @@
 import { formatIdentifier, parseZapEvent, encodeNpub, createDefaultZapInfo } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
-import { APP_CONFIG, ZAP_AMOUNT_CONFIG } from "./AppSettings.js";
+import { ZAP_AMOUNT_CONFIG } from "./AppSettings.js";
 
 export class ZapInfo {
   constructor(event, defaultIcon) {
@@ -20,11 +20,10 @@ export class ZapInfo {
 
   static #calculateAmountColorClass(amount) {
     const thresholds = ZAP_AMOUNT_CONFIG.THRESHOLDS;
-    if (amount >= thresholds.LEGENDARY) return "legendary";
-    if (amount >= thresholds.EPIC) return "epic";
-    if (amount >= thresholds.RARE) return "rare";
-    if (amount >= thresholds.UNCOMMON) return "uncommon";
-    return "common";
+    for (const threshold of thresholds) {
+      if (amount >= threshold.value) return threshold.className;
+    }
+    return "zap-amount-default"; // 既定のクラスを追加
   }
 
   async extractInfo() {

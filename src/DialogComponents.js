@@ -166,7 +166,7 @@ export class DialogComponents {
             ${components.nameComponent}
             ${components.pubkeyComponent}
           </div>
-          <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
+          <div class="zap-amount ${colorClass}"><span class="number">${amount}</span> ${unit}</div>
         </div>
         ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
         ${components.referenceComponent}
