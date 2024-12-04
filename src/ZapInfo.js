@@ -1,5 +1,6 @@
 import { formatIdentifier, parseZapEvent, encodeNpub, createDefaultZapInfo } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
+import { APP_CONFIG, ZAP_AMOUNT_CONFIG } from "./AppSettings.js";
 
 export class ZapInfo {
   constructor(event, defaultIcon) {
@@ -7,13 +8,29 @@ export class ZapInfo {
     this.defaultIcon = defaultIcon;
   }
 
+  static async createFromEvent(event, defaultIcon) {
+    const zapInfo = new ZapInfo(event, defaultIcon);
+    return await zapInfo.extractInfo();
+  }
+
+  static getAmountColorClass(amount, isColorModeEnabled = true) {
+    if (!isColorModeEnabled) return "";
+    return this.#calculateAmountColorClass(amount);
+  }
+
+  static #calculateAmountColorClass(amount) {
+    const thresholds = ZAP_AMOUNT_CONFIG.THRESHOLDS;
+    if (amount >= thresholds.LEGENDARY) return "legendary";
+    if (amount >= thresholds.EPIC) return "epic";
+    if (amount >= thresholds.RARE) return "rare";
+    if (amount >= thresholds.UNCOMMON) return "uncommon";
+    return "common";
+  }
+
   async extractInfo() {
     const eventId = this.event.id;
-    
     const cachedInfo = cacheManager.getZapInfo(eventId);
-    if (cachedInfo) {
-      return cachedInfo;
-    }
+    if (cachedInfo) return cachedInfo;
 
     try {
       const { pubkey, content, satsText } = await parseZapEvent(this.event);
@@ -34,6 +51,7 @@ export class ZapInfo {
         senderName: null,
         senderIcon: null,
         reference,
+        colorClass: ZapInfo.getAmountColorClass(satsAmount)
       };
 
       cacheManager.setZapInfo(eventId, info);
@@ -45,5 +63,17 @@ export class ZapInfo {
       cacheManager.setZapInfo(eventId, defaultInfo);
       return defaultInfo;
     }
+  }
+
+  static async batchExtractInfo(events, defaultIcon) {
+    const results = new Map();
+    await Promise.all(
+      events.map(async event => {
+        const zapInfo = new ZapInfo(event, defaultIcon);
+        const info = await zapInfo.extractInfo();
+        results.set(event.id, info);
+      })
+    );
+    return results;
   }
 }

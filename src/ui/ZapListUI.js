@@ -17,23 +17,17 @@ class ZapItemBuilder {
     this.isColorModeEnabled = isColorModeEnabled;
   }
 
-  createListItem(zapInfo, event) {
+  async createListItem(event) {
+    const zapInfo = await ZapInfo.createFromEvent(event, defaultIcon);
     const li = document.createElement("li");
-    const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
     
-    li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    li.className = `zap-list-item ${zapInfo.colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     li.setAttribute("data-pubkey", zapInfo.pubkey);
     if (event?.id) li.setAttribute("data-event-id", event.id);
 
-    // Zapアイテムの内容を作成
-    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, zapInfo.colorClass, this.viewId);
 
-    return li;
-  }
-
-  #getAmountColorClass(amount) {
-    if (!this.isColorModeEnabled) return "";
-    return getAmountColorClass(amount, ZAP_AMOUNT_CONFIG.THRESHOLDS);
+    return { li, zapInfo };
   }
 }
 
@@ -85,8 +79,7 @@ export class ZapListUI {
       const profileUpdates = [];
 
       for (const event of uniqueEvents) {
-        const zapInfo = await this.#handleZapInfo(event);
-        const li = this.itemBuilder.createListItem(zapInfo, event);
+        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
         
         // キャッシュされたreferenceがあれば表示
         const cachedReference = cacheManager.getReference(event.id);
@@ -120,8 +113,7 @@ export class ZapListUI {
 
     try {
       this.#removeNoZapsMessage(list);
-      const zapInfo = await this.#handleZapInfo(event);
-      const li = this.itemBuilder.createListItem(zapInfo, event);
+      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
       list.prepend(li);
       await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
     } catch (error) {
@@ -139,8 +131,7 @@ export class ZapListUI {
 
     try {
       this.#removeNoZapsMessage(list);
-      const zapInfo = await this.#handleZapInfo(event);
-      const li = this.itemBuilder.createListItem(zapInfo, event);
+      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
       
       // 適切な挿入位置を探す
       const position = this.#findInsertPosition(list, event.created_at);
@@ -175,7 +166,7 @@ export class ZapListUI {
     if (!this.#isValidPlaceholder(placeholder)) return;
 
     try {
-      const zapInfo = await this.#handleZapInfo(event);
+      const { zapInfo } = await this.itemBuilder.createListItem(event);
       this.#updatePlaceholderContent(placeholder, zapInfo, event.id);
       await this.#updateProfileIfNeeded(zapInfo.pubkey, placeholder);
     } catch (error) {
@@ -213,13 +204,6 @@ export class ZapListUI {
       this.#updateProfileIfNeeded(pubkey, element)
     );
     await Promise.allSettled(updates);
-  }
-
-  async #handleZapInfo(event) {
-    const zapInfo = new ZapInfo(event, defaultIcon);
-    const extractedInfo = await zapInfo.extractInfo();
-    cacheManager.updateZapCache(event, extractedInfo);
-    return extractedInfo;
   }
 
   #isColorModeEnabled() {
@@ -270,22 +254,24 @@ export class ZapListUI {
     if (!zapElement || !event.reference) return;
 
     const zapContent = zapElement.querySelector('.zap-content');
-    if (zapContent) {
-      // 既存の参照情報を削除
-      const existingReference = zapContent.querySelector('.zap-reference');
-      if (existingReference) {
-        existingReference.remove();
-      }
+    if (!zapContent) return;
 
-      // 新しい参照情報を追加
-      const referenceHTML = DialogComponents.createReferenceComponent({ 
-        reference: event.reference 
-      });
-      zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+    // 既存の参照情報を確実に削除
+    this.#cleanupExistingReferences(zapContent);
 
-      // 参照情報をキャッシュに保存
-      cacheManager.setReference(event.id, event.reference);
-    }
+    // 新しい参照情報を追加
+    const referenceHTML = DialogComponents.createReferenceComponent({ 
+      reference: event.reference 
+    });
+    zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+
+    // 参照情報をキャッシュに保存
+    cacheManager.setReference(event.id, event.reference);
+  }
+
+  #cleanupExistingReferences(container) {
+    const existingReferences = container.querySelectorAll('.zap-reference');
+    existingReferences.forEach(ref => ref.remove());
   }
 
   async batchUpdate(events) {
@@ -293,7 +279,6 @@ export class ZapListUI {
     if (!list) return;
 
     try {
-      // 既存のアイテムをMap化して高速なルックアップを可能に
       const existingItems = new Map(
         Array.from(list.querySelectorAll('.zap-list-item'))
           .map(item => [item.getAttribute('data-event-id'), item])
@@ -306,14 +291,24 @@ export class ZapListUI {
         // 既存のアイテムがあれば再利用
         const existingItem = existingItems.get(event.id);
         if (existingItem) {
+          // 既存のアイテムの参照情報をクリーンアップ
+          const zapContent = existingItem.querySelector('.zap-content');
+          if (zapContent) {
+            this.#cleanupExistingReferences(zapContent);
+            if (event.reference) {
+              const referenceHTML = DialogComponents.createReferenceComponent({ 
+                reference: event.reference 
+              });
+              zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+            }
+          }
           fragment.appendChild(existingItem);
           existingItems.delete(event.id);
           continue;
         }
 
         // 新しいアイテムを作成
-        const zapInfo = await this.#handleZapInfo(event);
-        const li = this.itemBuilder.createListItem(zapInfo, event);
+        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
         
         if (event.reference) {
           const zapContent = li.querySelector('.zap-content');
@@ -344,6 +339,5 @@ export class ZapListUI {
       console.error("Failed to batch update:", error);
     }
   }
-
 
 }

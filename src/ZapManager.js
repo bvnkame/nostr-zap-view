@@ -429,14 +429,13 @@ class ZapSubscriptionManager {
     if (cacheManager.addZapEvent(viewId, event)) {
       batchEvents.push(event);
       
-      // リファレンス情報を非同期で取得開始
+      // リファレンス情報の更新のみを担当
       this.updateEventReference(event, viewId).then(hasReference => {
         if (hasReference && this.zapListUI && event.reference) {
           this.zapListUI.updateZapReference(event);
         }
       });
 
-      // バッチサイズに達したら処理
       if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
         const eventsToProcess = batchEvents.splice(0);
         if (this.zapListUI) {
