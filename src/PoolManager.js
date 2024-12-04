@@ -1,3 +1,4 @@
+
 import { SimplePool } from "nostr-tools/pool";
 import { PROFILE_CONFIG, BATCH_CONFIG } from "./AppSettings.js";
 import {
@@ -6,7 +7,7 @@ import {
 } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
 
-class ZapPoolManager {
+class PoolManager {
   constructor() {
     this.zapPool = new SimplePool();
     this.profilePool = new SimplePool();
@@ -124,5 +125,5 @@ class ZapPoolManager {
   }
 }
 
-export const poolManager = new ZapPoolManager();
+export const poolManager = new PoolManager();
 export const { zapPool, profilePool } = poolManager;

@@ -1,4 +1,4 @@
-import { profilePool } from "./ZapPool.js";
+import { profilePool } from "./PoolManager.js";  // パスを更新
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./AppSettings.js";
 import { ProfileProcessor } from "./BatchProcessor.js";  // 明示的にProfileProcessorをインポート

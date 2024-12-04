@@ -10,7 +10,7 @@ import {
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profileManager } from "./ProfileManager.js";
-import { poolManager } from "./ZapPool.js";
+import { poolManager } from "./PoolManager.js";  // パスを更新
 import { cacheManager } from "./CacheManager.js";
 
 /**

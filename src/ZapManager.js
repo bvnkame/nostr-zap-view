@@ -4,7 +4,7 @@ import {
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
 import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
-import { poolManager } from "./ZapPool.js";
+import { poolManager } from "./PoolManager.js";  // パスを更新
 import { cacheManager } from "./CacheManager.js";
 import { profileManager } from "./ProfileManager.js"; // 追加: ProfileManagerからprofileManagerをインポート
 
@@ -45,7 +45,7 @@ class ZapSubscriptionManager {
       // バックグラウンドで両方の処理を完了
       Promise.all([referencePromise, profilePromise])
         .then(() => {
-          // プロフィールに基づくNIP-05検証のみ実行
+          // プロフィールに基づ��NIP-05検証のみ実行
           profileManager.verifyNip05Async(event.pubkey)
             .then(() => {
               // 新しいイベントのみ再レンダリング
