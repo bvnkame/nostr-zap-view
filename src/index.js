@@ -48,7 +48,7 @@ async function handleButtonClick(button, viewId) {
         // Zapイベントの購読開始
         subscriptionManager.initializeSubscriptions(config, viewId),
         // プロフィールプールの初期化
-        !profilePool.isInitialized ? profilePool._initialize() : Promise.resolve(),
+        !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
         // 統計情報の取得
         statsManager.initializeStats(config.identifier, viewId),
       ];

@@ -18,99 +18,113 @@ import { SimplePool } from "nostr-tools/pool";
  */
 export class ProfilePool {
   static instance = null;
+  #config;
+  #simplePool;
+  #isInitialized = false;
+  #profileProcessor;
 
   constructor() {
-    if (!ProfilePool.instance) {
-      this._config = PROFILE_CONFIG;
-      this.simplePool = new SimplePool();
+    if (ProfilePool.instance) return ProfilePool.instance;
 
-      // SimplePoolの検証を追加
-      if (!this.simplePool?.ensureRelay) {
-        throw new Error('Failed to initialize SimplePool');
-      }
+    this.#config = PROFILE_CONFIG;
+    this.#simplePool = new SimplePool();
 
-      this.isInitialized = false;
-      
-      this.profileProcessor = new ProfileProcessor({ 
-        simplePool: this.simplePool,
-        config: {
-          ...this._config,
-          RELAYS: this._config.RELAYS || []
-        }
-      });
-      
-      ProfilePool.instance = this;
+    if (!this.#simplePool?.ensureRelay) {
+      throw new Error('Failed to initialize SimplePool');
     }
-    return ProfilePool.instance;
+
+    this.#profileProcessor = new ProfileProcessor({ 
+      simplePool: this.#simplePool,
+      config: {
+        ...this.#config,
+        RELAYS: this.#config.RELAYS || []
+      }
+    });
+
+    ProfilePool.instance = this;
+    return this;
   }
 
-  async _initialize() {
-    if (this.isInitialized) return;
+  // Add public getter
+  get isInitialized() {
+    return this.#isInitialized;
+  }
+
+  // Change from private to public method
+  async initialize() {
+    return this.#initialize();
+  }
+
+  async #initialize() {
+    if (this.#isInitialized) return;
     
     try {
-      const connectedCount = await this.profileProcessor.connectToRelays();
-      console.log(`Profile relays connected (${connectedCount}/${this._config.RELAYS.length})`);
-      this.isInitialized = true;
+      const connectedCount = await this.#profileProcessor.connectToRelays();
+      console.log(`Profile relays connected (${connectedCount}/${this.#config.RELAYS.length})`);
+      this.#isInitialized = true;
     } catch (error) {
       console.error('ProfilePool initialization error:', error);
-      this.isInitialized = false;
+      this.#isInitialized = false;
       throw error;
     }
   }
 
   async fetchProfiles(pubkeys) {
-    if (!Array.isArray(pubkeys) || pubkeys.length === 0) {
-      return [];
-    }
+    if (!Array.isArray(pubkeys) || pubkeys.length === 0) return [];
 
     const now = Date.now();
     const results = new Array(pubkeys.length);
     const fetchQueue = [];
 
-    // キャッシュチェックを最適化
     for (let i = 0; i < pubkeys.length; i++) {
       const pubkey = pubkeys[i];
       const cached = cacheManager.getProfile(pubkey);
       
-      if (cached && cached._lastUpdated && now - cached._lastUpdated < 1800000) { // 30分
+      if (this.#isValidCache(cached, now)) {
         results[i] = cached;
       } else {
         fetchQueue.push({ index: i, pubkey });
       }
     }
 
-    // 未キャッシュのプロフィールを並列取得
     if (fetchQueue.length > 0) {
-      const fetchPromises = fetchQueue.map(({ pubkey }) =>
-        this.profileProcessor.getOrCreateFetchPromise(pubkey)
-          .then(event => {
-            if (!event) return this._createDefaultProfile();
-            
-            try {
-              const content = JSON.parse(event.content);
-              return {
-                ...content,
-                name: getProfileDisplayName(content) || "nameless",
-                _lastUpdated: now,
-                _eventCreatedAt: event.created_at
-              };
-            } catch {
-              return this._createDefaultProfile();
-            }
-          })
-          .catch(() => this._createDefaultProfile())
-      );
-
-      const fetchedProfiles = await Promise.all(fetchPromises);
-      
-      // 結果を元の順序で格納
-      fetchQueue.forEach(({ index }, i) => {
-        results[index] = fetchedProfiles[i];
-        cacheManager.setProfile(pubkeys[index], fetchedProfiles[i]);
-      });
+      await this.#processFetchQueue(fetchQueue, results, pubkeys);
     }
 
     return results;
+  }
+
+  #isValidCache(cached, now) {
+    return cached && cached._lastUpdated && (now - cached._lastUpdated < 1800000);
+  }
+
+  async #processFetchQueue(fetchQueue, results, pubkeys) {
+    const now = Date.now();
+    const fetchedProfiles = await Promise.all(
+      fetchQueue.map(({ pubkey }) => this.#fetchSingleProfile(pubkey, now))
+    );
+    
+    fetchQueue.forEach(({ index }, i) => {
+      results[index] = fetchedProfiles[i];
+      cacheManager.setProfile(pubkeys[index], fetchedProfiles[i]);
+    });
+  }
+
+  async #fetchSingleProfile(pubkey, now) {
+    try {
+      const event = await this.#profileProcessor.getOrCreateFetchPromise(pubkey);
+      if (!event) return this.#createDefaultProfile();
+
+      const content = JSON.parse(event.content);
+      return {
+        ...content,
+        name: getProfileDisplayName(content) || "nameless",
+        _lastUpdated: now,
+        _eventCreatedAt: event.created_at
+      };
+    } catch {
+      return this.#createDefaultProfile();
+    }
   }
 
   async verifyNip05Async(pubkey) {
@@ -170,13 +184,13 @@ export class ProfilePool {
 
   _handleFetchError(pubkeys) {
     pubkeys.forEach(pubkey => {
-      const defaultProfile = this._createDefaultProfile();
+      const defaultProfile = this.#createDefaultProfile();
       cacheManager.setProfile(pubkey, defaultProfile);
       this._resolvePromise(pubkey, defaultProfile);
     });
   }
 
-  _createDefaultProfile() {
+  #createDefaultProfile() {
     return {
       name: "anonymous",
       display_name: "anonymous",
@@ -185,7 +199,7 @@ export class ProfilePool {
 
   clearCache() {
     cacheManager.clearAll();
-    this.profileProcessor.clearPendingFetches();
+    this.#profileProcessor.clearPendingFetches();
   }
 
   /**
