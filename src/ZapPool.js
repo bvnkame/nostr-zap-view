@@ -5,7 +5,11 @@ import {
   PROFILE_CONFIG,
   BATCH_CONFIG,
 } from "./AppSettings.js";
-import { BatchProcessor } from "./BatchProcessor.js";
+import { 
+  BatchProcessor,
+  ETagReferenceProcessor,
+  ATagReferenceProcessor 
+} from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
 
 class ReferenceProcessor extends BatchProcessor {
@@ -86,7 +90,17 @@ class ZapPoolManager {
     this.profilePool = new SimplePool();
     this.subscriptions = new Map();
     this.state = new Map();
-    this.referenceProcessor = new ReferenceProcessor(this, CONFIG);
+    
+    // それぞれのプロセッサーを正しく初期化
+    this.etagProcessor = new ETagReferenceProcessor(this, {
+      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
+    });
+    this.aTagProcessor = new ATagReferenceProcessor(this, {
+      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
+    });
+
     this.isConnected = false;
   }
 
@@ -151,6 +165,7 @@ class ZapPoolManager {
     );
   }
 
+  // fetchReference メソッドも更新
   async fetchReference(relayUrls, eventId) {
     if (!eventId) return null;
 
@@ -158,8 +173,8 @@ class ZapPoolManager {
       const cachedRef = cacheManager.getReference(eventId);
       if (cachedRef) return cachedRef;
 
-      this.referenceProcessor.setRelayUrls(relayUrls);
-      const reference = await this.referenceProcessor.getOrCreateFetchPromise(eventId);
+      this.etagProcessor.setRelayUrls(relayUrls);
+      const reference = await this.etagProcessor.getOrCreateFetchPromise(eventId);
       
       if (reference) {
         cacheManager.setReference(eventId, reference);
@@ -168,7 +183,19 @@ class ZapPoolManager {
       return reference;
     } catch (error) {
       console.error("参照取得エラー:", error);
-      return cacheManager.getReference(eventId);
+      return null;
+    }
+  }
+
+  async fetchATagReference(relayUrls, aTagValue) {
+    if (!aTagValue) return null;
+
+    try {
+      this.aTagProcessor.setRelayUrls(relayUrls);
+      return await this.aTagProcessor.getOrCreateFetchPromise(aTagValue);
+    } catch (error) {
+      console.error("ATag reference fetch error:", error);
+      return null;
     }
   }
 }

@@ -63,6 +63,7 @@ class ZapSubscriptionManager {
   }
 
   async updateEventReference(event, viewId) {
+    const aTag = event.tags.find(tag => tag[0] === 'a');
     const eTag = event.tags.find(tag => tag[0] === 'e');
     const config = this.getViewConfig(viewId);
     
@@ -71,18 +72,31 @@ class ZapSubscriptionManager {
       return false;
     }
 
-    if (eTag && config?.relayUrls) {
-      try {
-        const reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
-        if (reference) {
-          event.reference = reference;
-          return true;
-        }
-      } catch (error) {
-        console.error("Failed to fetch reference:", error);
-      }
+    if (!config?.relayUrls) {
+      console.warn("No relay URLs configured for reference fetch");
+      return false;
     }
-    return false;
+
+    try {
+      let reference = null;
+      
+      if (aTag) {
+        reference = await poolManager.fetchATagReference(config.relayUrls, aTag[1]);
+      }
+      
+      if (!reference && eTag) {
+        reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+      }
+
+      if (reference) {
+        event.reference = reference;
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Reference fetch failed:", error, { eventId: event.id });
+      return false;
+    }
   }
 
   async updateEventReferenceBatch(events, viewId) {
@@ -93,19 +107,29 @@ class ZapSubscriptionManager {
     if (isEventIdentifier(identifier)) return;
 
     const eventIds = events
-      .map(event => event.tags.find(tag => tag[0] === 'e')?.[1])
+      .map(event => {
+        const aTag = event.tags.find(tag => tag[0] === 'a');
+        const eTag = event.tags.find(tag[0] === 'e');
+        return aTag?.[1] || eTag?.[1];
+      })
       .filter(Boolean);
 
     await Promise.all(
       eventIds.map(async (eventId) => {
         try {
           const reference = await poolManager.fetchReference(config.relayUrls, eventId);
-          const event = events.find(e => e.tags.some(t => t[0] === 'e' && t[1] === eventId));
+          const event = events.find(e => {
+            const aTag = e.tags.find(t => t[0] === 'a')?.[1] === eventId;
+            const eTag = e.tags.find(t => t[0] === 'e')?.[1] === eventId;
+            return aTag || eTag;
+          });
           if (event && reference) {
             event.reference = reference;
+          } else {
+            console.warn("No valid reference found for event:", eventId);
           }
         } catch (error) {
-          console.error("Failed to fetch reference:", error);
+          console.error("Failed to fetch reference for event:", eventId, error);
         }
       })
     );

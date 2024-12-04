@@ -1,7 +1,7 @@
 import { profilePool } from "./ZapPool.js";
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./AppSettings.js";
-import { BatchProcessor } from "./BatchProcessor.js";
+import { ProfileProcessor } from "./BatchProcessor.js";  // 明示的にProfileProcessorをインポート
 import { cacheManager } from "./CacheManager.js";
 
 /**
@@ -16,71 +16,6 @@ import { cacheManager } from "./CacheManager.js";
  * Class to manage Nostr profile information
  * Singleton pattern is adopted to share one instance throughout the application
  */
-class ProfileBatchProcessor extends BatchProcessor {
-  constructor(profileManager, config) {
-    super({
-      batchSize: config.BATCH_SIZE,
-      batchDelay: config.BATCH_DELAY
-    });
-    this.profileManager = profileManager;
-    this.config = config;
-  }
-
-  async onBatchProcess(pubkeys) {
-    // プロフィール情報の一括取得
-    const profiles = await profilePool.querySync(this.config.RELAYS, {
-      kinds: [0],
-      authors: pubkeys,
-    });
-
-    // プロフィール情報の高速な処理
-    const profileMap = new Map();
-    profiles.forEach(profile => {
-      const existing = profileMap.get(profile.pubkey);
-      if (!existing || existing.created_at < profile.created_at) {
-        profileMap.set(profile.pubkey, profile);
-      }
-    });
-
-    // バッチ処理による一括更新
-    await Promise.all(
-      Array.from(profileMap.values()).map(async profile => {
-        try {
-          const content = JSON.parse(profile.content);
-          const processedProfile = {
-            ...content,
-            name: getProfileDisplayName(content) || "nameless",
-            _lastUpdated: Date.now()
-          };
-          cacheManager.setProfile(profile.pubkey, processedProfile);
-          this.resolveItem(profile.pubkey, processedProfile);
-        } catch (error) {
-          const defaultProfile = this.profileManager._createDefaultProfile();
-          cacheManager.setProfile(pubkey, defaultProfile);
-          this.resolveItem(pubkey, defaultProfile);
-        }
-      })
-    );
-
-    // 未取得のプロフィールにデフォルト値を設定
-    pubkeys.forEach(pubkey => {
-      if (!cacheManager.hasProfile(pubkey)) {
-        const defaultProfile = this.profileManager._createDefaultProfile();
-        cacheManager.setProfile(pubkey, defaultProfile);
-        this.resolveItem(pubkey, defaultProfile);
-      }
-    });
-  }
-
-  onBatchError(pubkeys, error) {
-    pubkeys.forEach(pubkey => {
-      const defaultProfile = this.profileManager._createDefaultProfile();
-      cacheManager.setProfile(pubkey, defaultProfile);
-      this.resolveItem(pubkey, defaultProfile);
-    });
-  }
-}
-
 export class ProfileManager {
   static instance = null;
 
@@ -94,25 +29,49 @@ export class ProfileManager {
   }
 
   _initialize() {
-    this.batchProcessor = new ProfileBatchProcessor(this, this._config);
+    this.profileProcessor = new ProfileProcessor({ 
+      profilePool,
+      config: this._config 
+    });
   }
 
   async fetchProfiles(pubkeys) {
     const uncachedPubkeys = pubkeys.filter(pubkey => !cacheManager.hasProfile(pubkey));
-
+    
     if (uncachedPubkeys.length === 0) {
       return pubkeys.map(pubkey => cacheManager.getProfile(pubkey) || this._createDefaultProfile());
     }
 
-    const fetchPromises = uncachedPubkeys.map(pubkey => 
-      this.batchProcessor.getOrCreateFetchPromise(pubkey)
-    );
+    try {
+      console.log("[ProfileManager] Fetching profiles:", uncachedPubkeys);
+      
+      const profilePromises = uncachedPubkeys.map(pubkey => 
+        this.profileProcessor.getOrCreateFetchPromise(pubkey)
+          .then(event => {
+            if (!event) return this._createDefaultProfile();
+            
+            try {
+              const content = JSON.parse(event.content);
+              const processedProfile = {
+                ...content,
+                name: getProfileDisplayName(content) || "nameless",
+                _lastUpdated: Date.now()
+              };
+              cacheManager.setProfile(event.pubkey, processedProfile);
+              return processedProfile;
+            } catch (error) {
+              console.error("Profile processing error:", error);
+              return this._createDefaultProfile();
+            }
+          })
+      );
 
-    await Promise.all(fetchPromises);
-
-    return pubkeys.map(pubkey => 
-      cacheManager.getProfile(pubkey) || this._createDefaultProfile()
-    );
+      await Promise.all(profilePromises);
+      return pubkeys.map(pubkey => cacheManager.getProfile(pubkey) || this._createDefaultProfile());
+    } catch (error) {
+      console.error("Profile fetch error:", error);
+      return pubkeys.map(() => this._createDefaultProfile());
+    }
   }
 
   async verifyNip05Async(pubkey) {
