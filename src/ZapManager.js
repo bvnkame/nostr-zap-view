@@ -29,18 +29,21 @@ class ZapSubscriptionManager {
   // イベント処理を最適化した新しいメソッド
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
+      // プロフィール取得を最初に開始
+      const profilePromise = profilePool.fetchProfiles([event.pubkey]);
+
       // まずイベントを表示
       if (shouldUpdateUI && this.zapListUI) {
         await this.zapListUI.appendZap(event);
       }
 
-      // 参照情報とプロフィールは非同期で取得
+      // 参���情報とプロフィールは並列で取得
       Promise.all([
         this.updateEventReference(event, viewId),
         statsManager.handleZapEvent(event, viewId),
+        profilePromise,
         profilePool.verifyNip05Async(event.pubkey)
       ]).then(() => {
-        // 参照情報が取得できたら該当要素を更新
         if (shouldUpdateUI && this.zapListUI && event.reference) {
           this.zapListUI.updateZapReference(event);
         }
@@ -222,6 +225,10 @@ class ZapSubscriptionManager {
   // processBatchメソッドを最適化
   async processBatch(events, viewId) {
     try {
+      // プロフィール取得を先に開始
+      const pubkeys = [...new Set(events.map(event => event.pubkey))];
+      const profilePromise = profilePool.fetchProfiles(pubkeys);
+
       // イベントを作成時刻でソート
       const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
       
@@ -239,6 +246,7 @@ class ZapSubscriptionManager {
       // 非同期処理を並列実行
       await Promise.all([
         this.updateEventReferenceBatch(sortedEvents, viewId),
+        profilePromise,
         Promise.all(sortedEvents.map(event => {
           return Promise.all([
             statsManager.handleZapEvent(event, viewId),

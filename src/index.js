@@ -29,6 +29,13 @@ async function handleButtonClick(button, viewId) {
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
     initializeZapStats(viewId);
 
+    // キャッシュされたデータがある場合、プロフィール取得を先に開始
+    const cachedEvents = cacheManager.getZapEvents(viewId);
+    if (cachedEvents.length > 0) {
+      const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
+      profilePool.fetchProfiles(pubkeys);
+    }
+
     // 2. キャッシュされたデータの表示（あれば）
     const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
       viewId,
@@ -72,12 +79,19 @@ function initializeApp() {
     window[key] = value;
   });
 
-  // ボタンの初期化を一本化
+  // ProfilePoolの初期化を先に開始
+  const profileInitPromise = profilePool.initialize().catch(console.error);
+
+  // ボタンの初期化
   document.querySelectorAll("button[data-nzv-id]").forEach((button, index) => {
     if (!button.hasAttribute("data-zap-view-id")) {
       const viewId = `nostr-zap-view-${index}`;
       button.setAttribute("data-zap-view-id", viewId);
-      button.addEventListener("click", () => handleButtonClick(button, viewId));
+      button.addEventListener("click", async () => {
+        // ProfilePoolの初期化を待ってからボタンクリック処理を実行
+        await profileInitPromise;
+        handleButtonClick(button, viewId);
+      });
     }
   });
 }
