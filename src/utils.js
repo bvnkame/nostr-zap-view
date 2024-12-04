@@ -283,24 +283,6 @@ export function encodeNaddr(kind, pubkey, identifier, relays = []) {
   }
 }
 
-// Add function to extract reference from tags
-export function extractReferenceFromTags(event) {
-  if (!event.tags) return null;
-
-  const eTag = event.tags.find((tag) => tag[0] === "e");
-  const pTag = event.tags.find((tag) => tag[0] === "p");
-
-  if (!eTag) return null;
-
-  return {
-    id: eTag[1],
-    kind: parseInt(eTag[3], 10) || 1,
-    pubkey: pTag?.[1] || event.pubkey || "",
-    content: event.content || "",
-    tags: event.tags || [],
-  };
-}
-
 // Add function to create default zap info
 export function createDefaultZapInfo(event, defaultIcon) {
   return {

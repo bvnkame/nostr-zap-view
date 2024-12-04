@@ -7,12 +7,17 @@ import {
 import { cacheManager } from "./CacheManager.js";
 
 export class EventPool {
+  // Core components
   #zapPool;
-  #subscriptions;
-  #state;
   #isConnected;
+
+  // Processors
   #etagProcessor;
   #aTagProcessor;
+
+  // State management
+  #subscriptions;
+  #state;
 
   constructor() {
     this.#zapPool = new SimplePool();
@@ -30,6 +35,7 @@ export class EventPool {
     this.#aTagProcessor = new ATagReferenceProcessor(processorConfig);
   }
 
+  // Connection management
   async connectToRelays(zapRelayUrls) {
     if (this.#isConnected) return;
 
@@ -38,8 +44,7 @@ export class EventPool {
       this.#isConnected = true;
       console.log("Zap relays connected");
     } catch (error) {
-      console.error("Zap relay connection error:", error);
-      throw error;
+      this.#handleError("Relay connection error", error);
     }
   }
 
@@ -54,6 +59,22 @@ export class EventPool {
     ]);
   }
 
+  // Subscription management
+  subscribeToZaps(viewId, config, decoded, handlers) {
+    try {
+      this.#initializeSubscriptionState(viewId);
+      this.closeSubscription(viewId);
+
+      const state = this.#state.get(viewId);
+      state.isZapClosed = false;
+
+      this.#logSubscription(config, decoded);
+      this.#createSubscription(viewId, config, decoded, handlers);
+    } catch (error) {
+      this.#handleError("Subscription error", error);
+    }
+  }
+
   closeSubscription(viewId) {
     const subscription = this.#subscriptions.get(viewId);
     const state = this.#state.get(viewId);
@@ -66,18 +87,39 @@ export class EventPool {
     }
   }
 
-  subscribeToZaps(viewId, config, decoded, handlers) {
-    this.#initializeSubscriptionState(viewId);
-    this.closeSubscription(viewId);
+  // Reference handling
+  async fetchReference(relayUrls, eventId) {
+    if (!eventId) return null;
+    return this.#processCachedReference(relayUrls, eventId);
+  }
 
-    const state = this.#state.get(viewId);
-    state.isZapClosed = false;
+  async fetchATagReference(relayUrls, aTagValue) {
+    if (!aTagValue) return null;
+    return this.#processReference(relayUrls, aTagValue, this.#aTagProcessor);
+  }
 
-    console.log("[ZapPool] REQ送信:", {
-      relayUrls: config.relayUrls,
-      req: decoded.req,
-    });
+  // 参照関連の処理をEventPoolクラスに統合
+  extractReferenceFromTags(event) {
+    if (!event?.tags) return null;
 
+    const [eTag, pTag] = [
+      event.tags.find(tag => tag[0] === "e"),
+      event.tags.find(tag => tag[0] === "p")
+    ];
+
+    if (!eTag) return null;
+
+    return {
+      id: eTag[1],
+      kind: parseInt(eTag[3], 10) || 1,
+      pubkey: pTag?.[1] || event.pubkey || "",
+      content: event.content || "",
+      tags: event.tags || [],
+    };
+  }
+
+  // Private helper methods
+  #createSubscription(viewId, config, decoded, handlers) {
     this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
       config.relayUrls,
       [decoded.req],
@@ -91,6 +133,44 @@ export class EventPool {
     );
   }
 
+  async #processCachedReference(relayUrls, eventId) {
+    try {
+      const cachedRef = cacheManager.getReference(eventId);
+      if (cachedRef) return cachedRef;
+
+      const reference = await this.#processReference(relayUrls, eventId, this.#etagProcessor);
+      if (reference) {
+        cacheManager.setReference(eventId, reference);
+      }
+      return reference;
+    } catch (error) {
+      this.#handleError("Reference processing error", error);
+      return null;
+    }
+  }
+
+  async #processReference(relayUrls, value, processor) {
+    try {
+      processor.setRelayUrls(relayUrls);
+      return await processor.getOrCreateFetchPromise(value);
+    } catch (error) {
+      this.#handleError("Reference processing error", error);
+      return null;
+    }
+  }
+
+  #logSubscription(config, decoded) {
+    console.log("[ZapPool] REQ送信:", {
+      relayUrls: config.relayUrls,
+      req: decoded.req,
+    });
+  }
+
+  #handleError(message, error) {
+    console.error(message + ":", error);
+    throw error;
+  }
+
   #initializeSubscriptionState(viewId) {
     if (!this.#subscriptions.has(viewId)) {
       this.#subscriptions.set(viewId, { zap: null });
@@ -100,39 +180,7 @@ export class EventPool {
     }
   }
 
-  async fetchReference(relayUrls, eventId) {
-    if (!eventId) return null;
-
-    try {
-      const cachedRef = cacheManager.getReference(eventId);
-      if (cachedRef) return cachedRef;
-
-      this.#etagProcessor.setRelayUrls(relayUrls);
-      const reference = await this.#etagProcessor.getOrCreateFetchPromise(eventId);
-      
-      if (reference) {
-        cacheManager.setReference(eventId, reference);
-      }
-      
-      return reference;
-    } catch (error) {
-      console.error("Reference fetch error:", error);
-      return null;
-    }
-  }
-
-  async fetchATagReference(relayUrls, aTagValue) {
-    if (!aTagValue) return null;
-
-    try {
-      this.#aTagProcessor.setRelayUrls(relayUrls);
-      return await this.#aTagProcessor.getOrCreateFetchPromise(aTagValue);
-    } catch (error) {
-      console.error("ATag reference fetch error:", error);
-      return null;
-    }
-  }
-
+  // Getter
   get zapPool() {
     return this.#zapPool;
   }
