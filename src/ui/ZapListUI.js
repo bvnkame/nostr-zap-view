@@ -136,11 +136,33 @@ export class ZapListUI {
       this.#removeNoZapsMessage(list);
       const zapInfo = await this.#handleZapInfo(event);
       const li = this.itemBuilder.createListItem(zapInfo, event);
-      list.appendChild(li);
+      
+      // 適切な挿入位置を探す
+      const position = this.#findInsertPosition(list, event.created_at);
+      if (position) {
+        list.insertBefore(li, position);
+      } else {
+        list.appendChild(li);
+      }
+      
       await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
     } catch (error) {
       console.error("Failed to append zap:", error);
     }
+  }
+
+  #findInsertPosition(list, timestamp) {
+    const items = list.querySelectorAll('.zap-list-item');
+    for (const item of items) {
+      const event = item.getAttribute('data-event');
+      if (event) {
+        const itemTime = JSON.parse(event).created_at;
+        if (timestamp > itemTime) {
+          return item;
+        }
+      }
+    }
+    return null;
   }
 
   async replacePlaceholderWithZap(event, index) {

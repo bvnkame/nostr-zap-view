@@ -133,48 +133,71 @@ class ZapSubscriptionManager {
 
     return new Promise((resolve) => {
       let lastEventTime = null;
-      const initialEvents = [];
+      let batchEvents = [];
 
-      const handleEvent = async (event) => {
+      const handleEvent = (event) => {
         lastEventTime = Math.min(lastEventTime || event.created_at, event.created_at);
         if (cacheManager.addZapEvent(viewId, event)) {
-          initialEvents.push(event);
-          // イベントをUIに表示（リファレンスなしで）
-          await this.processZapEvent(event, viewId, false);
+          batchEvents.push(event);
+          
+          // バッチ処理のサイズに達したら表示
+          if (batchEvents.length >= 10) {
+            const eventsToProcess = batchEvents;
+            batchEvents = [];
+            this.processBatch(eventsToProcess, viewId);
+          }
         }
       };
 
       eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: handleEvent,
-        oneose: async () => {
-          // イベントの取得後、ソートしてからまとめて表示
-          const events = cacheManager.getZapEvents(viewId);
-          events.sort((a, b) => b.created_at - a.created_at);
-
-          // まずイベントを表示
-          try {
-            renderZapListFromCache(events, viewId);
-          } catch (error) {
-            console.error('Failed to render zap list:', error);
+        oneose: () => {
+          // 残りのイベントを処理
+          if (batchEvents.length > 0) {
+            this.processBatch(batchEvents, viewId);
           }
 
           // リファレンス情報を非同期で取得
-          if (initialEvents.length > 0) {
-            this.updateEventReferenceBatch(initialEvents, viewId).then(() => {
-              // リファレンス情報が取得できたら各イベントの参照を更新
-              initialEvents.forEach(event => {
-                if (event.reference && this.zapListUI) {
-                  this.zapListUI.updateZapReference(event);
-                }
-              });
+          const allEvents = cacheManager.getZapEvents(viewId);
+          this.updateEventReferenceBatch(allEvents, viewId).then(() => {
+            allEvents.forEach(event => {
+              if (event.reference && this.zapListUI) {
+                this.zapListUI.updateZapReference(event);
+              }
             });
-          }
+          });
 
           this.finalizeInitialization(viewId, lastEventTime);
           resolve();
         }
       });
     });
+  }
+
+  async processBatch(events, viewId) {
+    try {
+      // まずキャッシュに追加
+      events.forEach(event => {
+        cacheManager.addZapEvent(viewId, event);
+      });
+
+      // キャッシュから全イベントを取得してソート
+      const allEvents = cacheManager.getZapEvents(viewId);
+      allEvents.sort((a, b) => b.created_at - a.created_at);
+
+      // ソートされた状態で表示を更新
+      if (this.zapListUI) {
+        await this.zapListUI.batchUpdate(allEvents);
+      }
+
+      // プロフィール情報は非同期で取得
+      events.forEach(event => {
+        statsManager.handleZapEvent(event, viewId);
+        profilePool.verifyNip05Async(event.pubkey);
+      });
+    } catch (error) {
+      console.error("Failed to process batch:", error);
+    }
   }
 
   finalizeInitialization(viewId, lastEventTime) {
