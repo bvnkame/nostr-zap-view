@@ -59,10 +59,6 @@ export class ProfilePool {
   }
 
   async fetchProfiles(pubkeys) {
-    if (!this.isInitialized) {
-      await this._initialize();
-    }
-
     const uncachedPubkeys = pubkeys.filter(pubkey => !cacheManager.hasProfile(pubkey));
     
     if (uncachedPubkeys.length === 0) {
@@ -73,15 +69,23 @@ export class ProfilePool {
       const profilePromises = uncachedPubkeys.map(pubkey => 
         this.profileProcessor.getOrCreateFetchPromise(pubkey)
           .then(event => {
-            if (!event) return this._createDefaultProfile();
+            if (!event) {
+              console.log(`No profile found for pubkey: ${pubkey}`);
+              return this._createDefaultProfile();
+            }
             
             try {
+              console.log('Fetched profile event:', event);
               const content = JSON.parse(event.content);
+              console.log('Parsed profile content:', content);
+              
               const processedProfile = {
                 ...content,
                 name: getProfileDisplayName(content) || "nameless",
                 _lastUpdated: Date.now()
               };
+              console.log('Processed profile:', processedProfile);
+              
               cacheManager.setProfile(event.pubkey, processedProfile);
               return processedProfile;
             } catch (error) {

@@ -1,21 +1,21 @@
 import { APP_CONFIG, ZAP_CONFIG } from "./AppSettings.js";
 import { ViewerConfig } from "./AppSettings.js";
-import { 
-  createDialog, 
+import {
+  createDialog,
   initializeZapPlaceholders,
   initializeZapStats,
   showDialog,
-  renderZapListFromCache // renderZapListFromCacheを追加
+  renderZapListFromCache, // renderZapListFromCacheを追加
 } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profilePool } from "./ProfilePool.js";
-import { eventPool } from "./EventPool.js";  // パスを更新
+import { eventPool } from "./EventPool.js"; // パスを更新
 import { cacheManager } from "./CacheManager.js";
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
- * @param {HTMLElement} button - 初期化対象のボタン要素 
+ * @param {HTMLElement} button - 初期化対象のボタン要素
  * @param {string} viewId - ビューの識別子
  */
 async function handleButtonClick(button, viewId) {
@@ -23,7 +23,7 @@ async function handleButtonClick(button, viewId) {
     const config = ViewerConfig.fromButton(button);
     subscriptionManager.setViewConfig(viewId, config);
 
-    // 1. ��イアログとスケルトンUIの表示
+    // 1. ダイアログとスケルトンUIの表示
     createDialog(viewId);
     showDialog(viewId);
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
@@ -31,8 +31,8 @@ async function handleButtonClick(button, viewId) {
 
     // 2. キャッシュされたデータの表示（あれば）
     const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
-      viewId, 
-      config, 
+      viewId,
+      config,
       renderZapListFromCache
     );
 
@@ -41,22 +41,24 @@ async function handleButtonClick(button, viewId) {
     }
 
     // 3. 非同期でデータ取得を開始
-    if (!button.hasAttribute('data-initialized')) {
+    if (!button.hasAttribute("data-initialized")) {
       const initTasks = [
         // リレー接続
         eventPool.connectToRelays(config.relayUrls),
+        // Zapイベントの購読開始
+        subscriptionManager.initializeSubscriptions(config, viewId),
+        // プロフィールプールの初期化
+        !profilePool.isInitialized ? profilePool._initialize() : Promise.resolve(),
         // 統計情報の取得
         statsManager.initializeStats(config.identifier, viewId),
-        // Zapイベントの購読開始
-        subscriptionManager.initializeSubscriptions(config, viewId)
       ];
 
       Promise.all(initTasks)
         .then(() => {
-          button.setAttribute('data-initialized', 'true');
+          button.setAttribute("data-initialized", "true");
         })
-        .catch(error => {
-          console.error('Failed to initialize:', error);
+        .catch((error) => {
+          console.error("Failed to initialize:", error);
         });
     }
   } catch (error) {

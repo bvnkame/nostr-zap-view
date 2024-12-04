@@ -311,6 +311,7 @@ export class ProfileProcessor extends BatchProcessor {
 
     const eventHandler = (event, processedItems) => {
       if (!processedItems.has(event.pubkey)) {
+        console.log(`Received profile event for pubkey ${event.pubkey}:`, event);
         this.resolveItem(event.pubkey, event);
         processedItems.add(event.pubkey);
       }
