@@ -157,18 +157,20 @@ export class DialogComponents {
     const isNew = isWithin24Hours(zapInfo.created_at);
 
     return `
-      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
-        <div class="sender-icon${isNew ? " is-new" : ""}">
-          ${components.iconComponent}
+      <div class="zap-content">
+        <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
+          <div class="sender-icon${isNew ? " is-new" : ""}">
+            ${components.iconComponent}
+          </div>
+          <div class="sender-info">
+            ${components.nameComponent}
+            ${components.pubkeyComponent}
+          </div>
+          <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
         </div>
-        <div class="sender-info">
-          ${components.nameComponent}
-          ${components.pubkeyComponent}
-        </div>
-        <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
+        ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
+        ${components.referenceComponent}
       </div>
-      ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
-      ${components.referenceComponent}
     `;
   }
 }

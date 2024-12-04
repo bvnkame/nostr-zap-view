@@ -25,16 +25,8 @@ class ZapItemBuilder {
     li.setAttribute("data-pubkey", zapInfo.pubkey);
     if (event?.id) li.setAttribute("data-event-id", event.id);
 
-    // 基本的なZap情報のコンテナを作成
-    const zapContent = document.createElement('div');
-    zapContent.className = 'zap-content';
-    zapContent.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
-    li.appendChild(zapContent);
-
-    // 参照情報用のプレースホルダーを追加
-    const referenceContainer = document.createElement('div');
-    referenceContainer.className = 'reference-container';
-    li.appendChild(referenceContainer);
+    // Zapアイテムの内容を作成
+    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
 
     return li;
   }
@@ -279,11 +271,20 @@ export class ZapListUI {
     const zapElement = this.getElementByEventId(event.id);
     if (!zapElement || !event.reference) return;
 
-    const referenceContainer = zapElement.querySelector('.reference-container');
-    if (referenceContainer) {
-      referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+    const zapContent = zapElement.querySelector('.zap-content');
+    if (zapContent) {
+      // 既存の参照情報を削除
+      const existingReference = zapContent.querySelector('.zap-reference');
+      if (existingReference) {
+        existingReference.remove();
+      }
+
+      // 新しい参照情報を追加
+      const referenceHTML = DialogComponents.createReferenceComponent({ 
         reference: event.reference 
       });
+      zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+
       // 参照情報をキャッシュに保存
       cacheManager.setReference(event.id, event.reference);
     }

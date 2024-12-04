@@ -77,8 +77,6 @@ class ZapSubscriptionManager {
 
   async updateEventReference(event, viewId) {
     try {
-      const aTag = event.tags.find(tag => tag[0] === 'a');
-      const eTag = event.tags.find(tag => tag[0] === 'e');
       const config = this.getViewConfig(viewId);
       
       if (!config?.relayUrls?.length) {
@@ -89,30 +87,7 @@ class ZapSubscriptionManager {
       const identifier = config?.identifier || '';
       if (isEventIdentifier(identifier)) return false;
 
-      const fetchReference = async () => {
-        let reference = null;
-        if (aTag) {
-          try {
-            reference = await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
-          } catch (error) {
-            console.warn("A-tag reference fetch failed:", aTag[1], error);
-          }
-        }
-        
-        if (!reference && eTag) {
-          const eventId = eTag[1].toLowerCase();
-          if (/^[0-9a-f]{64}$/.test(eventId)) {
-            try {
-              reference = await eventPool.fetchReference(config.relayUrls, eventId);
-            } catch (error) {
-              console.warn("E-tag reference fetch failed:", eTag[1], error);
-            }
-          }
-        }
-        return reference;
-      };
-
-      const reference = await cacheManager.getOrFetchReference(event.id, fetchReference);
+      const reference = await this._fetchEventReference(event, config);
       if (reference) {
         event.reference = reference;
         return true;
@@ -122,6 +97,39 @@ class ZapSubscriptionManager {
     } catch (error) {
       console.error("Reference fetch failed:", error, { eventId: event.id });
       return false;
+    }
+  }
+
+  async _fetchEventReference(event, config) {
+    const fetchFn = async () => {
+      if (!event?.tags || !Array.isArray(event.tags)) {
+        console.warn("Invalid event tags:", event);
+        return null;
+      }
+
+      try {
+        const aTag = event.tags.find(t => Array.isArray(t) && t[0] === 'a');
+        if (aTag?.[1]) {
+          return await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
+        }
+
+        const eTag = event.tags.find(t => Array.isArray(t) && t[0] === 'e');
+        if (eTag?.[1] && /^[0-9a-f]{64}$/.test(eTag[1].toLowerCase())) {
+          return await eventPool.fetchReference(config.relayUrls, eTag[1]);
+        }
+
+        return null;
+      } catch (error) {
+        console.warn("Failed to fetch reference:", error);
+        return null;
+      }
+    };
+
+    try {
+      return await cacheManager.getOrFetchReference(event.id, fetchFn);
+    } catch (error) {
+      console.error("Reference fetch failed:", error, { event });
+      return null;
     }
   }
 
@@ -175,25 +183,37 @@ class ZapSubscriptionManager {
     });
   }
 
-  async _processBatchEvents(batchEvents, viewId) {
-    if (!Array.isArray(batchEvents) || batchEvents.length === 0) return;
+  async _processBatchEvents(events, viewId) {
+    if (!events?.length) return;
 
-    const pubkeys = [...new Set(batchEvents.map(event => event.pubkey))];
+    // イベントを時系列順にソート
+    events.sort((a, b) => b.created_at - a.created_at);
     
+    // キャッシュに追加
+    events.forEach(event => cacheManager.addZapEvent(viewId, event));
+
+    const pubkeys = [...new Set(events.map(event => event.pubkey))];
+    
+    // プロファイル情報とリファレンス情報を並列で取得
     await Promise.all([
       profilePool.fetchProfiles(pubkeys),
-      this.updateEventReferenceBatch(batchEvents, viewId),
-      ...batchEvents.map(event => statsManager.handleZapEvent(event, viewId)),
-      ...batchEvents.map(event => profilePool.verifyNip05Async(event.pubkey))
+      this.updateEventReferenceBatch(events, viewId),
+      ...events.map(event => statsManager.handleZapEvent(event, viewId)),
+      ...events.map(event => profilePool.verifyNip05Async(event.pubkey))
     ]);
 
+    // まとめてUIを更新
     if (this.zapListUI) {
+      // まずイベントリストを更新
       await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-      batchEvents.forEach(event => {
-        if (event.reference) {
+      
+      // その後でリファレンス情報を更新
+      const eventsWithRefs = events.filter(event => event.reference);
+      if (eventsWithRefs.length > 0) {
+        eventsWithRefs.forEach(event => {
           this.zapListUI.updateZapReference(event);
-        }
-      });
+        });
+      }
     }
   }
 
@@ -212,14 +232,68 @@ class ZapSubscriptionManager {
   }
 
   setupInfiniteScroll(viewId) {
-    this._cleanupExistingScroll(viewId);
+    this._cleanupInfiniteScroll(viewId);
     const list = this._getListElement(viewId);
     if (!list) return;
 
-    const { trigger, observer } = this._createScrollComponents(viewId, list);
+    const trigger = document.createElement('div');
+    trigger.className = 'load-more-trigger';
     list.appendChild(trigger);
+
+    const observer = new IntersectionObserver(
+      this._createIntersectionCallback(viewId),
+      {
+        root: list,
+        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
+        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
+      }
+    );
+
     observer.observe(trigger);
     this.observers.set(viewId, observer);
+  }
+
+  _cleanupInfiniteScroll(viewId) {
+    const observer = this.observers.get(viewId);
+    if (observer) {
+      observer.disconnect();
+      const list = this._getListElement(viewId);
+      const trigger = list?.querySelector('.load-more-trigger');
+      if (trigger) {
+        trigger.remove();
+      }
+      this.observers.delete(viewId);
+    }
+  }
+
+  _createIntersectionCallback(viewId) {
+    let isLoading = false;
+    let timeoutId = null;
+
+    return async (entries) => {
+      if (!entries[0].isIntersecting || isLoading) return;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      timeoutId = setTimeout(async () => {
+        try {
+          isLoading = true;
+          const loadedCount = await this.loadMoreZaps(viewId);
+          if (loadedCount === 0) {
+            this._cleanupInfiniteScroll(viewId);
+          }
+        } finally {
+          isLoading = false;
+        }
+      }, 300);
+    };
+  }
+
+  _getListElement(viewId) {
+    return document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
+      ?.shadowRoot?.querySelector('.dialog-zap-list');
   }
 
   // 新しいメソッド: 残りのリファレンス情報を更新
@@ -281,176 +355,52 @@ class ZapSubscriptionManager {
     }
   }
 
-  // loadMoreZaps method with improved error handling
-  async loadMoreZaps(viewId) {
-    const state = cacheManager.getLoadState(viewId);
-    const config = this.getViewConfig(viewId);
-
-    if (!this.canLoadMore(state, config)) return 0;
-
-    try {
-      state.isLoading = true;
-      return await this.executeLoadMore(viewId, state, config);
-    } catch (error) {
-      console.error('[ZapManager] 追加ロード失敗:', error);
-      return 0;
-    } finally {
-      state.isLoading = false;
-    }
-  }
-
-  canLoadMore(state, config) {
+  _canLoadMore(state, config) {
     return config && !state.isLoading && state.lastEventTime;
   }
 
-  async executeLoadMore(viewId, state, config) {
+  async _executeLoadMore(viewId, state, config) {
     const decoded = decodeIdentifier(config.identifier, state.lastEventTime);
     if (!decoded) return 0;
 
-    let newEventsCount = 0;
     const batchEvents = [];
-    const batchSize = APP_CONFIG.BATCH_SIZE || 20; // バッチサイズを設定
+    const batchSize = APP_CONFIG.BATCH_SIZE || 20;
 
     try {
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Load timeout'));
-        }, APP_CONFIG.LOAD_TIMEOUT || 10000);
-
-        eventPool.subscribeToZaps(viewId, config, decoded, {
-          onevent: async (event) => {
-            if (event.created_at < state.lastEventTime) {
-              batchEvents.push(event);
-              newEventsCount++;
-              state.lastEventTime = Math.min(state.lastEventTime, event.created_at);
-
-              // バッチサイズに達したら処理を終了
-              if (batchEvents.length >= batchSize) {
-                clearTimeout(timeout);
-                resolve();
-              }
-            }
-          },
-          oneose: () => {
-            clearTimeout(timeout);
-            resolve();
-          }
-        });
-      });
-
-      // バッチ処理による一括表示
-      if (newEventsCount > 0) {
-        // 新しいイベントを時系列でソート
-        batchEvents.sort((a, b) => b.created_at - a.created_at);
-        
-        // まとめてキャッシュに追加
-        batchEvents.forEach(event => {
-          cacheManager.addZapEvent(viewId, event);
-        });
-
-        // UI一括更新
-        if (this.zapListUI) {
-          await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-        }
-
-        // 参照情報とプロフィール情報を並列で取得
-        await Promise.all([
-          this.updateEventReferenceBatch(batchEvents, viewId),
-          Promise.all(batchEvents.map(event => profilePool.verifyNip05Async(event.pubkey))),
-          Promise.all(batchEvents.map(event => statsManager.handleZapEvent(event, viewId)))
-        ]);
-
-        // リファレンス情報の一括更新
-        if (this.zapListUI) {
-          batchEvents.forEach(event => {
-            if (event.reference) {
-              this.zapListUI.updateZapReference(event);
-            }
-          });
-        }
+      await this._collectEvents(viewId, config, decoded, batchEvents, batchSize, state);
+      if (batchEvents.length > 0) {
+        await this._processBatchEvents(batchEvents, viewId);
       }
-
-      return newEventsCount;
-
+      return batchEvents.length;
     } catch (error) {
-      console.error('[ZapManager] 追加ロード処理エラー:', error);
+      console.error('Load more events failed:', error);
       return 0;
     }
   }
 
-  // 無限スクロール機能の改善
-  setupInfiniteScroll(viewId) {
-    this.cleanupInfiniteScroll(viewId);
-    const list = this.getListElement(viewId);
-    if (!list) return;
+  async _collectEvents(viewId, config, decoded, batchEvents, batchSize, state) {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Load timeout')), 
+        APP_CONFIG.LOAD_TIMEOUT || 10000);
 
-    const trigger = this.createScrollTrigger();
-    list.appendChild(trigger);
-
-    const observer = new IntersectionObserver(
-      this.createScrollHandler(viewId),
-      this.getObserverOptions(list)
-    );
-
-    observer.observe(trigger);
-    this.observers.set(viewId, observer);
-  }
-
-  cleanupInfiniteScroll(viewId) {
-    const observer = this.observers.get(viewId);
-    if (observer) {
-      observer.disconnect();
-      const list = this.getListElement(viewId);
-      const trigger = list?.querySelector('.load-more-trigger');
-      if (trigger) {
-        trigger.remove();
-      }
-      this.observers.delete(viewId);
-    }
-  }
-
-  getListElement(viewId) {
-    const dialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-    return dialog?.shadowRoot?.querySelector('.dialog-zap-list');
-  }
-
-  createScrollTrigger() {
-    const trigger = document.createElement('div');
-    trigger.className = 'load-more-trigger';
-    return trigger;
-  }
-
-  createScrollHandler(viewId) {
-    let isLoading = false;
-    let debounceTimer = null;
-
-    return async (entries) => {
-      const entry = entries[0];
-      if (!entry.isIntersecting || isLoading) return;
-
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(async () => {
-        if (isLoading) return;
-        
-        try {
-          isLoading = true;
-          const loadedCount = await this.loadMoreZaps(viewId);
-          if (loadedCount === 0) {
-            this.cleanupInfiniteScroll(viewId);
+      eventPool.subscribeToZaps(viewId, config, decoded, {
+        onevent: (event) => {
+          if (event.created_at < state.lastEventTime) {
+            batchEvents.push(event);
+            state.lastEventTime = Math.min(state.lastEventTime, event.created_at);
+            
+            if (batchEvents.length >= batchSize) {
+              clearTimeout(timeout);
+              resolve();
+            }
           }
-        } finally {
-          isLoading = false;
+        },
+        oneose: () => {
+          clearTimeout(timeout);
+          resolve();
         }
-      }, 300);
-    };
-  }
-
-  getObserverOptions(list) {
-    return {
-      root: list,
-      rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
-      threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
-    };
+      });
+    });
   }
 
   _initializeLoadState(viewId) {
@@ -499,43 +449,6 @@ class ZapSubscriptionManager {
     return currentLastTime;
   }
 
-  async _processBatchEvents(batchEvents, viewId) {
-    if (batchEvents.length > 0) {
-      const pubkeys = [...new Set(batchEvents.map(event => event.pubkey))];
-      
-      await Promise.all([
-        // プロフィール取得
-        profilePool.fetchProfiles(pubkeys),
-        
-        // リファレンス情報の取得と更新
-        this.updateEventReferenceBatch(batchEvents, viewId).then(() => {
-          batchEvents.forEach(event => {
-            if (event.reference && this.zapListUI) {
-              this.zapListUI.updateZapReference(event);
-            }
-          });
-        }),
-        
-        // 統計情報の更新
-        ...batchEvents.map(event => statsManager.handleZapEvent(event, viewId)),
-        
-        // NIP-05検証
-        ...batchEvents.map(event => profilePool.verifyNip05Async(event.pubkey))
-      ]);
-
-      // 最終的なUI更新
-      if (this.zapListUI) {
-        await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-      }
-    }
-  }
-
-  async _finalizeEventCollection(batchEvents, viewId) {
-    if (batchEvents.length > 0 && this.zapListUI) {
-      await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-    }
-  }
-
   updateUIReferences(events) {
     if (!this.zapListUI) return;
     events.forEach(event => {
@@ -547,49 +460,6 @@ class ZapSubscriptionManager {
 
   _isValidReferenceConfig(config) {
     return config?.relayUrls?.length && !isEventIdentifier(config?.identifier || '');
-  }
-
-  async _fetchEventReference(event, config) {
-    const fetchFn = async () => {
-      const aTag = event.tags.find(tag => tag[0] === 'a');
-      const eTag = event.tags.find(tag => tag[0] === 'e');
-      
-      if (aTag) {
-        try {
-          return await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
-        } catch (error) {
-          console.warn("A-tag reference fetch failed:", error);
-        }
-      }
-
-      if (eTag && /^[0-9a-f]{64}$/.test(eTag[1].toLowerCase())) {
-        try {
-          return await eventPool.fetchReference(config.relayUrls, eTag[1]);
-        } catch (error) {
-          console.warn("E-tag reference fetch failed:", error);
-        }
-      }
-      
-      return null;
-    };
-
-    return await cacheManager.getOrFetchReference(event.id, fetchFn);
-  }
-
-  _createScrollComponents(viewId, list) {
-    const trigger = document.createElement('div');
-    trigger.className = 'load-more-trigger';
-
-    const observer = new IntersectionObserver(
-      this._createScrollHandler(viewId),
-      {
-        root: list,
-        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
-        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
-      }
-    );
-
-    return { trigger, observer };
   }
 }
 
