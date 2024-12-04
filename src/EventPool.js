@@ -11,55 +11,66 @@ export class EventPool {
   constructor() {
     this.zapPool = new SimplePool();
     this.subscriptions = new Map();
-    this.state = new Map();
-
-    this.etagProcessor = new ETagReferenceProcessor(this, {
-      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
-      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY,
-    });
-    this.aTagProcessor = new ATagReferenceProcessor(this, {
-      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
-      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY,
-    });
-
+    this.state = new Map();  // stateマップの初期化を追加
     this.isConnected = false;
+
+    this.etagProcessor = new ETagReferenceProcessor({
+      pool: this.zapPool,  // zapPoolオブジェクトを直接渡す
+      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
+    });
+
+    this.aTagProcessor = new ATagReferenceProcessor({
+      pool: this.zapPool,  // zapPoolオブジェクトを直接渡す
+      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
+    });
   }
 
   async connectToRelays(zapRelayUrls) {
     if (this.isConnected) return;
 
     try {
-      await profilePool.connectToRelays();  // プロフィールリレーの接続
-      
-      console.log("Connecting to zap relays...", zapRelayUrls);
-      await Promise.allSettled(
-        zapRelayUrls.map(url => this.zapPool.ensureRelay(url))
-      );
+      // 各プロセッサーにリレーURLを設定
+      this.etagProcessor.setRelayUrls(zapRelayUrls);
+      this.aTagProcessor.setRelayUrls(zapRelayUrls);
+
+      // 並列で接続処理を実行
+      await Promise.all([
+        this.etagProcessor.connectToRelays(),
+        this.aTagProcessor.connectToRelays()
+      ]);
 
       this.isConnected = true;
-      console.log("All relays connected");
+      console.log("Zap relays connected");
     } catch (error) {
-      console.error("Relay connection error:", error);
+      console.error("Zap relay connection error:", error);
+      throw error;
     }
   }
 
   closeSubscription(viewId) {
-    const subs = this.subscriptions.get(viewId);
+    const subscription = this.subscriptions.get(viewId);
     const state = this.state.get(viewId);
 
-    if (subs?.zap && !state?.isZapClosed) {
-      subs.zap.close();
+    if (!subscription || !state) return;  // 存在チェックを追加
+
+    if (subscription.zap && !state.isZapClosed) {
+      subscription.zap.close();
       state.isZapClosed = true;
     }
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {
-    this.closeSubscription(viewId);
-
+    // 既存の購読を閉じる前に、新しい状態を初期化
     if (!this.subscriptions.has(viewId)) {
       this.subscriptions.set(viewId, { zap: null });
+    }
+    if (!this.state.has(viewId)) {
       this.state.set(viewId, { isZapClosed: false });
     }
+
+    this.closeSubscription(viewId);  // 既存の購読を閉じる
 
     const state = this.state.get(viewId);
     state.isZapClosed = false;

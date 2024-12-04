@@ -23,7 +23,22 @@ export class ProfilePool {
     if (!ProfilePool.instance) {
       this._config = PROFILE_CONFIG;
       this.simplePool = new SimplePool();
+
+      // SimplePoolの検証を追加
+      if (!this.simplePool?.ensureRelay) {
+        throw new Error('Failed to initialize SimplePool');
+      }
+
       this.isInitialized = false;
+      
+      this.profileProcessor = new ProfileProcessor({ 
+        simplePool: this.simplePool,
+        config: {
+          ...this._config,
+          RELAYS: this._config.RELAYS || []
+        }
+      });
+      
       ProfilePool.instance = this;
     }
     return ProfilePool.instance;
@@ -33,54 +48,13 @@ export class ProfilePool {
     if (this.isInitialized) return;
     
     try {
-      await this.connectToRelays();
-      
-      // SimplePoolの初期化確認
-      if (!this._config.RELAYS?.length) {
-        throw new Error('No relays configured for profile fetch');
-      }
-
-      this.profileProcessor = new ProfileProcessor({ 
-        simplePool: this.simplePool,
-        config: this._config 
-      });
-      
+      const connectedCount = await this.profileProcessor.connectToRelays();
+      console.log(`Profile relays connected (${connectedCount}/${this._config.RELAYS.length})`);
       this.isInitialized = true;
-      console.log('ProfilePool initialized with relays:', this._config.RELAYS);
     } catch (error) {
       console.error('ProfilePool initialization error:', error);
       this.isInitialized = false;
       throw error;
-    }
-  }
-
-  async connectToRelays() {
-    if (!this._config.RELAYS?.length) {
-      throw new Error('No relays configured');
-    }
-
-    try {
-      console.log("Connecting to profile relays...", this._config.RELAYS);
-      
-      const connectionPromises = this._config.RELAYS.map(url => 
-        this.simplePool.ensureRelay(url)
-          .catch(error => {
-            console.warn(`Failed to connect to relay ${url}:`, error);
-            return null;
-          })
-      );
-
-      const results = await Promise.allSettled(connectionPromises);
-      const connectedCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
-
-      if (connectedCount === 0) {
-        throw new Error('Failed to connect to any relay');
-      }
-
-      console.log(`Profile relays connected (${connectedCount}/${this._config.RELAYS.length})`);
-    } catch (error) {
-      console.error("Profile relay connection error:", error);
-      throw error;  // 上位でハンドリングするためにエラーを再スロー
     }
   }
 

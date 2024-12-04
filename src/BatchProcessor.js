@@ -7,6 +7,11 @@ export class BatchProcessor {
     this.resolvers = new Map();
     this.processingItems = new Set();
     this.batchTimer = null;
+    if (!options.pool?.ensureRelay) {
+      throw new Error('Invalid pool object: ensureRelay method is required');
+    }
+    this.pool = options.pool;
+    this.relayUrls = options.relayUrls || [];
   }
 
   getOrCreateFetchPromise(key) {
@@ -106,7 +111,7 @@ export class BatchProcessor {
 
   // プール参照を抽象化
   _getSubscriptionPool() {
-    throw new Error("_getSubscriptionPool must be implemented by derived class");
+    return this.pool;
   }
 
   // 共通のプロミスベースの処理を抽象化
@@ -141,24 +146,53 @@ export class BatchProcessor {
       }, 5000);
     });
   }
-}
-
-export class ETagReferenceProcessor extends BatchProcessor {
-  constructor(pool, options = {}) {
-    super({
-      batchSize: options.batchSize || 50,
-      batchDelay: options.batchDelay || 100,
-    });
-    this.pool = pool;
-    this.relayUrls = [];
-  }
 
   setRelayUrls(urls) {
     this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
-  _getSubscriptionPool() {
-    return this.pool.zapPool;
+  async connectToRelays() {
+    if (!this.relayUrls?.length) {
+      throw new Error('No relays configured');
+    }
+
+    try {
+      const pool = this._getSubscriptionPool();
+      const connectionPromises = this.relayUrls.map(url => 
+        pool.ensureRelay(url)
+          .catch(error => {
+            console.warn(`Failed to connect to relay ${url}:`, error);
+            return null;
+          })
+      );
+
+      const results = await Promise.allSettled(connectionPromises);
+      const connectedCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+
+      if (connectedCount === 0) {
+        throw new Error('Failed to connect to any relay');
+      }
+
+      return connectedCount;
+    } catch (error) {
+      console.error("Relay connection error:", error);
+      throw error;
+    }
+  }
+}
+
+export class ETagReferenceProcessor extends BatchProcessor {
+  constructor(options = {}) {
+    super({
+      pool: options.pool,
+      batchSize: options.batchSize || 50,
+      batchDelay: options.batchDelay || 100,
+    });
+    this.relayUrls = [];
+  }
+
+  setRelayUrls(urls) {
+    this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
   async onBatchProcess(items) {
@@ -182,21 +216,17 @@ export class ETagReferenceProcessor extends BatchProcessor {
 }
 
 export class ATagReferenceProcessor extends BatchProcessor {
-  constructor(pool, options = {}) {
+  constructor(options = {}) {
     super({
+      pool: options.pool,
       batchSize: options.batchSize || 50,
       batchDelay: options.batchDelay || 100,
     });
-    this.pool = pool;
     this.relayUrls = [];
   }
 
   setRelayUrls(urls) {
     this.relayUrls = Array.isArray(urls) ? urls : [];
-  }
-
-  _getSubscriptionPool() {
-    return this.pool.zapPool;
   }
 
   _parseAtagValue(aTagValue) {
@@ -253,25 +283,23 @@ export class ATagReferenceProcessor extends BatchProcessor {
 }
 
 export class ProfileProcessor extends BatchProcessor {
-  constructor({ simplePool, config }) {
+  constructor(options = {}) {
+    const { simplePool, config } = options;
+    if (!simplePool?.ensureRelay) {
+      throw new Error('Invalid simplePool: ensureRelay method is required');
+    }
+
     super({
+      pool: simplePool,
       batchSize: config.BATCH_SIZE,
-      batchDelay: config.BATCH_DELAY
+      batchDelay: config.BATCH_DELAY,
+      relayUrls: config.RELAYS
     });
     
-    this.simplePool = simplePool;
     this.config = config;
   }
 
-  _getSubscriptionPool() {
-    return this.simplePool;
-  }
-
   async onBatchProcess(pubkeys) {
-    if (!this.simplePool) {
-      throw new Error('SimplePool not available');
-    }
-
     if (!this.config.RELAYS?.length) {
       throw new Error('No relays configured for profile fetch');
     }
