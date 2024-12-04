@@ -41,19 +41,16 @@ export class CacheManager {
   constructor() {
     if (this.#instance) return this.#instance;
 
-    this.caches = {
-      reference: new BaseCache(),
-      zapInfo: new BaseCache(),
-      uiComponent: new BaseCache(),
-      decoded: new BaseCache(),
-      profile: new BaseCache(),
-      nip05: new BaseCache(),
-      nip05PendingFetches: new BaseCache(),
-      zapEvents: new BaseCache(),
-      zapLoadStates: new BaseCache(),
-      profileFetching: new BaseCache(), // Add: プロフィール取得中のPromiseを保持
-      imageCache: new BaseCache(), // 画像キャッシュを追加
-    };
+    const CACHE_NAMES = [
+      'reference', 'zapInfo', 'uiComponent', 'decoded',
+      'profile', 'nip05', 'nip05PendingFetches', 'zapEvents',
+      'zapLoadStates', 'profileFetching', 'imageCache'
+    ];
+
+    this.caches = CACHE_NAMES.reduce((acc, name) => ({
+      ...acc,
+      [name]: new BaseCache()
+    }), {});
 
     this.viewStats = new Map();
     this.viewStates = new Map();
@@ -61,62 +58,106 @@ export class CacheManager {
     this.#instance = this;
   }
 
-  // Cache methods
-  setCache(cacheName, key, value) {
-    this.caches[cacheName].set(key, value);
+  // キャッシュ操作の基本メソッド
+  _cacheOperation(cacheName, operation, key, value) {
+    const cache = this.caches[cacheName];
+    if (!cache) return null;
+    
+    return cache[operation]?.(key, value);
   }
 
-  getCache(cacheName, key) {
-    return this.caches[cacheName].get(key);
+  // 統一されたキャッシュアクセスメソッド
+  setCacheItem(cacheName, key, value) { return this._cacheOperation(cacheName, 'set', key, value); }
+  getCacheItem(cacheName, key) { return this._cacheOperation(cacheName, 'get', key); }
+  hasCacheItem(cacheName, key) { return this._cacheOperation(cacheName, 'has', key); }
+  deleteCacheItem(cacheName, key) { return this._cacheOperation(cacheName, 'delete', key); }
+  clearCacheItems(cacheName) { return this._cacheOperation(cacheName, 'clear'); }
+
+  // プロフィール関連の統合メソッド
+  async getOrFetchProfile(pubkey, fetchFn) {
+    const cached = this.getCacheItem('profile', pubkey);
+    if (cached) return cached;
+
+    const fetching = this.getCacheItem('profileFetching', pubkey);
+    if (fetching) return fetching;
+
+    const promise = fetchFn(pubkey).then(profile => {
+      if (profile) this.notifyProfileUpdate(pubkey, profile);
+      this.deleteCacheItem('profileFetching', pubkey);
+      return profile;
+    });
+
+    this.setCacheItem('profileFetching', pubkey, promise);
+    return promise;
   }
 
-  deleteCache(cacheName, key) {
-    this.caches[cacheName].delete(key);
+  // イベント処理の統一メソッド
+  _processEvent(event, existingEvents) {
+    return existingEvents.some(e => 
+      e.id === event.id || 
+      (e.kind === event.kind && 
+       e.pubkey === event.pubkey && 
+       e.content === event.content && 
+       e.created_at === event.created_at)
+    );
   }
 
-  clearCache(cacheName) {
-    this.caches[cacheName].clear();
+  // View状態管理の統合メソッド
+  getOrCreateViewState(viewId, defaultState = {}) {
+    if (!this.viewStates.has(viewId)) {
+      this.viewStates.set(viewId, defaultState);
+    }
+    return this.viewStates.get(viewId);
+  }
+
+  // キャッシュクリア操作の統合
+  clearViewCache(viewId) {
+    ['zapEvents', 'zapLoadStates'].forEach(cache => 
+      this.deleteCacheItem(cache, viewId)
+    );
+    this.viewStats.delete(viewId);
+    this.viewStates.delete(viewId);
   }
 
   // Reference methods
-  setReference(eventId, reference) { this.setCache('reference', eventId, reference); }
-  getReference(eventId) { return this.getCache('reference', eventId); }
-  clearReference(eventId) { this.deleteCache('reference', eventId); }
+  setReference(eventId, reference) { this.setCacheItem('reference', eventId, reference); }
+  getReference(eventId) { return this.getCacheItem('reference', eventId); }
+  clearReference(eventId) { this.deleteCacheItem('reference', eventId); }
 
   // ZapInfo methods
-  setZapInfo(eventId, info) { this.setCache('zapInfo', eventId, info); }
-  getZapInfo(eventId) { return this.getCache('zapInfo', eventId); }
-  clearZapInfo(eventId) { this.deleteCache('zapInfo', eventId); }
+  setZapInfo(eventId, info) { this.setCacheItem('zapInfo', eventId, info); }
+  getZapInfo(eventId) { return this.getCacheItem('zapInfo', eventId); }
+  clearZapInfo(eventId) { this.deleteCacheItem('zapInfo', eventId); }
 
   // UI Component cache methods
-  setUIComponent(referenceId, html) { this.setCache('uiComponent', referenceId, html); }
-  getUIComponent(referenceId) { return this.getCache('uiComponent', referenceId); }
-  clearUIComponent(referenceId) { this.deleteCache('uiComponent', referenceId); }
-  clearAllUIComponents() { this.clearCache('uiComponent'); }
+  setUIComponent(referenceId, html) { this.setCacheItem('uiComponent', referenceId, html); }
+  getUIComponent(referenceId) { return this.getCacheItem('uiComponent', referenceId); }
+  clearUIComponent(referenceId) { this.deleteCacheItem('uiComponent', referenceId); }
+  clearAllUIComponents() { this.clearCacheItems('uiComponent'); }
 
   // Reference component cache methods
   setReferenceComponent(referenceId, html) {
     if (!this.caches.uiComponent.has(referenceId)) {
-      this.setCache('uiComponent', referenceId, html);
+      this.setCacheItem('uiComponent', referenceId, html);
     }
   }
 
   getReferenceComponent(referenceId) {
-    return this.getCache('uiComponent', referenceId);
+    return this.getCacheItem('uiComponent', referenceId);
   }
 
   // Clear methods
   clearAll() {
-    Object.keys(this.caches).forEach(cacheName => this.clearCache(cacheName));
+    Object.keys(this.caches).forEach(cacheName => this.clearCacheItems(cacheName));
     this.viewStats.clear();
     this.viewStates.clear();
   }
 
   // Decoded cache methods
-  setDecoded(key, value) { this.setCache('decoded', key, value); }
-  getDecoded(key) { return this.getCache('decoded', key); }
+  setDecoded(key, value) { this.setCacheItem('decoded', key, value); }
+  getDecoded(key) { return this.getCacheItem('decoded', key); }
   hasDecoded(key) { return this.caches.decoded.has(key); }
-  clearDecoded() { this.clearCache('decoded'); }
+  clearDecoded() { this.clearCacheItems('decoded'); }
 
   // View stats cache methods
   getOrCreateViewCache(viewId) {
@@ -149,39 +190,20 @@ export class CacheManager {
   }
 
   // Profile cache methods
-  setProfile(pubkey, profile) { this.setCache('profile', pubkey, profile); }
-  getProfile(pubkey) { return this.getCache('profile', pubkey); }
+  setProfile(pubkey, profile) { this.setCacheItem('profile', pubkey, profile); }
+  getProfile(pubkey) { return this.getCacheItem('profile', pubkey); }
   hasProfile(pubkey) { return this.caches.profile.has(pubkey); }
 
   setProfileFetching(pubkey, promise) {
-    this.setCache('profileFetching', pubkey, promise);
+    this.setCacheItem('profileFetching', pubkey, promise);
   }
 
   getProfileFetching(pubkey) {
-    return this.getCache('profileFetching', pubkey);
+    return this.getCacheItem('profileFetching', pubkey);
   }
 
   clearProfileFetching(pubkey) {
-    this.deleteCache('profileFetching', pubkey);
-  }
-
-  async getOrFetchProfile(pubkey, fetchFn) {
-    const cached = this.getProfile(pubkey);
-    if (cached) return cached;
-
-    // 既に取得中のPromiseがあればそれを返す
-    const fetching = this.getProfileFetching(pubkey);
-    if (fetching) return fetching;
-
-    // 新しく取得を開始
-    const promise = fetchFn(pubkey).then(profile => {
-      if (profile) this.setProfile(pubkey, profile);
-      this.clearProfileFetching(pubkey);
-      return profile;
-    });
-
-    this.setProfileFetching(pubkey, promise);
-    return promise;
+    this.deleteCacheItem('profileFetching', pubkey);
   }
 
   // プロフィール更新通知の購読
@@ -212,18 +234,35 @@ export class CacheManager {
   }
 
   // NIP-05 cache methods
-  setNip05(pubkey, nip05) { this.setCache('nip05', pubkey, nip05); }
-  getNip05(pubkey) { return this.getCache('nip05', pubkey); }
-  setNip05PendingFetch(pubkey, promise) { this.setCache('nip05PendingFetches', pubkey, promise); }
-  getNip05PendingFetch(pubkey) { return this.getCache('nip05PendingFetches', pubkey); }
-  deleteNip05PendingFetch(pubkey) { this.deleteCache('nip05PendingFetches', pubkey); }
+  setNip05(pubkey, nip05) { this.setCacheItem('nip05', pubkey, nip05); }
+  getNip05(pubkey) { return this.getCacheItem('nip05', pubkey); }
+  setNip05PendingFetch(pubkey, promise) { this.setCacheItem('nip05PendingFetches', pubkey, promise); }
+  getNip05PendingFetch(pubkey) { return this.getCacheItem('nip05PendingFetches', pubkey); }
+  deleteNip05PendingFetch(pubkey) { this.deleteCacheItem('nip05PendingFetches', pubkey); }
+
+  // イベント処理メソッドを追加
+  _processEvents(events, eventId) {
+    return events.some(e => 
+      e.id === eventId || 
+      (e.kind === event.kind && 
+       e.pubkey === event.pubkey && 
+       e.content === event.content && 
+       e.created_at === event.created_at)
+    );
+  }
 
   // Zap events cache methods
-  getZapEvents(viewId) { return this.getCache('zapEvents', viewId) || []; }
-  setZapEvents(viewId, events) { this.setCache('zapEvents', viewId, events); }
+  getZapEvents(viewId) { return this.getCacheItem('zapEvents', viewId) || []; }
+  setZapEvents(viewId, events) { this.setCacheItem('zapEvents', viewId, events); }
   addZapEvent(viewId, event) {
     const events = this.getZapEvents(viewId);
-    const isDuplicate = events.some(e => e.id === event.id || (e.kind === event.kind && e.pubkey === event.pubkey && e.content === event.content && e.created_at === event.created_at));
+    const isDuplicate = events.some(e => 
+      e.id === event.id || 
+      (e.kind === event.kind && 
+       e.pubkey === event.pubkey && 
+       e.content === event.content && 
+       e.created_at === event.created_at)
+    );
     if (!isDuplicate) {
       const updatedEvents = [...events, event];
       updatedEvents.sort((a, b) => b.created_at - a.created_at);
@@ -238,18 +277,19 @@ export class CacheManager {
     if (!this.caches.zapLoadStates.has(viewId)) {
       this.caches.zapLoadStates.set(viewId, { isInitialFetchComplete: false, isLoading: false, lastEventTime: null });
     }
-    return this.getCache('zapLoadStates', viewId);
+    return this.getCacheItem('zapLoadStates', viewId);
   }
 
   updateLoadState(viewId, updates) {
     const currentState = this.getLoadState(viewId);
-    this.setCache('zapLoadStates', viewId, { ...currentState, ...updates });
+    this.setCacheItem('zapLoadStates', viewId, { ...currentState, ...updates });
   }
 
   clearViewCache(viewId) {
-    ['zapEvents', 'zapLoadStates', 'viewStats', 'viewStates'].forEach(cacheName => this.deleteCache(cacheName, viewId));
+    ['zapEvents', 'zapLoadStates', 'viewStats', 'viewStates'].forEach(cacheName => this.deleteCacheItem(cacheName, viewId));
   }
 
+  // View状態管理メソッドを追加
   getViewState(viewId, defaultState = {}) {
     if (!this.viewStates.has(viewId)) {
       this.viewStates.set(viewId, defaultState);
@@ -304,11 +344,11 @@ export class CacheManager {
 
   // 画像キャッシュ用メソッドを追加
   setImageCache(url, img) {
-    this.setCache('imageCache', url, img);
+    this.setCacheItem('imageCache', url, img);
   }
 
   getImageCache(url) {
-    return this.getCache('imageCache', url);
+    return this.getCacheItem('imageCache', url);
   }
 
   hasImageCache(url) {
