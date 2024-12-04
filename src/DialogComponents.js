@@ -16,7 +16,7 @@ const REFERENCE_KIND_MAPPING = {
   30030: 'title',
   30009: 'name',
   40: 'name',
-  41: 'name',
+  42: 'name',
   31990: 'alt'
 };
 

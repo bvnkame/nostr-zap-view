@@ -84,7 +84,7 @@ export const BATCH_CONFIG = {
     BATCH_SIZE: 20,
     BATCH_DELAY: 50,
   },
-  SUPPORTED_EVENT_KINDS: [1, 30023, 30030, 30009, 40, 41, 31990],
+  SUPPORTED_EVENT_KINDS: [1, 30023, 30030, 30009, 40, 42, 31990],
 };
 
 export class ViewerConfig {

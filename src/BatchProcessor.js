@@ -197,7 +197,7 @@ export class ETagReferenceProcessor extends BatchProcessor {
 
   async onBatchProcess(items) {
     const filter = [{
-      kinds: [1, 30023, 30030, 30009, 40, 41, 31990],
+      kinds: [1, 30023, 30030, 30009, 40, 42, 31990],
       ids: items
     }];
 
