@@ -211,6 +211,23 @@ export class ProfilePool {
   getNip05(pubkey) {
     return cacheManager.getNip05(pubkey);
   }
+
+  // 新しく追加: 複数のプロファイルを並行処理
+  async processBatchProfiles(events) {
+    const pubkeys = [...new Set(events.map(event => event.pubkey))];
+    if (pubkeys.length === 0) return;
+
+    await Promise.all([
+      this.fetchProfiles(pubkeys),
+      ...pubkeys.map(pubkey => this.verifyNip05Async(pubkey))
+    ]);
+  }
+
+  // 新しく追加: プロファイルとNIP-05の検証を一括処理
+  async processEventProfiles(events) {
+    const pubkeys = [...new Set(events.map(event => event.pubkey))];
+    await this.processBatchProfiles(pubkeys);
+  }
 }
 
 export const profilePool = new ProfilePool();

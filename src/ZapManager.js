@@ -29,16 +29,14 @@ class ZapSubscriptionManager {
   // コア機能
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
-      const [hasReference, profiles] = await Promise.all([
+      const [hasReference] = await Promise.all([
         this._processEventReference(event, viewId),
-        profilePool.fetchProfiles([event.pubkey])
+        profilePool.processBatchProfiles([event])  // 変更: ProfilePoolに処理を委譲
       ]);
 
       if (shouldUpdateUI && this.zapListUI) {
         await this.zapListUI.appendZap(event);
       }
-
-      await this._processEventMetadata(event, viewId);
 
       if (hasReference && shouldUpdateUI && this.zapListUI && event.reference) {
         this.zapListUI.updateZapReference(event);
@@ -66,13 +64,6 @@ class ZapSubscriptionManager {
       return true;
     }
     return false;
-  }
-
-  async _processEventMetadata(event, viewId) {
-    await Promise.all([
-      statsManager.handleZapEvent(event, viewId),
-      profilePool.verifyNip05Async(event.pubkey)
-    ]);
   }
 
   async updateEventReference(event, viewId) {
@@ -186,34 +177,23 @@ class ZapSubscriptionManager {
   async _processBatchEvents(events, viewId) {
     if (!events?.length) return;
 
-    // イベントを時系列順にソート
     events.sort((a, b) => b.created_at - a.created_at);
-    
-    // キャッシュに追加
     events.forEach(event => cacheManager.addZapEvent(viewId, event));
 
-    const pubkeys = [...new Set(events.map(event => event.pubkey))];
-    
-    // プロファイル情報とリファレンス情報を並列で取得
+    // プロファイル処理をProfilePoolに委譲
     await Promise.all([
-      profilePool.fetchProfiles(pubkeys),
+      profilePool.processEventProfiles(events),
       this.updateEventReferenceBatch(events, viewId),
-      ...events.map(event => statsManager.handleZapEvent(event, viewId)),
-      ...events.map(event => profilePool.verifyNip05Async(event.pubkey))
+      ...events.map(event => statsManager.handleZapEvent(event, viewId))
     ]);
 
-    // まとめてUIを更新
     if (this.zapListUI) {
-      // まずイベントリストを更新
       await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
       
-      // その後でリファレンス情報を更新
       const eventsWithRefs = events.filter(event => event.reference);
-      if (eventsWithRefs.length > 0) {
-        eventsWithRefs.forEach(event => {
-          this.zapListUI.updateZapReference(event);
-        });
-      }
+      eventsWithRefs.forEach(event => {
+        this.zapListUI.updateZapReference(event);
+      });
     }
   }
 
