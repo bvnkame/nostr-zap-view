@@ -94,6 +94,18 @@ export class ZapListUI {
       for (const event of uniqueEvents) {
         const zapInfo = await this.#handleZapInfo(event);
         const li = this.itemBuilder.createListItem(zapInfo, event);
+        
+        // キャッシュされた参照情報があれば表示
+        const reference = cacheManager.getReference(event.id);
+        if (reference) {
+          const referenceContainer = li.querySelector('.reference-container');
+          if (referenceContainer) {
+            referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+              reference 
+            });
+          }
+        }
+
         fragment.appendChild(li);
 
         if (zapInfo.pubkey) {
