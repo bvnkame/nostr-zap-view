@@ -9,6 +9,7 @@ import {
 import { APP_CONFIG, ZAP_AMOUNT_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
+import { eventPool } from "../EventPool.js"; // 追加: EventPoolをインポート
 
 class ZapItemBuilder {
   constructor(viewId, isColorModeEnabled) {

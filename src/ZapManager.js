@@ -371,8 +371,17 @@ class ZapSubscriptionManager {
 
   // インフィニットスクロールの処理を改善
   setupInfiniteScroll(viewId) {
+    // 既存のobserverをクリーンアップ
+    this.cleanupInfiniteScroll(viewId);
+
     const list = this.getListElement(viewId);
-    if (!list || this.observers?.get(viewId)) return;
+    if (!list) return;
+
+    // 既存のtriggerを削除
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    if (existingTrigger) {
+      existingTrigger.remove();
+    }
 
     const trigger = this.createScrollTrigger();
     list.appendChild(trigger);
@@ -380,6 +389,19 @@ class ZapSubscriptionManager {
     const observer = this.createIntersectionObserver(viewId, trigger, list);
     observer.observe(trigger);
     this.observers.set(viewId, observer);
+  }
+
+  cleanupInfiniteScroll(viewId) {
+    const observer = this.observers.get(viewId);
+    if (observer) {
+      observer.disconnect();
+      const list = this.getListElement(viewId);
+      const trigger = list?.querySelector('.load-more-trigger');
+      if (trigger) {
+        trigger.remove();
+      }
+      this.observers.delete(viewId);
+    }
   }
 
   getListElement(viewId) {
@@ -411,7 +433,7 @@ class ZapSubscriptionManager {
             const loadedCount = await this.loadMoreZaps(viewId);
             
             if (loadedCount === 0) {
-              this.cleanupInfiniteScroll(viewId, trigger);
+              this.cleanupInfiniteScroll(viewId); // 引数を1つに修正
             }
           } catch (error) {
             console.error('[ZapManager] 追加ロード実行エラー:', error);
@@ -428,11 +450,15 @@ class ZapSubscriptionManager {
     );
   }
 
-  cleanupInfiniteScroll(viewId, trigger) {
+  cleanupInfiniteScroll(viewId) {
     const observer = this.observers.get(viewId);
     if (observer) {
       observer.disconnect();
-      trigger.remove();
+      const list = this.getListElement(viewId);
+      const trigger = list?.querySelector('.load-more-trigger');
+      if (trigger) {
+        trigger.remove();
+      }
       this.observers.delete(viewId);
     }
   }

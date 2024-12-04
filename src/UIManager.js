@@ -121,6 +121,10 @@ class NostrZapViewDialog extends HTMLElement {
   // Delegate methods to specialized UI classes
   async renderZapListFromCache(zapEventsCache) {
     await this.zapListUI.renderZapListFromCache(zapEventsCache);
+    // キャッシュからの表示後に無限スクロールを設定
+    if (zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+      subscriptionManager.setupInfiniteScroll(this.viewId);
+    }
   }
 
   initializeZapStats() {
