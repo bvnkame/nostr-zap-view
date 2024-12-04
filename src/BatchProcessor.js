@@ -1,4 +1,3 @@
-// BaseクラスをDefaultエクスポートに変更
 export class BatchProcessor {
   constructor(options = {}) {
     this.batchSize = options.batchSize || 50;
@@ -93,9 +92,57 @@ export class BatchProcessor {
   onBatchError(items, error) {
     throw new Error("Not implemented");
   }
+
+  // 共通の_cleanup処理を基底クラスに移動
+  _cleanup(timeoutId, sub, items, processedItems) {
+    clearTimeout(timeoutId);
+    if (sub) sub.close();
+    items.forEach(item => {
+      if (!processedItems.has(item) && this.resolvers.has(item)) {
+        this.resolveItem(item, null);
+      }
+    });
+  }
+
+  // プール参照を抽象化
+  _getSubscriptionPool() {
+    throw new Error("_getSubscriptionPool must be implemented by derived class");
+  }
+
+  // 共通のプロミスベースの処理を抽象化
+  async _createSubscriptionPromise(items, relayUrls, filter, eventHandler) {
+    if (!relayUrls?.length) {
+      items.forEach(id => this.resolveItem(id, null));
+      return;
+    }
+
+    return new Promise((resolve) => {
+      const processedItems = new Set();
+      let timeoutId;
+
+      const pool = this._getSubscriptionPool();
+      const sub = pool.subscribeMany(
+        relayUrls,
+        filter,
+        {
+          onevent: (event) => {
+            eventHandler(event, processedItems);
+          },
+          oneose: () => {
+            this._cleanup(timeoutId, sub, items, processedItems);
+            resolve();
+          }
+        }
+      );
+
+      timeoutId = setTimeout(() => {
+        this._cleanup(timeoutId, sub, items, processedItems);
+        resolve();
+      }, 5000);
+    });
+  }
 }
 
-// 各ProcessorクラスはBaseクラスと同じファイルで定義
 export class ETagReferenceProcessor extends BatchProcessor {
   constructor(pool, options = {}) {
     super({
@@ -110,49 +157,22 @@ export class ETagReferenceProcessor extends BatchProcessor {
     this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
-  async onBatchProcess(items) {
-    if (!this.relayUrls.length) {
-      items.forEach(id => this.resolveItem(id, null));
-      return;
-    }
-
-    return new Promise((resolve) => {
-      const processedEvents = new Set();
-      let timeoutId;
-
-      const sub = this.pool.zapPool.subscribeMany(
-        this.relayUrls,
-        [{
-          kinds: [1, 30023, 30030, 30009, 40, 41, 31990],
-          ids: items
-        }],
-        {
-          onevent: (event) => {
-            this.resolveItem(event.id, event);
-            processedEvents.add(event.id);
-          },
-          oneose: () => {
-            this._cleanup(timeoutId, sub, items, processedEvents);
-            resolve();
-          }
-        }
-      );
-
-      timeoutId = setTimeout(() => {
-        this._cleanup(timeoutId, sub, items, processedEvents);
-        resolve();
-      }, 5000);
-    });
+  _getSubscriptionPool() {
+    return this.pool.zapPool;
   }
 
-  _cleanup(timeoutId, sub, items, processedEvents) {
-    clearTimeout(timeoutId);
-    if (sub) sub.close();
-    items.forEach(item => {
-      if (!processedEvents.has(item) && this.resolvers.has(item)) {
-        this.resolveItem(item, null);
-      }
-    });
+  async onBatchProcess(items) {
+    const filter = [{
+      kinds: [1, 30023, 30030, 30009, 40, 41, 31990],
+      ids: items
+    }];
+
+    const eventHandler = (event, processedItems) => {
+      this.resolveItem(event.id, event);
+      processedItems.add(event.id);
+    };
+
+    return this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
   }
 
   onBatchError(items, error) {
@@ -175,49 +195,22 @@ export class ATagReferenceProcessor extends BatchProcessor {
     this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
-  async onBatchProcess(items) {
-    if (!this.relayUrls.length) {
-      items.forEach(id => this.resolveItem(id, null));
-      return;
-    }
-
-    return new Promise((resolve) => {
-      const processedEvents = new Set();
-      let timeoutId;
-
-      const sub = this.pool.zapPool.subscribeMany(
-        this.relayUrls,
-        items.map(aTagValue => ({ '#a': [aTagValue] })),
-        {
-          onevent: (event) => {
-            const aTagValue = event.tags.find(t => t[0] === 'a')?.[1];
-            if (aTagValue) {
-              this.resolveItem(aTagValue, event);
-              processedEvents.add(aTagValue);
-            }
-          },
-          oneose: () => {
-            this._cleanup(timeoutId, sub, items, processedEvents);
-            resolve();
-          }
-        }
-      );
-
-      timeoutId = setTimeout(() => {
-        this._cleanup(timeoutId, sub, items, processedEvents);
-        resolve();
-      }, 5000);
-    });
+  _getSubscriptionPool() {
+    return this.pool.zapPool;
   }
 
-  _cleanup(timeoutId, sub, items, processedEvents) {
-    clearTimeout(timeoutId);
-    if (sub) sub.close();
-    items.forEach(item => {
-      if (!processedEvents.has(item) && this.resolvers.has(item)) {
-        this.resolveItem(item, null);
+  async onBatchProcess(items) {
+    const filter = items.map(aTagValue => ({ '#a': [aTagValue] }));
+
+    const eventHandler = (event, processedItems) => {
+      const aTagValue = event.tags.find(t => t[0] === 'a')?.[1];
+      if (aTagValue) {
+        this.resolveItem(aTagValue, event);
+        processedItems.add(aTagValue);
       }
-    });
+    };
+
+    return this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
   }
 
   onBatchError(items, error) {
@@ -227,7 +220,7 @@ export class ATagReferenceProcessor extends BatchProcessor {
 }
 
 export class ProfileProcessor extends BatchProcessor {
-  constructor({ profilePool, config }) {  // 引数の構造を修正
+  constructor({ profilePool, config }) {
     super({
       batchSize: config.BATCH_SIZE || 50,
       batchDelay: config.BATCH_DELAY || 100,
@@ -236,50 +229,22 @@ export class ProfileProcessor extends BatchProcessor {
     this.config = config;
   }
 
-  async onBatchProcess(items) {
-    if (!this.config?.RELAYS?.length) {
-      console.warn("No profile relays configured");
-      items.forEach(item => this.resolveItem(item, null));
-      return;
-    }
-
-    return new Promise((resolve) => {
-      const processedProfiles = new Set();
-      let timeoutId;
-
-      const sub = this.profilePool.subscribeMany(
-        this.config.RELAYS,
-        [{
-          kinds: [0],
-          authors: items
-        }],
-        {
-          onevent: (event) => {
-            this.resolveItem(event.pubkey, event);
-            processedProfiles.add(event.pubkey);
-          },
-          oneose: () => {
-            this._cleanup(timeoutId, sub, items, processedProfiles);
-            resolve();
-          }
-        }
-      );
-
-      timeoutId = setTimeout(() => {
-        this._cleanup(timeoutId, sub, items, processedProfiles);
-        resolve();
-      }, 5000);
-    });
+  _getSubscriptionPool() {
+    return this.profilePool;
   }
 
-  _cleanup(timeoutId, sub, items, processedProfiles) {
-    clearTimeout(timeoutId);
-    if (sub) sub.close();
-    items.forEach(item => {
-      if (!processedProfiles.has(item) && this.resolvers.has(item)) {
-        this.resolveItem(item, null);
-      }
-    });
+  async onBatchProcess(items) {
+    const filter = [{
+      kinds: [0],
+      authors: items
+    }];
+
+    const eventHandler = (event, processedItems) => {
+      this.resolveItem(event.pubkey, event);
+      processedItems.add(event.pubkey);
+    };
+
+    return this._createSubscriptionPromise(items, this.config.RELAYS, filter, eventHandler);
   }
 
   onBatchError(items, error) {
