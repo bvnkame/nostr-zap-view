@@ -15,7 +15,7 @@ const REFERENCE_KIND_MAPPING = {
   30023: 'title',
   30030: 'title',
   30009: 'name',
-  40: 'name',
+  40: 'content',
   42: 'name',
   31990: 'alt'
 };
@@ -106,17 +106,19 @@ export class DialogComponents {
     return nonSourceTag?.[1];
   }
 
-  static #createNeventUrl(reference) {
-    return `https://njump.me/${encodeNevent(
-      reference.id,
-      reference.kind,
-      reference.pubkey
-    )}`;
-  }
-
   static #getReferenceContent(reference) {
     const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
     if (!tagKey) return reference.content;
+
+    if (reference.kind === 40) {
+      try {
+        const contentObj = JSON.parse(reference.content);
+        return contentObj.name || reference.content;
+      } catch (e) {
+        console.error('Failed to parse kind 40 content:', e);
+        return reference.content;
+      }
+    }
 
     if (tagKey === 'content') return reference.content;
     return reference.tags.find(t => t[0] === tagKey)?.[1] || reference.content;
