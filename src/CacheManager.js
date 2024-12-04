@@ -4,17 +4,31 @@ class BaseCache {
   constructor(maxSize = 1000) {
     this.cache = new Map();
     this.maxSize = maxSize;
+    this.accessOrder = new Map(); // LRU追跡用
   }
 
   set(key, value) {
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
+    if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
+      // 最も古いエントリーを削除
+      const oldestKey = this.accessOrder.keys().next().value;
+      this.cache.delete(oldestKey);
+      this.accessOrder.delete(oldestKey);
     }
     this.cache.set(key, value);
+    this.accessOrder.delete(key);
+    this.accessOrder.set(key, Date.now());
   }
 
-  get(key) { return this.cache.get(key); }
+  get(key) {
+    const value = this.cache.get(key);
+    if (value !== undefined) {
+      // アクセス順を更新
+      this.accessOrder.delete(key);
+      this.accessOrder.set(key, Date.now());
+    }
+    return value;
+  }
+
   has(key) { return this.cache.has(key); }
   delete(key) { this.cache.delete(key); }
   clear() { this.cache.clear(); }

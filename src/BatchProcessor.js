@@ -297,6 +297,8 @@ export class ProfileProcessor extends BatchProcessor {
     });
     
     this.config = config;
+    this.eventCache = new Map();  // プロフィールイベントのキャッシュを追加
+    this.maxCacheAge = 1800000;   // 30分のキャッシュ期限
   }
 
   async onBatchProcess(pubkeys) {
@@ -304,9 +306,24 @@ export class ProfileProcessor extends BatchProcessor {
       throw new Error('No relays configured for profile fetch');
     }
 
+    // 期限内のキャッシュがあるpubkeyをフィルタリング
+    const now = Date.now();
+    const uncachedPubkeys = pubkeys.filter(pubkey => {
+      const cached = this.eventCache.get(pubkey);
+      if (!cached) return true;
+      if (now - cached.timestamp > this.maxCacheAge) {
+        this.eventCache.delete(pubkey);
+        return true;
+      }
+      this.resolveItem(pubkey, cached.event);
+      return false;
+    });
+
+    if (uncachedPubkeys.length === 0) return;
+
     const filter = [{
       kinds: [0],
-      authors: pubkeys
+      authors: uncachedPubkeys
     }];
 
     const latestEvents = new Map();
@@ -316,6 +333,11 @@ export class ProfileProcessor extends BatchProcessor {
       
       if (!currentEvent || event.created_at > currentEvent.created_at) {
         latestEvents.set(event.pubkey, event);
+        // キャッシュを更新
+        this.eventCache.set(event.pubkey, {
+          event,
+          timestamp: now
+        });
       }
       // イベントを受信したことを記録
       processedItems.add(event.pubkey);
@@ -323,14 +345,14 @@ export class ProfileProcessor extends BatchProcessor {
 
     try {
       await this._createSubscriptionPromise(
-        pubkeys,
+        uncachedPubkeys,
         this.config.RELAYS,
         filter,
         eventHandler
       );
 
       // 最新のイベントをresolve
-      pubkeys.forEach(pubkey => {
+      uncachedPubkeys.forEach(pubkey => {
         const latestEvent = latestEvents.get(pubkey);
         this.resolveItem(pubkey, latestEvent || null);
       });

@@ -62,54 +62,55 @@ export class ProfilePool {
     if (!Array.isArray(pubkeys) || pubkeys.length === 0) {
       return [];
     }
-  
-    // すべてのpubkeyに対する取得Promise配列を作成
-    const profilePromises = pubkeys.map(async pubkey => {
-      try {
-        // 一時的なプロフィールをすぐに返す
-        if (cacheManager.hasProfile(pubkey)) {
-          const profile = cacheManager.getProfile(pubkey);
-          if (profile && profile._lastUpdated && Date.now() - profile._lastUpdated < 300000) {
-            return profile; // 5分以内に更新されたプロフィールはそのまま返す
-          }
-        }
-  
-        // 最新のプロフィールを非同期で取得
-        const latestProfile = await cacheManager.getOrFetchProfile(pubkey, async () => {
-          const event = await this.profileProcessor.getOrCreateFetchPromise(pubkey);
-          if (!event) {
-            console.log(`No profile found for pubkey: ${pubkey}`);
-            return this._createDefaultProfile();
-          }
 
-          try {
-            const content = JSON.parse(event.content);
-            const processedProfile = {
-              ...content,
-              name: getProfileDisplayName(content) || "nameless",
-              _lastUpdated: Date.now(),
-              _eventCreatedAt: event.created_at
-            };
-            return processedProfile;
-          } catch (error) {
-            console.error("Profile processing error:", error);
-            return this._createDefaultProfile();
-          }
-        });
+    const now = Date.now();
+    const results = new Array(pubkeys.length);
+    const fetchQueue = [];
 
-        // 新しいプロフィールが取得できた場合、更新通知を発行
-        if (latestProfile) {
-          cacheManager.notifyProfileUpdate(pubkey, latestProfile);
-        }
-
-        return latestProfile;
-      } catch (error) {
-        console.error(`Profile fetch error for ${pubkey}:`, error);
-        return this._createDefaultProfile();
+    // キャッシュチェックを最適化
+    for (let i = 0; i < pubkeys.length; i++) {
+      const pubkey = pubkeys[i];
+      const cached = cacheManager.getProfile(pubkey);
+      
+      if (cached && cached._lastUpdated && now - cached._lastUpdated < 1800000) { // 30分
+        results[i] = cached;
+      } else {
+        fetchQueue.push({ index: i, pubkey });
       }
-    });
-  
-    return Promise.all(profilePromises);
+    }
+
+    // 未キャッシュのプロフィールを並列取得
+    if (fetchQueue.length > 0) {
+      const fetchPromises = fetchQueue.map(({ pubkey }) =>
+        this.profileProcessor.getOrCreateFetchPromise(pubkey)
+          .then(event => {
+            if (!event) return this._createDefaultProfile();
+            
+            try {
+              const content = JSON.parse(event.content);
+              return {
+                ...content,
+                name: getProfileDisplayName(content) || "nameless",
+                _lastUpdated: now,
+                _eventCreatedAt: event.created_at
+              };
+            } catch {
+              return this._createDefaultProfile();
+            }
+          })
+          .catch(() => this._createDefaultProfile())
+      );
+
+      const fetchedProfiles = await Promise.all(fetchPromises);
+      
+      // 結果を元の順序で格納
+      fetchQueue.forEach(({ index }, i) => {
+        results[index] = fetchedProfiles[i];
+        cacheManager.setProfile(pubkeys[index], fetchedProfiles[i]);
+      });
+    }
+
+    return results;
   }
 
   async verifyNip05Async(pubkey) {
