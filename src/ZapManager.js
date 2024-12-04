@@ -139,61 +139,42 @@ class ZapSubscriptionManager {
         lastEventTime = Math.min(lastEventTime || event.created_at, event.created_at);
         if (cacheManager.addZapEvent(viewId, event)) {
           initialEvents.push(event);
-          // イベントをすぐにUIに表示
-          await this.processImmediateZap(event, viewId);
+          // イベントをUIに表示（リファレンスなしで）
+          await this.processZapEvent(event, viewId, false);
         }
       };
 
       eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: handleEvent,
         oneose: async () => {
-          // リファレンス情報を非同期で取得して更新
-          this.processDeferredReferences(initialEvents, viewId);
+          // イベントの取得後、ソートしてからまとめて表示
+          const events = cacheManager.getZapEvents(viewId);
+          events.sort((a, b) => b.created_at - a.created_at);
+
+          // まずイベントを表示
+          try {
+            renderZapListFromCache(events, viewId);
+          } catch (error) {
+            console.error('Failed to render zap list:', error);
+          }
+
+          // リファレンス情報を非同期で取得
+          if (initialEvents.length > 0) {
+            this.updateEventReferenceBatch(initialEvents, viewId).then(() => {
+              // リファレンス情報が取得できたら各イベントの参照を更新
+              initialEvents.forEach(event => {
+                if (event.reference && this.zapListUI) {
+                  this.zapListUI.updateZapReference(event);
+                }
+              });
+            });
+          }
+
           this.finalizeInitialization(viewId, lastEventTime);
           resolve();
         }
       });
     });
-  }
-
-  // 即時表示用の処理（リファレンスなし）
-  async processImmediateZap(event, viewId) {
-    if (this.zapListUI) {
-      await this.zapListUI.appendZap(event);
-      // プロフィール情報を非同期で取得
-      Promise.all([
-        statsManager.handleZapEvent(event, viewId),
-        profilePool.verifyNip05Async(event.pubkey)
-      ]).catch(console.error);
-    }
-  }
-
-  // リファレンス情報の遅延処理
-  async processDeferredReferences(events, viewId) {
-    try {
-      // 100件ごとにバッチ処理
-      const batchSize = 100;
-      for (let i = 0; i < events.length; i += batchSize) {
-        const batch = events.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map(event => 
-            this.updateEventReference(event, viewId)
-              .then(success => {
-                if (success && this.zapListUI) {
-                  this.zapListUI.updateZapReference(event);
-                }
-              })
-              .catch(console.error)
-          )
-        );
-        // 各バッチ間で少し待機して負荷を分散
-        if (i + batchSize < events.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-    } catch (error) {
-      console.error("Deferred reference processing failed:", error);
-    }
   }
 
   finalizeInitialization(viewId, lastEventTime) {
