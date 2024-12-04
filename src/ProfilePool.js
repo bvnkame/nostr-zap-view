@@ -59,44 +59,47 @@ export class ProfilePool {
   }
 
   async fetchProfiles(pubkeys) {
-    const uncachedPubkeys = pubkeys.filter(pubkey => !cacheManager.hasProfile(pubkey));
-    
-    if (uncachedPubkeys.length === 0) {
-      return pubkeys.map(pubkey => cacheManager.getProfile(pubkey) || this._createDefaultProfile());
+    if (!Array.isArray(pubkeys) || pubkeys.length === 0) {
+      return [];
     }
-
+  
+    // すべてのpubkeyに対する取得Promise配列を作成
+    const profilePromises = pubkeys.map(async pubkey => {
+      // キャッシュにあればそれを返す
+      if (cacheManager.hasProfile(pubkey)) {
+        return cacheManager.getProfile(pubkey);
+      }
+  
+      try {
+        // 既に取得中のPromiseがあればそれを返す
+        return await cacheManager.getOrFetchProfile(pubkey, async () => {
+          const event = await this.profileProcessor.getOrCreateFetchPromise(pubkey);
+          if (!event) {
+            console.log(`No profile found for pubkey: ${pubkey}`);
+            return this._createDefaultProfile();
+          }
+  
+          try {
+            const content = JSON.parse(event.content);
+            const processedProfile = {
+              ...content,
+              name: getProfileDisplayName(content) || "nameless",
+              _lastUpdated: Date.now()
+            };
+            return processedProfile;
+          } catch (error) {
+            console.error("Profile processing error:", error);
+            return this._createDefaultProfile();
+          }
+        });
+      } catch (error) {
+        console.error(`Profile fetch error for ${pubkey}:`, error);
+        return this._createDefaultProfile();
+      }
+    });
+  
     try {
-      const profilePromises = uncachedPubkeys.map(pubkey => 
-        this.profileProcessor.getOrCreateFetchPromise(pubkey)
-          .then(event => {
-            if (!event) {
-              console.log(`No profile found for pubkey: ${pubkey}`);
-              return this._createDefaultProfile();
-            }
-            
-            try {
-              console.log('Fetched profile event:', event);
-              const content = JSON.parse(event.content);
-              console.log('Parsed profile content:', content);
-              
-              const processedProfile = {
-                ...content,
-                name: getProfileDisplayName(content) || "nameless",
-                _lastUpdated: Date.now()
-              };
-              console.log('Processed profile:', processedProfile);
-              
-              cacheManager.setProfile(event.pubkey, processedProfile);
-              return processedProfile;
-            } catch (error) {
-              console.error("Profile processing error:", error);
-              return this._createDefaultProfile();
-            }
-          })
-      );
-
-      await Promise.all(profilePromises);
-      return pubkeys.map(pubkey => cacheManager.getProfile(pubkey) || this._createDefaultProfile());
+      return await Promise.all(profilePromises);
     } catch (error) {
       console.error("Profile fetch error:", error);
       return pubkeys.map(() => this._createDefaultProfile());
