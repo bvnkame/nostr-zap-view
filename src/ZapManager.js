@@ -29,8 +29,8 @@ class ZapSubscriptionManager {
   // コア機能
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
-      const [hasReference, profile] = await Promise.all([
-        this.updateEventReference(event, viewId),
+      const [hasReference, profiles] = await Promise.all([
+        this._processEventReference(event, viewId),
         profilePool.fetchProfiles([event.pubkey])
       ]);
 
@@ -38,10 +38,7 @@ class ZapSubscriptionManager {
         await this.zapListUI.appendZap(event);
       }
 
-      await Promise.all([
-        statsManager.handleZapEvent(event, viewId),
-        profilePool.verifyNip05Async(event.pubkey)
-      ]);
+      await this._processEventMetadata(event, viewId);
 
       if (hasReference && shouldUpdateUI && this.zapListUI && event.reference) {
         this.zapListUI.updateZapReference(event);
@@ -57,6 +54,25 @@ class ZapSubscriptionManager {
   async handleZapEvent(event, viewId) {
     if (!cacheManager.addZapEvent(viewId, event)) return;
     await this.processZapEvent(event, viewId);
+  }
+
+  async _processEventReference(event, viewId) {
+    const config = this.getViewConfig(viewId);
+    if (!this._isValidReferenceConfig(config)) return false;
+
+    const reference = await this._fetchEventReference(event, config);
+    if (reference) {
+      event.reference = reference;
+      return true;
+    }
+    return false;
+  }
+
+  async _processEventMetadata(event, viewId) {
+    await Promise.all([
+      statsManager.handleZapEvent(event, viewId),
+      profilePool.verifyNip05Async(event.pubkey)
+    ]);
   }
 
   async updateEventReference(event, viewId) {
@@ -130,8 +146,11 @@ class ZapSubscriptionManager {
     
     const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
     
-    await this._processBatchEvents(batchEvents, viewId);
-    this.finalizeInitialization(viewId, lastEventTime);
+    if (batchEvents?.length > 0) {
+      await this._processBatchEvents(batchEvents, viewId);
+    }
+    
+    await this.finalizeInitialization(viewId, lastEventTime);
   }
 
   async _collectInitialEvents(viewId, config, decoded) {
@@ -148,13 +167,34 @@ class ZapSubscriptionManager {
             lastEventTime = currentLastTime;
           }
         },
-        oneose: async () => {
+        oneose: () => {
           clearInterval(bufferInterval);
-          await this._finalizeEventCollection(batchEvents, viewId);
-          resolve({ batchEvents, lastEventTime });
+          resolve({ batchEvents: [...batchEvents], lastEventTime });
         }
       });
     });
+  }
+
+  async _processBatchEvents(batchEvents, viewId) {
+    if (!Array.isArray(batchEvents) || batchEvents.length === 0) return;
+
+    const pubkeys = [...new Set(batchEvents.map(event => event.pubkey))];
+    
+    await Promise.all([
+      profilePool.fetchProfiles(pubkeys),
+      this.updateEventReferenceBatch(batchEvents, viewId),
+      ...batchEvents.map(event => statsManager.handleZapEvent(event, viewId)),
+      ...batchEvents.map(event => profilePool.verifyNip05Async(event.pubkey))
+    ]);
+
+    if (this.zapListUI) {
+      await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
+      batchEvents.forEach(event => {
+        if (event.reference) {
+          this.zapListUI.updateZapReference(event);
+        }
+      });
+    }
   }
 
   async loadMoreZaps(viewId) {
@@ -172,18 +212,12 @@ class ZapSubscriptionManager {
   }
 
   setupInfiniteScroll(viewId) {
-    this.cleanupInfiniteScroll(viewId);
-    const list = this.getListElement(viewId);
+    this._cleanupExistingScroll(viewId);
+    const list = this._getListElement(viewId);
     if (!list) return;
 
-    const trigger = this.createScrollTrigger();
+    const { trigger, observer } = this._createScrollComponents(viewId, list);
     list.appendChild(trigger);
-
-    const observer = new IntersectionObserver(
-      this.createScrollHandler(viewId),
-      this.getObserverOptions(list)
-    );
-
     observer.observe(trigger);
     this.observers.set(viewId, observer);
   }
@@ -509,6 +543,53 @@ class ZapSubscriptionManager {
         this.zapListUI.updateZapReference(event);
       }
     });
+  }
+
+  _isValidReferenceConfig(config) {
+    return config?.relayUrls?.length && !isEventIdentifier(config?.identifier || '');
+  }
+
+  async _fetchEventReference(event, config) {
+    const fetchFn = async () => {
+      const aTag = event.tags.find(tag => tag[0] === 'a');
+      const eTag = event.tags.find(tag => tag[0] === 'e');
+      
+      if (aTag) {
+        try {
+          return await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
+        } catch (error) {
+          console.warn("A-tag reference fetch failed:", error);
+        }
+      }
+
+      if (eTag && /^[0-9a-f]{64}$/.test(eTag[1].toLowerCase())) {
+        try {
+          return await eventPool.fetchReference(config.relayUrls, eTag[1]);
+        } catch (error) {
+          console.warn("E-tag reference fetch failed:", error);
+        }
+      }
+      
+      return null;
+    };
+
+    return await cacheManager.getOrFetchReference(event.id, fetchFn);
+  }
+
+  _createScrollComponents(viewId, list) {
+    const trigger = document.createElement('div');
+    trigger.className = 'load-more-trigger';
+
+    const observer = new IntersectionObserver(
+      this._createScrollHandler(viewId),
+      {
+        root: list,
+        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
+        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
+      }
+    );
+
+    return { trigger, observer };
   }
 }
 
