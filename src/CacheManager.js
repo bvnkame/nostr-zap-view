@@ -265,36 +265,49 @@ export class CacheManager {
   getNip05PendingFetch(pubkey) { return this.getCacheItem('nip05PendingFetches', pubkey); }
   deleteNip05PendingFetch(pubkey) { this.deleteCacheItem('nip05PendingFetches', pubkey); }
 
-  // イベント処理メソッドを追加
+  // イベント処理メソッドを修正
   _processEvents(events, eventId) {
+    const targetEvent = events.find(e => e.id === eventId);
     return events.some(e => 
       e.id === eventId || 
-      (e.kind === event.kind && 
-       e.pubkey === event.pubkey && 
-       e.content === event.content && 
-       e.created_at === event.created_at)
+      (targetEvent && 
+       e.kind === targetEvent.kind && 
+       e.pubkey === targetEvent.pubkey && 
+       e.content === targetEvent.content && 
+       e.created_at === targetEvent.created_at)
     );
   }
 
   // Zap events cache methods
   getZapEvents(viewId) { return this.getCacheItem('zapEvents', viewId) || []; }
-  setZapEvents(viewId, events) { this.setCacheItem('zapEvents', viewId, events); }
+  setZapEvents(viewId, events, maintainOrder = false) {
+    const currentEvents = maintainOrder ? this.getZapEvents(viewId) : [];
+    
+    // 新しいイベントをマップに変換
+    const newEventsMap = new Map(events.map(e => [e.id, e]));
+    
+    // 既存のイベントから重複を除外して保持
+    const existingEvents = currentEvents.filter(e => !newEventsMap.has(e.id));
+    
+    // 結合して保存
+    const mergedEvents = [...existingEvents, ...events];
+    this.setCacheItem('zapEvents', viewId, mergedEvents);
+  }
+
   addZapEvent(viewId, event) {
+    if (!event?.id) return false;
+    
     const events = this.getZapEvents(viewId);
-    const isDuplicate = this._processEvents(events, event.id);
-    if (!isDuplicate) {
-      // 既存の参照情報があれば復元
-      const cachedRef = this.getReference(event.id);
-      if (cachedRef) {
-        event.reference = cachedRef;
-      }
-      
-      const updatedEvents = [...events, event];
-      updatedEvents.sort((a, b) => b.created_at - a.created_at);
-      this.setZapEvents(viewId, updatedEvents);
-      return true;
+    if (this._processEvents(events, event.id)) {
+      return false;
     }
-    return false;
+
+    // 既存のイベントリストを維持しながら追加
+    events.push(event);
+    // created_atでソート
+    events.sort((a, b) => b.created_at - a.created_at);
+    this.setZapEvents(viewId, events, true);
+    return true;
   }
 
   // Load state management
