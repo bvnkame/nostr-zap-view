@@ -1,22 +1,18 @@
 import { SimplePool } from "nostr-tools/pool";
-import { PROFILE_CONFIG, BATCH_CONFIG } from "./AppSettings.js";
+import { BATCH_CONFIG } from "./AppSettings.js";
 import {
   ETagReferenceProcessor,
   ATagReferenceProcessor,
 } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
-import { ProfilePool } from "./ProfilePool.js";
+import { profilePool } from "./ProfilePool.js";
 
-class EventPool {
+export class EventPool {
   constructor() {
     this.zapPool = new SimplePool();
-    this.simpleProfilePool = new SimplePool();  // プロフィール取得用のSimplePoolを追加
-    this.profilePool = new ProfilePool();
-    this.profilePool.setEventPool(this); // EventPoolインスタンスを設定
     this.subscriptions = new Map();
     this.state = new Map();
 
-    // それぞれのプロセッサーを正しく初期化
     this.etagProcessor = new ETagReferenceProcessor(this, {
       batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
       batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY,
@@ -33,14 +29,11 @@ class EventPool {
     if (this.isConnected) return;
 
     try {
-      console.log("Connecting to profile relays...", PROFILE_CONFIG.RELAYS);
-      await Promise.allSettled(
-        PROFILE_CONFIG.RELAYS.map((url) => this.simpleProfilePool.ensureRelay(url))
-      );
-
+      await profilePool.connectToRelays();  // プロフィールリレーの接続
+      
       console.log("Connecting to zap relays...", zapRelayUrls);
       await Promise.allSettled(
-        zapRelayUrls.map((url) => this.zapPool.ensureRelay(url))
+        zapRelayUrls.map(url => this.zapPool.ensureRelay(url))
       );
 
       this.isConnected = true;
@@ -95,7 +88,6 @@ class EventPool {
     );
   }
 
-  // fetchReference メソッドも更新
   async fetchReference(relayUrls, eventId) {
     if (!eventId) return null;
 
@@ -104,9 +96,7 @@ class EventPool {
       if (cachedRef) return cachedRef;
 
       this.etagProcessor.setRelayUrls(relayUrls);
-      const reference = await this.etagProcessor.getOrCreateFetchPromise(
-        eventId
-      );
+      const reference = await this.etagProcessor.getOrCreateFetchPromise(eventId);
 
       if (reference) {
         cacheManager.setReference(eventId, reference);
@@ -114,7 +104,7 @@ class EventPool {
 
       return reference;
     } catch (error) {
-      console.error("参照取得エラー:", error);
+      console.error("Reference fetch error:", error);
       return null;
     }
   }
@@ -133,4 +123,4 @@ class EventPool {
 }
 
 export const eventPool = new EventPool();
-export const { zapPool, profilePool } = eventPool;
+export const { zapPool } = eventPool;  // profilePoolは直接ProfilePool.jsからエクスポート

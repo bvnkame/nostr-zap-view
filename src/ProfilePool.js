@@ -1,7 +1,8 @@
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
 import { PROFILE_CONFIG } from "./AppSettings.js";
-import { ProfileProcessor } from "./BatchProcessor.js";  // 明示的にProfileProcessorをインポート
+import { ProfileProcessor } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
+import { SimplePool } from "nostr-tools/pool";
 
 /**
  * @typedef {Object} ProfileResult
@@ -21,27 +22,73 @@ export class ProfilePool {
   constructor() {
     if (!ProfilePool.instance) {
       this._config = PROFILE_CONFIG;
-      this._pool = null; // EventPool参照用
-      this._initialize();
+      this.simplePool = new SimplePool();
+      this.isInitialized = false;
       ProfilePool.instance = this;
     }
     return ProfilePool.instance;
   }
 
-  setEventPool(pool) {
-    this._pool = pool;
-    // ProfileProcessorを再初期化
-    this._initialize();
+  async _initialize() {
+    if (this.isInitialized) return;
+    
+    try {
+      await this.connectToRelays();
+      
+      // SimplePoolの初期化確認
+      if (!this._config.RELAYS?.length) {
+        throw new Error('No relays configured for profile fetch');
+      }
+
+      this.profileProcessor = new ProfileProcessor({ 
+        simplePool: this.simplePool,
+        config: this._config 
+      });
+      
+      this.isInitialized = true;
+      console.log('ProfilePool initialized with relays:', this._config.RELAYS);
+    } catch (error) {
+      console.error('ProfilePool initialization error:', error);
+      this.isInitialized = false;
+      throw error;
+    }
   }
 
-  _initialize() {
-    this.profileProcessor = new ProfileProcessor({ 
-      profilePool: this,
-      config: this._config 
-    });
+  async connectToRelays() {
+    if (!this._config.RELAYS?.length) {
+      throw new Error('No relays configured');
+    }
+
+    try {
+      console.log("Connecting to profile relays...", this._config.RELAYS);
+      
+      const connectionPromises = this._config.RELAYS.map(url => 
+        this.simplePool.ensureRelay(url)
+          .catch(error => {
+            console.warn(`Failed to connect to relay ${url}:`, error);
+            return null;
+          })
+      );
+
+      const results = await Promise.allSettled(connectionPromises);
+      const connectedCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+
+      if (connectedCount === 0) {
+        throw new Error('Failed to connect to any relay');
+      }
+
+      console.log(`Profile relays connected (${connectedCount}/${this._config.RELAYS.length})`);
+    } catch (error) {
+      console.error("Profile relay connection error:", error);
+      throw error;  // 上位でハンドリングするためにエラーを再スロー
+    }
   }
 
   async fetchProfiles(pubkeys) {
+    if (!this.isInitialized) {
+      await this._initialize();
+    }
+
     const uncachedPubkeys = pubkeys.filter(pubkey => !cacheManager.hasProfile(pubkey));
     
     if (uncachedPubkeys.length === 0) {
@@ -150,6 +197,7 @@ export class ProfilePool {
 
   clearCache() {
     cacheManager.clearAll();
+    this.profileProcessor.clearPendingFetches();
   }
 
   /**
