@@ -1,9 +1,8 @@
 import { 
-  renderZapListFromCache, 
   showNoZapsMessage
 } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG, APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";  // DIALOG_CONFIGを追加
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";  // DIALOG_CONFIGを追加
 import { statsManager } from "./StatsManager.js";
 import { eventPool } from "./EventPool.js";  // パスを更新
 import { cacheManager } from "./CacheManager.js";
@@ -268,18 +267,29 @@ class ZapSubscriptionManager {
       if (newEventsCount > 0) {
         newEvents.sort((a, b) => b.created_at - a.created_at);
         
+        // キャッシュから既存の参照情報を取得
+        const eventRefs = newEvents.map(event => ({
+          event,
+          reference: cacheManager.getReference(event.id)
+        }));
+
         // まず先にイベントを表示
-        for (const event of newEvents) {
+        for (const { event, reference } of eventRefs) {
           cacheManager.addZapEvent(viewId, event);
+          if (reference) {
+            event.reference = reference;
+          }
           await this.processZapEvent(event, viewId);
         }
 
-        // 参照情報は非同期で取得
-        this.updateEventReferenceBatch(newEvents, viewId).then(() => {
-          // 参照情報が取得できたらまとめて更新
-          const allEvents = cacheManager.getZapEvents(viewId);
-          renderZapListFromCache(allEvents, viewId);
-        });
+        // 参照情報がないイベントのみ非同期で取得
+        const eventsNeedingRefs = eventRefs
+          .filter(({ reference }) => !reference)
+          .map(({ event }) => event);
+
+        if (eventsNeedingRefs.length > 0) {
+          this.updateEventReferenceBatch(eventsNeedingRefs, viewId);
+        }
       }
 
       return newEventsCount;

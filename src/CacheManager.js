@@ -127,19 +127,22 @@ export class CacheManager {
 
   // 参照情報の取得とフェッチを一元管理
   async getOrFetchReference(eventId, fetchFn) {
-    const cached = this.getCacheItem('reference', eventId);
+    const cached = this.getReference(eventId);
     if (cached) return cached;
 
-    // 同じイベントのフェッチが進行中の場合はそれを返す
     const fetching = this.#referenceFetching.get(eventId);
     if (fetching) return fetching;
 
     const promise = fetchFn().then(reference => {
       if (reference) {
-        this.setCacheItem('reference', eventId, reference);
+        this.setReference(eventId, reference);
       }
       this.#referenceFetching.delete(eventId);
       return reference;
+    }).catch(error => {
+      console.error("Reference fetch failed:", error);
+      this.#referenceFetching.delete(eventId);
+      return null;
     });
 
     this.#referenceFetching.set(eventId, promise);
@@ -278,14 +281,14 @@ export class CacheManager {
   setZapEvents(viewId, events) { this.setCacheItem('zapEvents', viewId, events); }
   addZapEvent(viewId, event) {
     const events = this.getZapEvents(viewId);
-    const isDuplicate = events.some(e => 
-      e.id === event.id || 
-      (e.kind === event.kind && 
-       e.pubkey === event.pubkey && 
-       e.content === event.content && 
-       e.created_at === event.created_at)
-    );
+    const isDuplicate = this._processEvents(events, event.id);
     if (!isDuplicate) {
+      // 既存の参照情報があれば復元
+      const cachedRef = this.getReference(event.id);
+      if (cachedRef) {
+        event.reference = cachedRef;
+      }
+      
       const updatedEvents = [...events, event];
       updatedEvents.sort((a, b) => b.created_at - a.created_at);
       this.setZapEvents(viewId, updatedEvents);

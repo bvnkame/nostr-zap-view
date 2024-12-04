@@ -261,12 +261,16 @@ export class ZapListUI {
   }
 
   updateZapReference(event) {
-    const zapElement = this.#getElement(`[data-event-id="${event.id}"]`);
+    const zapElement = this.getElementByEventId(event.id);
     if (!zapElement || !event.reference) return;
 
     const referenceContainer = zapElement.querySelector('.reference-container');
     if (referenceContainer) {
-      referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ reference: event.reference });
+      referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+        reference: event.reference 
+      });
+      // 参照情報をキャッシュに保存
+      cacheManager.setReference(event.id, event.reference);
     }
   }
 
@@ -281,6 +285,17 @@ export class ZapListUI {
       for (const event of events) {
         const zapInfo = await this.#handleZapInfo(event);
         const li = this.itemBuilder.createListItem(zapInfo, event);
+        
+        // 参照情報があれば表示
+        if (event.reference) {
+          const referenceContainer = li.querySelector('.reference-container');
+          if (referenceContainer) {
+            referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+              reference: event.reference 
+            });
+          }
+        }
+
         fragment.appendChild(li);
 
         if (zapInfo.pubkey) {
