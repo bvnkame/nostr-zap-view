@@ -122,4 +122,46 @@ export class ProfileUI {
       iconContainer.appendChild(defaultImg);
     }
   }
+
+  /**
+   * プロフィール要素を更新
+   * @param {HTMLElement} element 更新対象の要素
+   * @param {Object} profile プロフィール情報
+   */
+  async updateProfileElement(element, profile) {
+    if (!element || !profile) return;
+
+    // アイコン要素の更新
+    const iconElement = element.querySelector('.sender-icon img, .zap-placeholder-icon');
+    if (iconElement) {
+      if (profile.picture) {
+        const img = document.createElement('img');
+        img.src = profile.picture;
+        img.alt = profile.name || 'Profile Picture';
+        img.width = 40;
+        img.height = 40;
+        if (iconElement.parentElement) {
+          iconElement.parentElement.replaceChild(img, iconElement);
+        }
+      }
+    }
+
+    // 名前要素の更新
+    const nameElement = element.querySelector('.sender-name, .zap-placeholder-name');
+    if (nameElement) {
+      nameElement.textContent = profile.display_name || profile.name || 'anonymous';
+      nameElement.className = 'sender-name';
+    }
+
+    // NIP-05の更新
+    if (profile.nip05) {
+      const pubkey = element.getAttribute('data-pubkey');
+      if (pubkey) {
+        const nip05Element = element.querySelector('[data-nip05-target="true"]');
+        if (nip05Element) {
+          await this.updateNip05Display(pubkey, nip05Element);
+        }
+      }
+    }
+  }
 }

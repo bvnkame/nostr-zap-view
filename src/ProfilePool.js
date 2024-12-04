@@ -65,28 +65,30 @@ export class ProfilePool {
   
     // すべてのpubkeyに対する取得Promise配列を作成
     const profilePromises = pubkeys.map(async pubkey => {
-      // キャッシュにあればそれを返す
-      if (cacheManager.hasProfile(pubkey)) {
-        return cacheManager.getProfile(pubkey);
-      }
-  
       try {
-        // 既に取得中のPromiseがあればそれを返す
-        return await cacheManager.getOrFetchProfile(pubkey, async () => {
+        // 一時的なプロフィールをすぐに返す
+        if (cacheManager.hasProfile(pubkey)) {
+          const profile = cacheManager.getProfile(pubkey);
+          if (profile && profile._lastUpdated && Date.now() - profile._lastUpdated < 300000) {
+            return profile; // 5分以内に更新されたプロフィールはそのまま返す
+          }
+        }
+  
+        // 最新のプロフィールを非同期で取得
+        const latestProfile = await cacheManager.getOrFetchProfile(pubkey, async () => {
           const event = await this.profileProcessor.getOrCreateFetchPromise(pubkey);
           if (!event) {
             console.log(`No profile found for pubkey: ${pubkey}`);
             return this._createDefaultProfile();
           }
 
-          console.log(`Received profile event for pubkey ${pubkey}:`, event);
-  
           try {
             const content = JSON.parse(event.content);
             const processedProfile = {
               ...content,
               name: getProfileDisplayName(content) || "nameless",
-              _lastUpdated: Date.now()
+              _lastUpdated: Date.now(),
+              _eventCreatedAt: event.created_at
             };
             return processedProfile;
           } catch (error) {
@@ -94,18 +96,20 @@ export class ProfilePool {
             return this._createDefaultProfile();
           }
         });
+
+        // 新しいプロフィールが取得できた場合、更新通知を発行
+        if (latestProfile) {
+          cacheManager.notifyProfileUpdate(pubkey, latestProfile);
+        }
+
+        return latestProfile;
       } catch (error) {
         console.error(`Profile fetch error for ${pubkey}:`, error);
         return this._createDefaultProfile();
       }
     });
   
-    try {
-      return await Promise.all(profilePromises);
-    } catch (error) {
-      console.error("Profile fetch error:", error);
-      return pubkeys.map(() => this._createDefaultProfile());
-    }
+    return Promise.all(profilePromises);
   }
 
   async verifyNip05Async(pubkey) {

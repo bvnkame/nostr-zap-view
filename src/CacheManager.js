@@ -22,6 +22,7 @@ class BaseCache {
 
 export class CacheManager {
   #instance = null;
+  #profileUpdateCallbacks = new Map();
 
   constructor() {
     if (this.#instance) return this.#instance;
@@ -167,6 +168,33 @@ export class CacheManager {
 
     this.setProfileFetching(pubkey, promise);
     return promise;
+  }
+
+  // プロフィール更新通知の購読
+  subscribeToProfileUpdates(callback) {
+    const id = Math.random().toString(36).substr(2, 9);
+    this.#profileUpdateCallbacks.set(id, callback);
+    return () => {
+      this.#profileUpdateCallbacks.delete(id);
+    };
+  }
+
+  // プロフィール更新の通知
+  notifyProfileUpdate(pubkey, profile) {
+    const oldProfile = this.getProfile(pubkey);
+    if (!oldProfile || 
+        !oldProfile._eventCreatedAt || 
+        !profile._eventCreatedAt ||
+        profile._eventCreatedAt > oldProfile._eventCreatedAt) {
+      this.setProfile(pubkey, profile);
+      this.#profileUpdateCallbacks.forEach(callback => {
+        try {
+          callback(pubkey, profile);
+        } catch (error) {
+          console.error('Profile update callback error:', error);
+        }
+      });
+    }
   }
 
   // NIP-05 cache methods

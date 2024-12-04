@@ -40,6 +40,29 @@ export class ZapListUI {
     this.profileUI = profileUI || new ProfileUI();
     this.viewId = viewId;
     this.itemBuilder = new ZapItemBuilder(viewId, this.#isColorModeEnabled());
+    this.profileUpdateUnsubscribe = null;
+    this.#initializeProfileUpdates();
+  }
+
+  #initializeProfileUpdates() {
+    this.profileUpdateUnsubscribe = cacheManager.subscribeToProfileUpdates(async (pubkey, profile) => {
+      try {
+        const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+        const updatePromises = Array.from(elements).map(element => 
+          this.profileUI.updateProfileElement(element, profile)
+        );
+        await Promise.allSettled(updatePromises);
+      } catch (error) {
+        console.error('Profile update error:', error, { pubkey, profile });
+      }
+    });
+  }
+
+  destroy() {
+    if (this.profileUpdateUnsubscribe) {
+      this.profileUpdateUnsubscribe();
+      this.profileUpdateUnsubscribe = null;
+    }
   }
 
   #getElement(selector) {
@@ -193,7 +216,9 @@ export class ZapListUI {
     if (!pubkey || !element) return;
   
     try {
+      // 即座にプロフィールを読み込んで表示
       await this.profileUI.loadAndUpdate(pubkey, element);
+      // 更新は購読で処理されるため、ここでは初期表示のみ
     } catch (error) {
       console.error("Failed to load profile:", error);
     }
