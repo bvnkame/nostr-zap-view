@@ -79,17 +79,12 @@ function initializeApp() {
     window[key] = value;
   });
 
-  // ProfilePoolの初期化を先に開始
-  const profileInitPromise = profilePool.initialize().catch(console.error);
-
   // ボタンの初期化
   document.querySelectorAll("button[data-nzv-id]").forEach((button, index) => {
     if (!button.hasAttribute("data-zap-view-id")) {
       const viewId = `nostr-zap-view-${index}`;
       button.setAttribute("data-zap-view-id", viewId);
-      button.addEventListener("click", async () => {
-        // ProfilePoolの初期化を待ってからボタンクリック処理を実行
-        await profileInitPromise;
+      button.addEventListener("click", () => {
         handleButtonClick(button, viewId);
       });
     }
