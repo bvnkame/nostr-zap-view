@@ -82,12 +82,10 @@ class ZapSubscriptionManager {
       
       if (aTag) {
         reference = await poolManager.fetchATagReference(config.relayUrls, aTag[1]);
-        console.log("ATag reference fetched:", reference);
       }
       
       if (!reference && eTag) {
         reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
-        console.log("Reference fetched:", reference);
       }
 
       if (reference) {

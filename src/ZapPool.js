@@ -96,11 +96,6 @@ class ZapPoolManager {
       if (cachedRef) return cachedRef;
 
       this.etagProcessor.setRelayUrls(relayUrls);
-      // コンソールログを追加して、リレーに送信されるREQを確認
-      console.log("[ZapPool] 参照取得リクエスト:", {
-        relayUrls,
-        eventId,
-      });
       const reference = await this.etagProcessor.getOrCreateFetchPromise(
         eventId
       );
@@ -121,11 +116,6 @@ class ZapPoolManager {
 
     try {
       this.aTagProcessor.setRelayUrls(relayUrls);
-      // コンソールログを追加して、リレーに送信されるREQを確認
-      console.log("[ZapPool] ATag参照取得リクエスト:", {
-        relayUrls,
-        aTagValue,
-      });
       return await this.aTagProcessor.getOrCreateFetchPromise(aTagValue);
     } catch (error) {
       console.error("ATag reference fetch error:", error);
