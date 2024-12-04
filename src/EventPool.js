@@ -64,17 +64,33 @@ export class EventPool {
   // Subscription management
   subscribeToZaps(viewId, config, decoded, handlers) {
     try {
+      // デバッグ情報を追加
+      console.debug("Subscription attempt:", { viewId, config, decoded });
+
       this.#initializeSubscriptionState(viewId);
       this.closeSubscription(viewId);
 
       const state = this.#state.get(viewId);
       state.isZapClosed = false;
 
-      this.#logSubscription(config, decoded);
+      // フィルターの検証を修正
+      if (!this._isValidSubscription(decoded)) {
+        console.warn("Invalid subscription:", decoded);
+        throw new Error("無効なサブスクリプション設定");
+      }
+
       this.#createSubscription(viewId, config, decoded, handlers);
     } catch (error) {
       this.#handleError("Subscription error", error);
     }
+  }
+
+  _isValidSubscription(decoded) {
+    // 検証ロジックを緩和
+    return decoded && 
+           decoded.req && 
+           typeof decoded.req === 'object' &&  // reqがオブジェクトであることを確認
+           Array.isArray(decoded.req.kinds);   // kinds配列が存在することを確認
   }
 
   closeSubscription(viewId) {
@@ -92,6 +108,12 @@ export class EventPool {
   // Reference handling
   async fetchReference(relayUrls, event, type) {
     try {
+      // フィールドがnullでないことを確認
+      if (!event || !event.id || !event.tags) {
+        console.warn("無効なイベントデータ:", event);
+        return null;
+      }
+
       if (!event?.tags || !Array.isArray(event.tags)) {
         return null;
       }
@@ -184,17 +206,28 @@ export class EventPool {
 
   // Private helper methods
   #createSubscription(viewId, config, decoded, handlers) {
-    this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
-      config.relayUrls,
-      [decoded.req],
-      {
-        ...handlers,
-        oneose: () => {
-          console.log("[ZapPool] リレー購読完了:", { viewId });
-          handlers.oneose();
-        },
-      }
-    );
+    try {
+      // デバッグ情報を追加
+      console.debug("Creating subscription:", {
+        relayUrls: config.relayUrls,
+        filter: decoded.req
+      });
+
+      this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
+        config.relayUrls,
+        [decoded.req],
+        {
+          ...handlers,
+          oneose: () => {
+            console.log("[ZapPool] リレー購読完了:", { viewId });
+            handlers.oneose();
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Subscription creation failed:", error);
+      throw error;
+    }
   }
 
   async #processCachedReference(relayUrls, eventId) {

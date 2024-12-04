@@ -99,30 +99,61 @@ export class ProfilePool {
   }
 
   async #processFetchQueue(fetchQueue, results, pubkeys) {
+    if (!fetchQueue.length) return;
+
     const now = Date.now();
+    const validQueue = fetchQueue.filter(({pubkey}) => 
+      pubkey && typeof pubkey === 'string' && pubkey.length === 64
+    );
+
+    if (validQueue.length === 0) return;
+
     const fetchedProfiles = await Promise.all(
-      fetchQueue.map(({ pubkey }) => this.#fetchSingleProfile(pubkey, now))
+      validQueue.map(({ pubkey }) => this.#fetchSingleProfile(pubkey, now))
     );
     
-    fetchQueue.forEach(({ index }, i) => {
-      results[index] = fetchedProfiles[i];
-      cacheManager.setProfile(pubkeys[index], fetchedProfiles[i]);
+    validQueue.forEach(({ index }, i) => {
+      if (index >= 0 && index < results.length) {
+        results[index] = fetchedProfiles[i];
+        if (pubkeys[index]) {
+          cacheManager.setProfile(pubkeys[index], fetchedProfiles[i]);
+        }
+      }
     });
   }
 
   async #fetchSingleProfile(pubkey, now) {
-    try {
-      const event = await this.#profileProcessor.getOrCreateFetchPromise(pubkey);
-      if (!event) return this.#createDefaultProfile();
+    if (!pubkey || typeof pubkey !== 'string' || pubkey.length !== 64) {
+      console.warn('Invalid pubkey:', pubkey);
+      return this.#createDefaultProfile();
+    }
 
-      const content = JSON.parse(event.content);
+    try {
+      const filter = {
+        kinds: [0],
+        authors: [pubkey],
+        limit: 1
+      };
+
+      const event = await this.#profileProcessor.getOrCreateFetchPromise(pubkey, filter);
+      if (!event?.content) return this.#createDefaultProfile();
+
+      let content;
+      try {
+        content = JSON.parse(event.content);
+      } catch (e) {
+        console.warn('Invalid profile content:', e);
+        return this.#createDefaultProfile();
+      }
+
       return {
         ...content,
         name: getProfileDisplayName(content) || "nameless",
         _lastUpdated: now,
         _eventCreatedAt: event.created_at
       };
-    } catch {
+    } catch (error) {
+      console.warn('Profile fetch failed:', error);
       return this.#createDefaultProfile();
     }
   }
@@ -214,13 +245,24 @@ export class ProfilePool {
 
   // 新しく追加: 複数のプロファイルを並行処理
   async processBatchProfiles(events) {
-    const pubkeys = [...new Set(events.map(event => event.pubkey))];
+    if (!Array.isArray(events) || events.length === 0) return;
+
+    const pubkeys = [...new Set(
+      events
+        .map(event => event?.pubkey)
+        .filter(pubkey => pubkey && typeof pubkey === 'string' && pubkey.length === 64)
+    )];
+
     if (pubkeys.length === 0) return;
 
-    await Promise.all([
-      this.fetchProfiles(pubkeys),
-      ...pubkeys.map(pubkey => this.verifyNip05Async(pubkey))
-    ]);
+    try {
+      await Promise.all([
+        this.fetchProfiles(pubkeys),
+        ...pubkeys.map(pubkey => this.verifyNip05Async(pubkey))
+      ]);
+    } catch (error) {
+      console.warn('Batch profile processing failed:', error);
+    }
   }
 
   // 新しく追加: プロファイルとNIP-05の検証を一括処理

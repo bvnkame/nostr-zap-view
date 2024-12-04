@@ -156,18 +156,45 @@ class ZapSubscriptionManager {
 
   // initializeSubscriptionsメソッドを最適化
   async initializeSubscriptions(config, viewId) {
-    const decoded = decodeIdentifier(config.identifier);
-    if (!decoded) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+    try {
+      // デバッグ情報を追加
+      console.debug("Initializing subscription:", { config, viewId });
 
-    this._initializeLoadState(viewId);
-    
-    const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
-    
-    if (batchEvents?.length > 0) {
-      await this._processBatchEvents(batchEvents, viewId);
+      if (!this._isValidFilter(config)) {
+        console.warn("Invalid filter configuration:", config);
+        throw new Error("無効なフィルター設定");
+      }
+
+      const decoded = decodeIdentifier(config.identifier);
+      if (!decoded) {
+        console.warn("Failed to decode identifier:", config.identifier);
+        throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+      }
+
+      console.debug("Decoded identifier:", decoded);
+
+      this._initializeLoadState(viewId);
+      
+      const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
+      
+      if (batchEvents?.length > 0) {
+        await this._processBatchEvents(batchEvents, viewId);
+      }
+      
+      await this.finalizeInitialization(viewId, lastEventTime);
+    } catch (error) {
+      console.error("サブスクリプション初期化エラー:", error);
+      throw error; // エラーを上位に伝播させる
     }
-    
-    await this.finalizeInitialization(viewId, lastEventTime);
+  }
+
+  _isValidFilter(config) {
+    // フィルターの検証を緩和
+    return config && 
+           config.relayUrls && 
+           Array.isArray(config.relayUrls) && 
+           config.relayUrls.length > 0 && 
+           config.identifier;
   }
 
   async _collectInitialEvents(viewId, config, decoded) {
