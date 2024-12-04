@@ -51,7 +51,6 @@ export class ProfileUI {
   }
 
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
-    console.log("アイコン画像を更新します。");
     if (skeleton && iconContainer) {
       const updateIcon = (src) => {
         skeleton.remove();
@@ -79,16 +78,6 @@ export class ProfileUI {
       };
 
       if (senderIcon) {
-        // キャッシュをチェック
-        const cachedImage = cacheManager.getImageCache(senderIcon);
-        if (cachedImage) {
-          console.log("アイコン画像はキャッシュから読みだされました。");
-          updateIcon(senderIcon);
-          return;
-        } else {
-          console.log("アイコン画像はキャッシュに存在しません。");
-        }
-
         const img = new Image();
         img.onload = () => {
           cacheManager.setImageCache(senderIcon, img);

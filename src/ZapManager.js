@@ -82,10 +82,12 @@ class ZapSubscriptionManager {
       
       if (aTag) {
         reference = await poolManager.fetchATagReference(config.relayUrls, aTag[1]);
+        console.log("ATag reference fetched:", reference);
       }
       
       if (!reference && eTag) {
         reference = await poolManager.fetchReference(config.relayUrls, eTag[1]);
+        console.log("Reference fetched:", reference);
       }
 
       if (reference) {
@@ -159,8 +161,6 @@ class ZapSubscriptionManager {
           try {
             // 1. まずreferenceを取得
             await this.updateEventReference(event, viewId);
-            
-            console.log('[ZapManager] イベント処理:', event);
 
             // 2. Zapイベントをキャッシュに追加
             if (cacheManager.addZapEvent(viewId, event)) {

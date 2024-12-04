@@ -43,8 +43,6 @@ export class ProfileManager {
     }
 
     try {
-      console.log("[ProfileManager] Fetching profiles:", uncachedPubkeys);
-      
       const profilePromises = uncachedPubkeys.map(pubkey => 
         this.profileProcessor.getOrCreateFetchPromise(pubkey)
           .then(event => {

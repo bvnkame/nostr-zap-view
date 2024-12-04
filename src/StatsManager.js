@@ -28,7 +28,6 @@ export class StatsManager {
   async fetchStats(identifier) {
     try {
       const response = await this._fetchFromApi(identifier);
-      console.log("Fetched Zap stats:", response);
       const stats = this._formatStats(response);
       return stats || this.createTimeoutError();
     } catch (error) {
