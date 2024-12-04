@@ -18,30 +18,25 @@ class ZapSubscriptionManager {
     this.zapListUI = zapListUI;
   }
 
+  // 設定管理
   setViewConfig(viewId, config) {
     this.configStore.set(viewId, config);
+    cacheManager.initializeZapView(viewId);
   }
 
   getViewConfig(viewId) {
     return this.configStore.get(viewId);
   }
 
-  // コア機能
+  // コア処理をシンプルに保持
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
-      const [hasReference] = await Promise.all([
+      await Promise.all([
         this._processEventReference(event, viewId),
-        profilePool.processBatchProfiles([event])  // 変更: ProfilePoolに処理を委譲
+        profilePool.processBatchProfiles([event])
       ]);
 
-      if (shouldUpdateUI && this.zapListUI) {
-        await this.zapListUI.appendZap(event);
-      }
-
-      if (hasReference && shouldUpdateUI && this.zapListUI && event.reference) {
-        this.zapListUI.updateZapReference(event);
-      }
-
+      shouldUpdateUI && this.zapListUI?.appendZap(event);
       return true;
     } catch (error) {
       console.error("Zap処理エラー:", error);
@@ -54,16 +49,39 @@ class ZapSubscriptionManager {
     await this.processZapEvent(event, viewId);
   }
 
+  // 統合されたリファレンス処理
   async _processEventReference(event, viewId) {
     const config = this.getViewConfig(viewId);
     if (!this._isValidReferenceConfig(config)) return false;
 
-    const reference = await this._fetchEventReference(event, config);
+    const reference = await this._fetchReferenceWithCache(event, config);
     if (reference) {
       event.reference = reference;
       return true;
     }
     return false;
+  }
+
+  async _fetchReferenceWithCache(event, config) {
+    const fetchFn = async () => {
+      if (!event?.tags?.length) return null;
+
+      const tagTypes = ['a', 'e'];
+      for (const type of tagTypes) {
+        const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
+        if (tag?.[1] && (type !== 'e' || /^[0-9a-f]{64}$/.test(tag[1].toLowerCase()))) {
+          return await eventPool.fetchReference(config.relayUrls, event, type);
+        }
+      }
+      return null;
+    };
+
+    try {
+      return await cacheManager.getOrFetchReference(event.id, fetchFn);
+    } catch (error) {
+      console.error("Reference fetch failed:", error);
+      return null;
+    }
   }
 
   async updateEventReference(event, viewId) {
@@ -174,27 +192,36 @@ class ZapSubscriptionManager {
     });
   }
 
+  // バッチ処理の最適化
   async _processBatchEvents(events, viewId) {
     if (!events?.length) return;
 
     events.sort((a, b) => b.created_at - a.created_at);
     events.forEach(event => cacheManager.addZapEvent(viewId, event));
 
-    // プロファイル処理をProfilePoolに委譲
     await Promise.all([
       profilePool.processEventProfiles(events),
-      this.updateEventReferenceBatch(events, viewId),
+      this._processBatchReferences(events, viewId),
       ...events.map(event => statsManager.handleZapEvent(event, viewId))
     ]);
 
-    if (this.zapListUI) {
-      await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-      
-      const eventsWithRefs = events.filter(event => event.reference);
-      eventsWithRefs.forEach(event => {
-        this.zapListUI.updateZapReference(event);
-      });
-    }
+    await this._updateUI(events, viewId);
+  }
+
+  async _processBatchReferences(events, viewId) {
+    const config = this.getViewConfig(viewId);
+    if (!this._isValidReferenceConfig(config)) return;
+
+    const fetchPromises = events.map(event => this._processEventReference(event, viewId));
+    await Promise.allSettled(fetchPromises);
+  }
+
+  async _updateUI(events, viewId) {
+    if (!this.zapListUI) return;
+
+    await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
+    events.filter(e => e.reference)
+          .forEach(event => this.zapListUI.updateZapReference(event));
   }
 
   async loadMoreZaps(viewId) {
@@ -246,29 +273,19 @@ class ZapSubscriptionManager {
     }
   }
 
+  // 無限スクロールの最適化
   _createIntersectionCallback(viewId) {
     let isLoading = false;
-    let timeoutId = null;
-
-    return async (entries) => {
+    return debounce(async (entries) => {
       if (!entries[0].isIntersecting || isLoading) return;
-
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      try {
+        isLoading = true;
+        const loadedCount = await this.loadMoreZaps(viewId);
+        if (loadedCount === 0) this._cleanupInfiniteScroll(viewId);
+      } finally {
+        isLoading = false;
       }
-
-      timeoutId = setTimeout(async () => {
-        try {
-          isLoading = true;
-          const loadedCount = await this.loadMoreZaps(viewId);
-          if (loadedCount === 0) {
-            this._cleanupInfiniteScroll(viewId);
-          }
-        } finally {
-          isLoading = false;
-        }
-      }, 300);
-    };
+    }, 300);
   }
 
   _getListElement(viewId) {
@@ -440,6 +457,15 @@ class ZapSubscriptionManager {
   _isValidReferenceConfig(config) {
     return config?.relayUrls?.length && !isEventIdentifier(config?.identifier || '');
   }
+}
+
+// デバウンス関数
+function debounce(fn, delay) {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn.apply(this, args), delay);
+  };
 }
 
 // ZapSubscriptionManager を初期化する際に zapListUI を設定

@@ -39,6 +39,7 @@ export class CacheManager {
   #profileUpdateCallbacks = new Map();
   #referenceFetching = new Map();
   #relayUrls = null;
+  #zapViewStates = new Map();
 
   constructor() {
     if (this.#instance) return this.#instance;
@@ -408,6 +409,95 @@ export class CacheManager {
 
   getRelayUrls() {
     return this.#relayUrls;
+  }
+
+  // Zapイベントの状態管理を強化
+  initializeZapView(viewId) {
+    this.#zapViewStates.set(viewId, {
+      isInitialFetchComplete: false,
+      lastEventTime: null,
+      isLoading: false,
+      batchProcessing: false
+    });
+  }
+
+  getZapViewState(viewId) {
+    return this.#zapViewStates.get(viewId) || this.initializeZapView(viewId);
+  }
+
+  updateZapViewState(viewId, updates) {
+    const currentState = this.getZapViewState(viewId);
+    this.#zapViewStates.set(viewId, { ...currentState, ...updates });
+    return this.#zapViewStates.get(viewId);
+  }
+
+  // バッチ処理の最適化
+  async processBatchZapEvents(events, viewId) {
+    const state = this.getZapViewState(viewId);
+    if (state.batchProcessing) return false;
+
+    try {
+      state.batchProcessing = true;
+      const existingEvents = this.getZapEvents(viewId);
+      const newEvents = events.filter(event => 
+        !existingEvents.some(e => e.id === event.id)
+      );
+
+      if (newEvents.length === 0) return false;
+
+      // 新しいイベントをタイムスタンプでソート
+      newEvents.sort((a, b) => b.created_at - a.created_at);
+      
+      // 既存のイベントと結合して保存
+      const mergedEvents = [...existingEvents, ...newEvents];
+      mergedEvents.sort((a, b) => b.created_at - a.created_at);
+      
+      this.setZapEvents(viewId, mergedEvents);
+
+      // 最新のタイムスタンプを更新
+      const lastEventTime = Math.min(
+        ...newEvents.map(e => e.created_at),
+        state.lastEventTime || Infinity
+      );
+      this.updateZapViewState(viewId, { lastEventTime });
+
+      return true;
+    } finally {
+      state.batchProcessing = false;
+    }
+  }
+
+  // LoadState管理の改善
+  initializeLoadState(viewId) {
+    const initialState = {
+      isInitialFetchComplete: false,
+      lastEventTime: null,
+      isLoading: false,
+      currentCount: 0
+    };
+    this.updateLoadState(viewId, initialState);
+    return initialState;
+  }
+
+  updateLoadProgress(viewId, count) {
+    const state = this.getLoadState(viewId);
+    state.currentCount += count;
+    this.updateLoadState(viewId, { currentCount: state.currentCount });
+    return state.currentCount;
+  }
+
+  canLoadMore(viewId) {
+    const state = this.getLoadState(viewId);
+    return state && !state.isLoading && state.lastEventTime;
+  }
+
+  // イベントキャッシュの最適化
+  getBatchEvents(viewId, from, to) {
+    const events = this.getZapEvents(viewId);
+    return events.filter(e => 
+      e.created_at <= from && 
+      e.created_at > to
+    );
   }
 }
 
