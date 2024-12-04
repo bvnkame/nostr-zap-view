@@ -1,9 +1,16 @@
 export class BatchProcessor {
   constructor(options = {}) {
+    this._validateOptions(options);
+    this._initializeProperties(options);
+  }
+
+  _validateOptions(options) {
     if (!options.pool?.ensureRelay) {
       throw new Error('Invalid pool object: ensureRelay method is required');
     }
+  }
 
+  _initializeProperties(options) {
     this.pool = options.pool;
     this.batchSize = options.batchSize || 50;
     this.batchDelay = options.batchDelay || 100;
@@ -15,9 +22,8 @@ export class BatchProcessor {
     this.processingItems = new Set();
     this.batchTimer = null;
 
-    // キャッシュ機能の追加
     this.eventCache = new Map();
-    this.maxCacheAge = options.maxCacheAge || 1800000; // デフォルト30分
+    this.maxCacheAge = options.maxCacheAge || 1800000;
   }
 
   getOrCreateFetchPromise(key) {
@@ -46,27 +52,43 @@ export class BatchProcessor {
   async _processBatchQueue() {
     if (this.batchQueue.size === 0) return;
 
+    const batchItems = this._getBatchItems();
+    await this._processBatch(batchItems);
+    
+    // _scheduleNextBatchの代わりに直接次のバッチをスケジュール
+    if (this.batchQueue.size > 0) {
+      this._scheduleBatchProcess();
+    }
+  }
+
+  _getBatchItems() {
     const batchItems = Array.from(this.batchQueue).splice(0, this.batchSize);
     this.batchQueue = new Set(Array.from(this.batchQueue).filter(key => !batchItems.includes(key)));
-
     batchItems.forEach(key => this.processingItems.add(key));
+    return batchItems;
+  }
 
+  async _processBatch(batchItems) {
     try {
       await this.onBatchProcess(batchItems);
     } catch (error) {
-      console.error("Batch processing failed:", error);
-      this.onBatchError(batchItems, error);
+      this._handleBatchError(batchItems, error);
     } finally {
-      batchItems.forEach(key => {
-        this.processingItems.delete(key);
-        this.pendingFetches.delete(key);
-        this.resolvers.delete(key);
-      });
-
-      if (this.batchQueue.size > 0) {
-        this._scheduleBatchProcess();
-      }
+      this._cleanupBatchItems(batchItems);
     }
+  }
+
+  _handleBatchError(items, error) {
+    console.error(`${this.constructor.name} batch processing error:`, error);
+    items.forEach(item => this.resolveItem(item, null));
+  }
+
+  _cleanupBatchItems(items) {
+    items.forEach(key => {
+      this.processingItems.delete(key);
+      this.pendingFetches.delete(key);
+      this.resolvers.delete(key);
+    });
   }
 
   resolveItem(key, result) {
@@ -145,41 +167,43 @@ export class BatchProcessor {
       throw new Error('No relays configured');
     }
 
-    try {
-      const pool = this._getSubscriptionPool();
-      const connectionPromises = this.relayUrls.map(url => 
-        pool.ensureRelay(url)
-          .catch(error => {
-            console.warn(`Failed to connect to relay ${url}:`, error);
-            return null;
-          })
-      );
-
-      const results = await Promise.allSettled(connectionPromises);
-      const connectedCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
-
-      if (connectedCount === 0) {
-        throw new Error('Failed to connect to any relay');
-      }
-
-      return connectedCount;
-    } catch (error) {
-      console.error("Relay connection error:", error);
-      throw error;
+    const results = await this._connectToRelays();
+    const connectedCount = this._countSuccessfulConnections(results);
+    
+    if (connectedCount === 0) {
+      throw new Error('Failed to connect to any relay');
     }
+
+    return connectedCount;
   }
 
+  async _connectToRelays() {
+    const connectionPromises = this.relayUrls.map(url => 
+      this.pool.ensureRelay(url).catch(error => {
+        console.warn(`Failed to connect to relay ${url}:`, error);
+        return null;
+      })
+    );
+    return Promise.allSettled(connectionPromises);
+  }
+
+  _countSuccessfulConnections(results) {
+    return results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+  }
+
+  // キャッシュ関連メソッドの改善
   getCachedItem(key) {
-    const now = Date.now();
     const cached = this.eventCache.get(key);
-    
-    if (!cached) return null;
-    if (now - cached.timestamp > this.maxCacheAge) {
+    if (!this._isValidCache(cached)) {
       this.eventCache.delete(key);
       return null;
     }
-    
     return cached.event;
+  }
+
+  _isValidCache(cached) {
+    if (!cached) return false;
+    return (Date.now() - cached.timestamp) <= this.maxCacheAge;
   }
 
   setCachedItem(key, event) {
