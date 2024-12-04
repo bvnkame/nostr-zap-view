@@ -78,6 +78,8 @@ export class ProfilePool {
             console.log(`No profile found for pubkey: ${pubkey}`);
             return this._createDefaultProfile();
           }
+
+          console.log(`Received profile event for pubkey ${pubkey}:`, event);
   
           try {
             const content = JSON.parse(event.content);

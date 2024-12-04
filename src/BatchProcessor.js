@@ -309,12 +309,16 @@ export class ProfileProcessor extends BatchProcessor {
       authors: pubkeys
     }];
 
+    const latestEvents = new Map();
+
     const eventHandler = (event, processedItems) => {
-      if (!processedItems.has(event.pubkey)) {
-        console.log(`Received profile event for pubkey ${event.pubkey}:`, event);
-        this.resolveItem(event.pubkey, event);
-        processedItems.add(event.pubkey);
+      const currentEvent = latestEvents.get(event.pubkey);
+      
+      if (!currentEvent || event.created_at > currentEvent.created_at) {
+        latestEvents.set(event.pubkey, event);
       }
+      // イベントを受信したことを記録
+      processedItems.add(event.pubkey);
     };
 
     try {
@@ -324,6 +328,13 @@ export class ProfileProcessor extends BatchProcessor {
         filter,
         eventHandler
       );
+
+      // 最新のイベントをresolve
+      pubkeys.forEach(pubkey => {
+        const latestEvent = latestEvents.get(pubkey);
+        this.resolveItem(pubkey, latestEvent || null);
+      });
+
     } catch (error) {
       console.error("Profile fetch error:", error);
       this.onBatchError(pubkeys, error);
