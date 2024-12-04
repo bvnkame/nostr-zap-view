@@ -226,5 +226,13 @@ export const prependZap = (event, viewId) =>
   dialogAPI.execute(viewId, 'prependZap', event);
 export const displayZapStats = (stats, viewId) => 
   dialogAPI.execute(viewId, 'displayZapStats', stats);
-export const showNoZapsMessage = (viewId) => 
-  dialogAPI.execute(viewId, 'showNoZapsMessage');
+export const showNoZapsMessage = (viewId) => {
+  try {
+    const dialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+    if (dialog) {
+      dialog.showNoZapsMessage(DIALOG_CONFIG.NO_ZAPS_MESSAGE);
+    }
+  } catch (error) {
+    console.error('Failed to show no zaps message:', error);
+  }
+};

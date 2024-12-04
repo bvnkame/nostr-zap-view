@@ -14,9 +14,11 @@ export const APP_CONFIG = {
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
   ADDITIONAL_LOAD_COUNT: 20, // 追加：追加ロード件数
+  LOAD_TIMEOUT: 10000, // 追加ロードのタイムアウト時間（ミリ秒）
   INFINITE_SCROLL: {
     ROOT_MARGIN: '400px',
-    THRESHOLD: [0.1]
+    THRESHOLD: [0.1],
+    DEBOUNCE_TIME: 300 // デバウンス時間を設定として追加
   }
 };
 
@@ -45,13 +47,8 @@ export const ZAP_AMOUNT_CONFIG = {
 
 // Add new settings for zap dialog
 export const DIALOG_CONFIG = {
-  MAX_DISPLAY_LIMIT: 50,
-  DEFAULT_TITLE: "To ",
-  NO_ZAPS_MESSAGE: `
-    <div class="no-zaps-message">
-      No Zaps yet!<br>Send the first Zap!
-    </div>
-  `,
+  NO_ZAPS_MESSAGE: "まだZapがありません",
+  // 他の必要な設定...
 };
 
 // Timeout settings for metadata requests

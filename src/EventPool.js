@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools/pool";
-import { BATCH_CONFIG } from "./AppSettings.js";
+import { BATCH_CONFIG, REQUEST_CONFIG } from "./AppSettings.js";
 import {
   ETagReferenceProcessor,
   ATagReferenceProcessor,
@@ -89,13 +89,50 @@ export class EventPool {
 
   // Reference handling
   async fetchReference(relayUrls, eventId) {
-    if (!eventId) return null;
-    return this.#processCachedReference(relayUrls, eventId);
+    try {
+      if (!eventId) {
+        console.warn('Invalid eventId provided');
+        return null;
+      }
+
+      // フィルターを直接オブジェクトとして渡す
+      const result = await this.fetchEventWithFilter(relayUrls, {
+        ids: [eventId.toLowerCase()]
+      });
+
+      if (result) {
+        console.debug('Reference found:', { eventId, result });
+      }
+      return result;
+    } catch (error) {
+      console.error('Reference fetch error:', error);
+      return null;
+    }
   }
 
   async fetchATagReference(relayUrls, aTagValue) {
-    if (!aTagValue) return null;
-    return this.#processReference(relayUrls, aTagValue, this.#aTagProcessor);
+    try {
+      const [kind, pubkey, identifier] = aTagValue.split(':');
+      if (!kind || !pubkey || !identifier) {
+        console.warn('Invalid a-tag format:', aTagValue);
+        return null;
+      }
+
+      // フィルターを直接オブジェクトとして渡す
+      const result = await this.fetchEventWithFilter(relayUrls, {
+        kinds: [parseInt(kind)],
+        authors: [pubkey],
+        '#d': [identifier]
+      });
+
+      if (result) {
+        console.debug('A-tag reference found:', { aTagValue, result });
+      }
+      return result;
+    } catch (error) {
+      console.error('A-tag reference fetch error:', error);
+      return null;
+    }
   }
 
   // 参照関連の処理をEventPoolクラスに統合
@@ -116,6 +153,36 @@ export class EventPool {
       content: event.content || "",
       tags: event.tags || [],
     };
+  }
+
+  // 追加: イベント取得の共通メソッド
+  async fetchEventWithFilter(relayUrls, filter) {
+    try {
+      if (!Array.isArray(relayUrls) || relayUrls.length === 0) {
+        console.warn('No relay URLs provided for event fetch');
+        return null;
+      }
+
+      // フィルターの形式を修正
+      const events = await this.#zapPool.querySync(
+        relayUrls,
+        filter,  // 配列で包まない
+        { 
+          timeout: REQUEST_CONFIG.METADATA_TIMEOUT 
+        }
+      );
+
+      if (!events || events.length === 0) {
+        console.debug('No events found for filter:', filter);
+        return null;
+      }
+
+      // 最新のイベントを返す
+      return events.sort((a, b) => b.created_at - a.created_at)[0];
+    } catch (error) {
+      console.error('Event fetch error:', { error, filter, relayUrls });
+      return null;
+    }
   }
 
   // Private helper methods
