@@ -269,6 +269,20 @@ export function encodeNevent(id, kind, pubkey, relays = []) {
   }
 }
 
+export function encodeNaddr(kind, pubkey, identifier, relays = []) {
+  try {
+    return window.NostrTools.nip19.naddrEncode({
+      kind,
+      pubkey,
+      identifier,
+      relays,
+    });
+  } catch (error) {
+    console.debug("Failed to encode naddr:", error);
+    return null;
+  }
+}
+
 // Add function to extract reference from tags
 export function extractReferenceFromTags(event) {
   if (!event.tags) return null;

@@ -2,6 +2,7 @@ import {
   escapeHTML, 
   isEventIdentifier, 
   encodeNevent,
+  encodeNaddr,
   isWithin24Hours 
 } from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
@@ -81,7 +82,22 @@ export class DialogComponents {
     if (reference.kind === 31990) {
       return this.#extractRTagUrl(reference) || '';
     }
-    return this.#createNeventUrl(reference);
+
+    // Check if this is an a-tag referenced event
+    const dTag = reference.tags.find(t => t[0] === 'd');
+    if (dTag) {
+      return `https://njump.me/${encodeNaddr(
+        reference.kind,
+        reference.pubkey,
+        dTag[1]
+      )}`;
+    }
+
+    return `https://njump.me/${encodeNevent(
+      reference.id,
+      reference.kind,
+      reference.pubkey
+    )}`;
   }
 
   static #extractRTagUrl(reference) {
