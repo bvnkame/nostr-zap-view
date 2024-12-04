@@ -90,31 +90,33 @@ export class ZapListUI {
       const fragment = document.createDocumentFragment();
       const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
       const profileUpdates = [];
+      const referencePromises = [];
 
       for (const event of uniqueEvents) {
         const zapInfo = await this.#handleZapInfo(event);
         const li = this.itemBuilder.createListItem(zapInfo, event);
         
-        // キャッシュされた参照情報があれば表示
-        const reference = cacheManager.getReference(event.id);
-        if (reference) {
-          const referenceContainer = li.querySelector('.reference-container');
-          if (referenceContainer) {
-            referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
-              reference 
-            });
-          }
+        // 参照情報の処理を並列化
+        if (event.tags.some(tag => tag[0] === 'e')) {
+          referencePromises.push({
+            element: li,
+            promise: this.#processEventReference(event)
+          });
         }
 
         fragment.appendChild(li);
-
         if (zapInfo.pubkey) {
           profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
         }
       }
 
       this.#updateList(list, fragment);
-      await this.#updateProfiles(profileUpdates);
+
+      // プロフィールと参照情報の更新を並列実行
+      await Promise.all([
+        this.#updateProfiles(profileUpdates),
+        this.#processReferences(referencePromises)
+      ]);
     } catch (error) {
       console.error("Failed to render zap list:", error);
       this.showNoZapsMessage();
@@ -340,5 +342,43 @@ export class ZapListUI {
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
+  }
+
+  async #processEventReference(event) {
+    try {
+      const reference = eventPool.extractReferenceFromTags(event);
+      if (reference) {
+        const processedRef = await eventPool.fetchReference(
+          cacheManager.getRelayUrls() || [],
+          reference.id
+        );
+        if (processedRef) {
+          return { eventId: event.id, reference: processedRef };
+        }
+      }
+    } catch (error) {
+      console.error("Reference processing error:", error);
+    }
+    return null;
+  }
+
+  async #processReferences(referencePromises) {
+    const results = await Promise.allSettled(
+      referencePromises.map(({ promise }) => promise)
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        const { element } = referencePromises[index];
+        const { eventId, reference } = result.value;
+        const referenceContainer = element.querySelector('.reference-container');
+        if (referenceContainer && reference) {
+          referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+            reference 
+          });
+          cacheManager.setReference(eventId, reference);
+        }
+      }
+    });
   }
 }

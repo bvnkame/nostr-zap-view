@@ -18,12 +18,14 @@ export class EventPool {
   // State management
   #subscriptions;
   #state;
+  #referenceFetching; // 追加: プライベートプロパティとして定義
 
   constructor() {
     this.#zapPool = new SimplePool();
     this.#subscriptions = new Map();
     this.#state = new Map();
     this.#isConnected = false;
+    this.#referenceFetching = new Map(); // 初期化を追加
 
     const processorConfig = {
       pool: this.#zapPool,
@@ -95,15 +97,27 @@ export class EventPool {
         return null;
       }
 
-      // フィルターを直接オブジェクトとして渡す
-      const result = await this.fetchEventWithFilter(relayUrls, {
+      // キャッシュをまず確認
+      const cached = cacheManager.getReference(eventId);
+      if (cached) return cached;
+
+      // 既に進行中のフェッチがあればそれを返す
+      const pending = this.#referenceFetching.get(eventId); // 修正: プライベートプロパティにアクセス
+      if (pending) return pending;
+
+      // 新しいフェッチを開始
+      const promise = this.fetchEventWithFilter(relayUrls, {
         ids: [eventId.toLowerCase()]
+      }).then(result => {
+        if (result) {
+          cacheManager.setReference(eventId, result);
+        }
+        this.#referenceFetching.delete(eventId); // 修正: プライベートプロパティにアクセス
+        return result;
       });
 
-      if (result) {
-        console.debug('Reference found:', { eventId, result });
-      }
-      return result;
+      this.#referenceFetching.set(eventId, promise); // 修正: プライベートプロパティにアクセス
+      return promise;
     } catch (error) {
       console.error('Reference fetch error:', error);
       return null;

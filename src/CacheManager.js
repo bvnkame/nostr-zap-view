@@ -38,6 +38,7 @@ export class CacheManager {
   #instance = null;
   #profileUpdateCallbacks = new Map();
   #referenceFetching = new Map();
+  #relayUrls = null;
 
   constructor() {
     if (this.#instance) return this.#instance;
@@ -369,6 +370,9 @@ export class CacheManager {
   }
 
   async processCachedData(viewId, config, renderCallback) {
+    // リレーURLを設定
+    this.setRelayUrls(config.relayUrls);
+    
     const cachedEvents = this.getZapEvents(viewId);
     const results = await Promise.all([
       this.getCachedStats(viewId, config.identifier),
@@ -391,6 +395,14 @@ export class CacheManager {
 
   hasImageCache(url) {
     return this.caches.imageCache.has(url);
+  }
+
+  setRelayUrls(urls) {
+    this.#relayUrls = urls;
+  }
+
+  getRelayUrls() {
+    return this.#relayUrls;
   }
 }
 
