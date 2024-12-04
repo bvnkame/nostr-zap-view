@@ -279,14 +279,28 @@ export class ZapListUI {
     if (!list) return;
 
     try {
+      // 既存のアイテムをMap化して高速なルックアップを可能に
+      const existingItems = new Map(
+        Array.from(list.querySelectorAll('.zap-list-item'))
+          .map(item => [item.getAttribute('data-event-id'), item])
+      );
+
       const fragment = document.createDocumentFragment();
       const profileUpdates = [];
 
       for (const event of events) {
+        // 既存のアイテムがあれば再利用
+        const existingItem = existingItems.get(event.id);
+        if (existingItem) {
+          fragment.appendChild(existingItem);
+          existingItems.delete(event.id);
+          continue;
+        }
+
+        // 新しいアイテムを作成
         const zapInfo = await this.#handleZapInfo(event);
         const li = this.itemBuilder.createListItem(zapInfo, event);
         
-        // 参照情報があれば表示
         if (event.reference) {
           const referenceContainer = li.querySelector('.reference-container');
           if (referenceContainer) {

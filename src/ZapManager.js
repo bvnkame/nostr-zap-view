@@ -134,15 +134,57 @@ class ZapSubscriptionManager {
     const batchEvents = [];
     let lastEventTime = null;
 
-    // イベントバッファを作成し、一定量たまったら処理を開始
-    const processBuffer = async () => {
-      if (batchEvents.length === 0) return;
-      const eventsToProcess = batchEvents.splice(0);
-      await this.processBatch(eventsToProcess, viewId);
+    // リファレンス情報の取得を効率化するための追跡
+    let referencePromises = new Map();
+    
+    // バッチ処理時のキャッシュ更新を確実に
+    const processBatch = async (events) => {
+      if (events.length === 0) return;
+      
+      const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
+      
+      // まずキャッシュを更新
+      sortedEvents.forEach(event => {
+        cacheManager.addZapEvent(viewId, event);
+      });
+
+      // UIの更新とリファレンス情報の取得を並列化
+      await Promise.all([
+        // UIの更新（キャッシュから全イベントを取得）
+        this.zapListUI?.batchUpdate(cacheManager.getZapEvents(viewId)),
+        
+        // リファレンス情報の取得
+        ...sortedEvents.map(event => {
+          if (!referencePromises.has(event.id)) {
+            const promise = this.updateEventReference(event, viewId)
+              .then(hasReference => {
+                if (hasReference && this.zapListUI) {
+                  this.zapListUI.updateZapReference(event);
+                }
+              });
+            referencePromises.set(event.id, promise);
+            return promise;
+          }
+          return referencePromises.get(event.id);
+        }),
+
+        // その他の処理
+        Promise.all(sortedEvents.map(event => 
+          Promise.all([
+            statsManager.handleZapEvent(event, viewId),
+            profilePool.verifyNip05Async(event.pubkey)
+          ])
+        ))
+      ]);
     };
 
-    // 定期的なバッファ処理を設定
-    const bufferInterval = setInterval(processBuffer, 1000);
+    // バッファ処理のインターバルを設定
+    const bufferInterval = setInterval(() => {
+      if (batchEvents.length > 0) {
+        const eventsToProcess = batchEvents.splice(0);
+        processBatch(eventsToProcess);
+      }
+    }, 500);
 
     return new Promise((resolve) => {
       eventPool.subscribeToZaps(viewId, config, decoded, {
@@ -151,19 +193,17 @@ class ZapSubscriptionManager {
           if (cacheManager.addZapEvent(viewId, event)) {
             batchEvents.push(event);
             
-            // バッファサイズが閾値に達したら即時処理
-            if (batchEvents.length >= 10) {
-              processBuffer();
+            if (batchEvents.length >= APP_CONFIG.BATCH_SIZE || 5) {
+              const eventsToProcess = batchEvents.splice(0);
+              processBatch(eventsToProcess);
             }
           }
         },
         oneose: async () => {
           clearInterval(bufferInterval);
-          await processBuffer(); // 残りのイベントを処理
-
-          // リファレンス情報を更新
-          this.updateRemainingReferences(viewId);
-
+          if (batchEvents.length > 0) {
+            await processBatch(batchEvents);
+          }
           this.finalizeInitialization(viewId, lastEventTime);
           resolve();
         }
