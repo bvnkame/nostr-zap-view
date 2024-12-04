@@ -83,18 +83,21 @@ export class ZapListUI {
       const fragment = document.createDocumentFragment();
       const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
       const profileUpdates = [];
-      const referencePromises = [];
 
       for (const event of uniqueEvents) {
         const zapInfo = await this.#handleZapInfo(event);
         const li = this.itemBuilder.createListItem(zapInfo, event);
         
-        // 参照情報の処理を並列化
-        if (event.tags.some(tag => tag[0] === 'e')) {
-          referencePromises.push({
-            element: li,
-            promise: this.#processEventReference(event)
-          });
+        // キャッシュされたreferenceがあれば表示
+        const cachedReference = cacheManager.getReference(event.id);
+        if (cachedReference) {
+          const zapContent = li.querySelector('.zap-content');
+          if (zapContent) {
+            const referenceHTML = DialogComponents.createReferenceComponent({ 
+              reference: cachedReference 
+            });
+            zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+          }
         }
 
         fragment.appendChild(li);
@@ -104,12 +107,7 @@ export class ZapListUI {
       }
 
       this.#updateList(list, fragment);
-
-      // プロフィールと参照情報の更新を並列実行
-      await Promise.all([
-        this.#updateProfiles(profileUpdates),
-        this.#processReferences(referencePromises)
-      ]);
+      await this.#updateProfiles(profileUpdates);
     } catch (error) {
       console.error("Failed to render zap list:", error);
       this.showNoZapsMessage();
@@ -318,11 +316,12 @@ export class ZapListUI {
         const li = this.itemBuilder.createListItem(zapInfo, event);
         
         if (event.reference) {
-          const referenceContainer = li.querySelector('.reference-container');
-          if (referenceContainer) {
-            referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
+          const zapContent = li.querySelector('.zap-content');
+          if (zapContent) {
+            const referenceHTML = DialogComponents.createReferenceComponent({ 
               reference: event.reference 
             });
+            zapContent.insertAdjacentHTML('beforeend', referenceHTML);
           }
         }
 
@@ -346,41 +345,5 @@ export class ZapListUI {
     }
   }
 
-  async #processEventReference(event) {
-    try {
-      const reference = eventPool.extractReferenceFromTags(event);
-      if (reference) {
-        const processedRef = await eventPool.fetchReference(
-          cacheManager.getRelayUrls() || [],
-          reference.id
-        );
-        if (processedRef) {
-          return { eventId: event.id, reference: processedRef };
-        }
-      }
-    } catch (error) {
-      console.error("Reference processing error:", error);
-    }
-    return null;
-  }
 
-  async #processReferences(referencePromises) {
-    const results = await Promise.allSettled(
-      referencePromises.map(({ promise }) => promise)
-    );
-
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled' && result.value) {
-        const { element } = referencePromises[index];
-        const { eventId, reference } = result.value;
-        const referenceContainer = element.querySelector('.reference-container');
-        if (referenceContainer && reference) {
-          referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ 
-            reference 
-          });
-          cacheManager.setReference(eventId, reference);
-        }
-      }
-    });
-  }
 }

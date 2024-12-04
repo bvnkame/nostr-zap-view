@@ -370,17 +370,22 @@ export class CacheManager {
   }
 
   async processCachedData(viewId, config, renderCallback) {
-    // リレーURLを設定
     this.setRelayUrls(config.relayUrls);
     
     const cachedEvents = this.getZapEvents(viewId);
+    
+    // キャッシュされたreferenceの確認
+    const hasReferences = cachedEvents.some(event => this.getReference(event.id));
+    
     const results = await Promise.all([
       this.getCachedStats(viewId, config.identifier),
       cachedEvents.length > 0 ? renderCallback(cachedEvents, viewId) : null
     ]);
+
     return {
       stats: results[0],
-      hasEnoughCachedEvents: cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT
+      hasEnoughCachedEvents: cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT,
+      hasReferences: hasReferences
     };
   }
 
