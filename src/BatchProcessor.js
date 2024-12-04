@@ -1,17 +1,23 @@
 export class BatchProcessor {
   constructor(options = {}) {
+    if (!options.pool?.ensureRelay) {
+      throw new Error('Invalid pool object: ensureRelay method is required');
+    }
+
+    this.pool = options.pool;
     this.batchSize = options.batchSize || 50;
     this.batchDelay = options.batchDelay || 100;
+    this.relayUrls = options.relayUrls || [];
+    
     this.batchQueue = new Set();
     this.pendingFetches = new Map();
     this.resolvers = new Map();
     this.processingItems = new Set();
     this.batchTimer = null;
-    if (!options.pool?.ensureRelay) {
-      throw new Error('Invalid pool object: ensureRelay method is required');
-    }
-    this.pool = options.pool;
-    this.relayUrls = options.relayUrls || [];
+
+    // キャッシュ機能の追加
+    this.eventCache = new Map();
+    this.maxCacheAge = options.maxCacheAge || 1800000; // デフォルト30分
   }
 
   getOrCreateFetchPromise(key) {
@@ -63,24 +69,6 @@ export class BatchProcessor {
     }
   }
 
-  async processBatch() {
-    if (this.currentBatch.size === 0) return;
-
-    const items = Array.from(this.currentBatch);
-    this.currentBatch.clear();
-
-    try {
-      // バッチ処理を非同期で実行し、完了を待たない
-      this.onBatchProcess(items).catch(error => {
-        console.error("Batch processing error:", error);
-        this.onBatchError(items, error);
-      });
-    } catch (error) {
-      console.error("Batch processing error:", error);
-      this.onBatchError(items, error);
-    }
-  }
-
   resolveItem(key, result) {
     const resolver = this.resolvers.get(key);
     if (resolver) {
@@ -91,11 +79,12 @@ export class BatchProcessor {
 
   // Override these methods in derived classes
   async onBatchProcess(items) {
-    throw new Error("Not implemented");
+    throw new Error("onBatchProcess must be implemented by derived class");
   }
 
   onBatchError(items, error) {
-    throw new Error("Not implemented");
+    console.error(`Batch processing error in ${this.constructor.name}:`, error);
+    items.forEach(item => this.resolveItem(item, null));
   }
 
   // 共通の_cleanup処理を基底クラスに移動
@@ -179,20 +168,31 @@ export class BatchProcessor {
       throw error;
     }
   }
+
+  getCachedItem(key) {
+    const now = Date.now();
+    const cached = this.eventCache.get(key);
+    
+    if (!cached) return null;
+    if (now - cached.timestamp > this.maxCacheAge) {
+      this.eventCache.delete(key);
+      return null;
+    }
+    
+    return cached.event;
+  }
+
+  setCachedItem(key, event) {
+    this.eventCache.set(key, {
+      event,
+      timestamp: Date.now()
+    });
+  }
 }
 
 export class ETagReferenceProcessor extends BatchProcessor {
   constructor(options = {}) {
-    super({
-      pool: options.pool,
-      batchSize: options.batchSize || 50,
-      batchDelay: options.batchDelay || 100,
-    });
-    this.relayUrls = [];
-  }
-
-  setRelayUrls(urls) {
-    this.relayUrls = Array.isArray(urls) ? urls : [];
+    super(options);
   }
 
   async onBatchProcess(items) {
@@ -208,25 +208,11 @@ export class ETagReferenceProcessor extends BatchProcessor {
 
     return this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
   }
-
-  onBatchError(items, error) {
-    console.error("ETag batch processing error:", error);
-    items.forEach(item => this.resolveItem(item, null));
-  }
 }
 
 export class ATagReferenceProcessor extends BatchProcessor {
   constructor(options = {}) {
-    super({
-      pool: options.pool,
-      batchSize: options.batchSize || 50,
-      batchDelay: options.batchDelay || 100,
-    });
-    this.relayUrls = [];
-  }
-
-  setRelayUrls(urls) {
-    this.relayUrls = Array.isArray(urls) ? urls : [];
+    super(options);
   }
 
   _parseAtagValue(aTagValue) {
@@ -275,30 +261,19 @@ export class ATagReferenceProcessor extends BatchProcessor {
 
     return this._createSubscriptionPromise(items, this.relayUrls, filters, eventHandler);
   }
-
-  onBatchError(items, error) {
-    console.error("ATag batch processing error:", error);
-    items.forEach(item => this.resolveItem(item, null));
-  }
 }
 
 export class ProfileProcessor extends BatchProcessor {
   constructor(options = {}) {
     const { simplePool, config } = options;
-    if (!simplePool?.ensureRelay) {
-      throw new Error('Invalid simplePool: ensureRelay method is required');
-    }
-
     super({
       pool: simplePool,
       batchSize: config.BATCH_SIZE,
       batchDelay: config.BATCH_DELAY,
-      relayUrls: config.RELAYS
+      relayUrls: config.RELAYS,
+      maxCacheAge: 1800000 // 30分
     });
-    
     this.config = config;
-    this.eventCache = new Map();  // プロフィールイベントのキャッシュを追加
-    this.maxCacheAge = 1800000;   // 30分のキャッシュ期限
   }
 
   async onBatchProcess(pubkeys) {
@@ -306,17 +281,13 @@ export class ProfileProcessor extends BatchProcessor {
       throw new Error('No relays configured for profile fetch');
     }
 
-    // 期限内のキャッシュがあるpubkeyをフィルタリング
-    const now = Date.now();
     const uncachedPubkeys = pubkeys.filter(pubkey => {
-      const cached = this.eventCache.get(pubkey);
-      if (!cached) return true;
-      if (now - cached.timestamp > this.maxCacheAge) {
-        this.eventCache.delete(pubkey);
-        return true;
+      const cached = this.getCachedItem(pubkey);
+      if (cached) {
+        this.resolveItem(pubkey, cached);
+        return false;
       }
-      this.resolveItem(pubkey, cached.event);
-      return false;
+      return true;
     });
 
     if (uncachedPubkeys.length === 0) return;
@@ -330,16 +301,10 @@ export class ProfileProcessor extends BatchProcessor {
 
     const eventHandler = (event, processedItems) => {
       const currentEvent = latestEvents.get(event.pubkey);
-      
       if (!currentEvent || event.created_at > currentEvent.created_at) {
         latestEvents.set(event.pubkey, event);
-        // キャッシュを更新
-        this.eventCache.set(event.pubkey, {
-          event,
-          timestamp: now
-        });
+        this.setCachedItem(event.pubkey, event);
       }
-      // イベントを受信したことを記録
       processedItems.add(event.pubkey);
     };
 
@@ -351,7 +316,6 @@ export class ProfileProcessor extends BatchProcessor {
         eventHandler
       );
 
-      // 最新のイベントをresolve
       uncachedPubkeys.forEach(pubkey => {
         const latestEvent = latestEvents.get(pubkey);
         this.resolveItem(pubkey, latestEvent || null);
@@ -361,10 +325,5 @@ export class ProfileProcessor extends BatchProcessor {
       console.error("Profile fetch error:", error);
       this.onBatchError(pubkeys, error);
     }
-  }
-
-  onBatchError(items, error) {
-    console.error("Profile batch processing error:", error);
-    items.forEach(pubkey => this.resolveItem(pubkey, null));
   }
 }
