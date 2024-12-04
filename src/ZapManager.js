@@ -110,12 +110,12 @@ class ZapSubscriptionManager {
       try {
         const aTag = event.tags.find(t => Array.isArray(t) && t[0] === 'a');
         if (aTag?.[1]) {
-          return await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
+          return await eventPool.fetchReference(config.relayUrls, event, 'a');
         }
 
         const eTag = event.tags.find(t => Array.isArray(t) && t[0] === 'e');
         if (eTag?.[1] && /^[0-9a-f]{64}$/.test(eTag[1].toLowerCase())) {
-          return await eventPool.fetchReference(config.relayUrls, eTag[1]);
+          return await eventPool.fetchReference(config.relayUrls, event, 'e');
         }
 
         return null;

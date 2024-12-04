@@ -90,61 +90,74 @@ export class EventPool {
   }
 
   // Reference handling
-  async fetchReference(relayUrls, eventId) {
+  async fetchReference(relayUrls, event, type) {
     try {
-      if (!eventId) {
-        console.warn('Invalid eventId provided');
+      if (!event?.tags || !Array.isArray(event.tags)) {
         return null;
       }
 
-      // キャッシュをまず確認
-      const cached = cacheManager.getReference(eventId);
+      const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
+      if (!tag) return null;
+
+      // キャッシュチェック
+      const cached = cacheManager.getReference(event.id);
       if (cached) return cached;
 
-      // 既に進行中のフェッチがあればそれを返す
-      const pending = this.#referenceFetching.get(eventId); // 修正: プライベートプロパティにアクセス
+      // 進行中のフェッチチェック
+      const pending = this.#referenceFetching.get(event.id);
       if (pending) return pending;
 
-      // 新しいフェッチを開始
-      const promise = this.fetchEventWithFilter(relayUrls, {
-        ids: [eventId.toLowerCase()]
-      }).then(result => {
-        if (result) {
-          cacheManager.setReference(eventId, result);
-        }
-        this.#referenceFetching.delete(eventId); // 修正: プライベートプロパティにアクセス
-        return result;
-      });
+      let filter;
+      if (type === 'a') {
+        const [kind, pubkey, identifier] = tag[1].split(':');
+        filter = {
+          kinds: [parseInt(kind)],
+          authors: [pubkey],
+          '#d': [identifier]
+        };
+      } else if (type === 'e' && /^[0-9a-f]{64}$/.test(tag[1].toLowerCase())) {
+        filter = { ids: [tag[1].toLowerCase()] };
+      } else {
+        return null;
+      }
 
-      this.#referenceFetching.set(eventId, promise); // 修正: プライベートプロパティにアクセス
+      const promise = this.fetchEventWithFilter(relayUrls, filter)
+        .then(result => {
+          if (result) {
+            cacheManager.setReference(event.id, result);
+          }
+          this.#referenceFetching.delete(event.id);
+          return result;
+        });
+
+      this.#referenceFetching.set(event.id, promise);
       return promise;
     } catch (error) {
       console.error('Reference fetch error:', error);
+      this.#referenceFetching.delete(event.id);
       return null;
     }
   }
 
-  async fetchATagReference(relayUrls, aTagValue) {
+  // 最適化されたイベント取得メソッド
+  async fetchEventWithFilter(relayUrls, filter) {
+    if (!Array.isArray(relayUrls) || relayUrls.length === 0) {
+      console.warn('No relay URLs provided for event fetch');
+      return null;
+    }
+
     try {
-      const [kind, pubkey, identifier] = aTagValue.split(':');
-      if (!kind || !pubkey || !identifier) {
-        console.warn('Invalid a-tag format:', aTagValue);
-        return null;
-      }
+      const events = await this.#zapPool.querySync(
+        relayUrls,
+        filter,
+        { timeout: REQUEST_CONFIG.METADATA_TIMEOUT }
+      );
 
-      // フィルターを直接オブジェクトとして渡す
-      const result = await this.fetchEventWithFilter(relayUrls, {
-        kinds: [parseInt(kind)],
-        authors: [pubkey],
-        '#d': [identifier]
-      });
-
-      if (result) {
-        console.debug('A-tag reference found:', { aTagValue, result });
-      }
-      return result;
+      return events && events.length > 0
+        ? events.sort((a, b) => b.created_at - a.created_at)[0]
+        : null;
     } catch (error) {
-      console.error('A-tag reference fetch error:', error);
+      console.error('Event fetch error:', { error, filter, relayUrls });
       return null;
     }
   }
@@ -167,36 +180,6 @@ export class EventPool {
       content: event.content || "",
       tags: event.tags || [],
     };
-  }
-
-  // 追加: イベント取得の共通メソッド
-  async fetchEventWithFilter(relayUrls, filter) {
-    try {
-      if (!Array.isArray(relayUrls) || relayUrls.length === 0) {
-        console.warn('No relay URLs provided for event fetch');
-        return null;
-      }
-
-      // フィルターの形式を修正
-      const events = await this.#zapPool.querySync(
-        relayUrls,
-        filter,  // 配列で包まない
-        { 
-          timeout: REQUEST_CONFIG.METADATA_TIMEOUT 
-        }
-      );
-
-      if (!events || events.length === 0) {
-        console.debug('No events found for filter:', filter);
-        return null;
-      }
-
-      // 最新のイベントを返す
-      return events.sort((a, b) => b.created_at - a.created_at)[0];
-    } catch (error) {
-      console.error('Event fetch error:', { error, filter, relayUrls });
-      return null;
-    }
   }
 
   // Private helper methods
