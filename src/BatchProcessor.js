@@ -199,18 +199,51 @@ export class ATagReferenceProcessor extends BatchProcessor {
     return this.pool.zapPool;
   }
 
+  _parseAtagValue(aTagValue) {
+    const parts = aTagValue.split(':');
+    if (parts.length !== 3) return null;
+
+    return {
+      kind: parseInt(parts[0]),
+      pubkey: parts[1],
+      identifier: parts[2]
+    };
+  }
+
   async onBatchProcess(items) {
-    const filter = items.map(aTagValue => ({ '#a': [aTagValue] }));
+    // aタグの値を解析してフィルターを作成
+    const filters = items.map(aTagValue => {
+      const parsed = this._parseAtagValue(aTagValue);
+      if (!parsed) return null;
+
+      return {
+        kinds: [parsed.kind],
+        authors: [parsed.pubkey],
+        '#d': [parsed.identifier]
+      };
+    }).filter(Boolean);
+
+    if (filters.length === 0) {
+      items.forEach(item => this.resolveItem(item, null));
+      return;
+    }
 
     const eventHandler = (event, processedItems) => {
-      const aTagValue = event.tags.find(t => t[0] === 'a')?.[1];
+      const aTagValue = items.find(item => {
+        const parsed = this._parseAtagValue(item);
+        return parsed && 
+               event.kind === parsed.kind && 
+               event.pubkey === parsed.pubkey &&
+               event.tags.some(t => t[0] === 'd' && t[1] === parsed.identifier);
+      });
+
       if (aTagValue) {
         this.resolveItem(aTagValue, event);
         processedItems.add(aTagValue);
       }
     };
 
-    return this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
+    return this._createSubscriptionPromise(items, this.relayUrls, filters, eventHandler);
   }
 
   onBatchError(items, error) {
