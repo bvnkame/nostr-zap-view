@@ -27,25 +27,26 @@ class ZapSubscriptionManager {
     return this.configStore.get(viewId);
   }
 
-  // イベント処理を共通化した新しいメソッド
+  // イベント処理を最適化した新しいメソッド
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
-      // referenceの取得とプロフィール処理を並行実行
-      const [referenceResult, profileResult] = await Promise.all([
-        this.updateEventReference(event, viewId),
-        statsManager.handleZapEvent(event, viewId)
-      ]);
-
+      // まずイベントを表示
       if (shouldUpdateUI && this.zapListUI) {
-        const events = cacheManager.getZapEvents(viewId);
-        // イベントを日付の降順でソート
-        events.sort((a, b) => b.created_at - a.created_at);
         await this.zapListUI.appendZap(event);
       }
 
-      // NIP-05検証
-      await profilePool.verifyNip05Async(event.pubkey);
-      
+      // 参照情報とプロフィールは非同期で取得
+      Promise.all([
+        this.updateEventReference(event, viewId),
+        statsManager.handleZapEvent(event, viewId),
+        profilePool.verifyNip05Async(event.pubkey)
+      ]).then(() => {
+        // 参照情報が取得できたら該当要素を更新
+        if (shouldUpdateUI && this.zapListUI && event.reference) {
+          this.zapListUI.updateZapReference(event);
+        }
+      });
+
       return true;
     } catch (error) {
       console.error("Failed to process zap event:", error);
@@ -72,28 +73,30 @@ class ZapSubscriptionManager {
       const identifier = config?.identifier || '';
       if (isEventIdentifier(identifier)) return false;
 
-      let reference = null;
-      
-      if (aTag) {
-        try {
-          reference = await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
-        } catch (error) {
-          console.warn("A-tag reference fetch failed:", aTag[1], error);
+      const fetchReference = async () => {
+        let reference = null;
+        if (aTag) {
+          try {
+            reference = await eventPool.fetchATagReference(config.relayUrls, aTag[1]);
+          } catch (error) {
+            console.warn("A-tag reference fetch failed:", aTag[1], error);
+          }
         }
-      }
-      
-      if (!reference && eTag) {
-        try {
-          // hex形式の確認を追加
+        
+        if (!reference && eTag) {
           const eventId = eTag[1].toLowerCase();
           if (/^[0-9a-f]{64}$/.test(eventId)) {
-            reference = await eventPool.fetchReference(config.relayUrls, eventId);
+            try {
+              reference = await eventPool.fetchReference(config.relayUrls, eventId);
+            } catch (error) {
+              console.warn("E-tag reference fetch failed:", eTag[1], error);
+            }
           }
-        } catch (error) {
-          console.warn("E-tag reference fetch failed:", eTag[1], error);
         }
-      }
+        return reference;
+      };
 
+      const reference = await cacheManager.getOrFetchReference(event.id, fetchReference);
       if (reference) {
         event.reference = reference;
         return true;
@@ -113,64 +116,9 @@ class ZapSubscriptionManager {
     const identifier = config?.identifier || '';
     if (isEventIdentifier(identifier)) return;
 
-    // aタグとeタグの参照を分けて処理
-    const aTagRefs = new Map();
-    const eTagRefs = new Map();
-
-    events.forEach(event => {
-      const aTag = event.tags.find(tag => tag[0] === 'a');
-      const eTag = event.tags.find(tag => tag[0] === 'e');
-
-      if (aTag?.[1]) {
-        aTagRefs.set(aTag[1], event);
-      }
-      
-      if (eTag?.[1]) {
-        const eventId = eTag[1].toLowerCase();
-        if (/^[0-9a-f]{64}$/.test(eventId)) {
-          eTagRefs.set(eventId, event);
-        }
-      }
-    });
-
-    try {
-      // a-tagの参照を取得
-      if (aTagRefs.size > 0) {
-        const aTagResults = await Promise.allSettled(
-          Array.from(aTagRefs.keys()).map(async (aTagValue) => {
-            const result = await eventPool.fetchATagReference(config.relayUrls, aTagValue);
-            return { aTagValue, result };
-          })
-        );
-
-        aTagResults.forEach(result => {
-          if (result.status === 'fulfilled' && result.value.result) {
-            const event = aTagRefs.get(result.value.aTagValue);
-            if (event) event.reference = result.value.result;
-          }
-        });
-      }
-
-      // e-tagの参照を取得
-      if (eTagRefs.size > 0) {
-        const eTagResults = await Promise.allSettled(
-          Array.from(eTagRefs.keys()).map(async (eventId) => {
-            const result = await eventPool.fetchReference(config.relayUrls, eventId);
-            return { eventId, result };
-          })
-        );
-
-        eTagResults.forEach(result => {
-          if (result.status === 'fulfilled' && result.value.result) {
-            const event = eTagRefs.get(result.value.eventId);
-            if (event) event.reference = result.value.result;
-          }
-        });
-      }
-
-    } catch (error) {
-      console.error("Batch reference fetch failed:", error);
-    }
+    // イベントごとにリファレンス情報を取得
+    const fetchPromises = events.map(event => this.updateEventReference(event, viewId));
+    await Promise.allSettled(fetchPromises);
   }
 
   async initializeSubscriptions(config, viewId) {
@@ -185,31 +133,67 @@ class ZapSubscriptionManager {
 
     return new Promise((resolve) => {
       let lastEventTime = null;
+      const initialEvents = [];
 
       const handleEvent = async (event) => {
         lastEventTime = Math.min(lastEventTime || event.created_at, event.created_at);
         if (cacheManager.addZapEvent(viewId, event)) {
-          await this.processZapEvent(event, viewId, false); // UIの更新を一時的に無効化
-
-          // イベントの取得後、ソートしてからまとめて表示
-          const events = cacheManager.getZapEvents(viewId);
-          events.sort((a, b) => b.created_at - a.created_at);
-          try {
-            renderZapListFromCache(events, viewId);
-          } catch (error) {
-            console.error('Failed to render zap list:', error);
-          }
+          initialEvents.push(event);
+          // イベントをすぐにUIに表示
+          await this.processImmediateZap(event, viewId);
         }
       };
 
       eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: handleEvent,
-        oneose: () => {
+        oneose: async () => {
+          // リファレンス情報を非同期で取得して更新
+          this.processDeferredReferences(initialEvents, viewId);
           this.finalizeInitialization(viewId, lastEventTime);
           resolve();
         }
       });
     });
+  }
+
+  // 即時表示用の処理（リファレンスなし）
+  async processImmediateZap(event, viewId) {
+    if (this.zapListUI) {
+      await this.zapListUI.appendZap(event);
+      // プロフィール情報を非同期で取得
+      Promise.all([
+        statsManager.handleZapEvent(event, viewId),
+        profilePool.verifyNip05Async(event.pubkey)
+      ]).catch(console.error);
+    }
+  }
+
+  // リファレンス情報の遅延処理
+  async processDeferredReferences(events, viewId) {
+    try {
+      // 100件ごとにバッチ処理
+      const batchSize = 100;
+      for (let i = 0; i < events.length; i += batchSize) {
+        const batch = events.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(event => 
+            this.updateEventReference(event, viewId)
+              .then(success => {
+                if (success && this.zapListUI) {
+                  this.zapListUI.updateZapReference(event);
+                }
+              })
+              .catch(console.error)
+          )
+        );
+        // 各バッチ間で少し待機して負荷を分散
+        if (i + batchSize < events.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    } catch (error) {
+      console.error("Deferred reference processing failed:", error);
+    }
   }
 
   finalizeInitialization(viewId, lastEventTime) {
@@ -264,14 +248,9 @@ class ZapSubscriptionManager {
         eventPool.subscribeToZaps(viewId, config, decoded, {
           onevent: async (event) => {
             if (event.created_at < state.lastEventTime) {
-              try {
-                // イベントを一時配列に保存
-                newEvents.push(event);
-                newEventsCount++;
-                state.lastEventTime = Math.min(state.lastEventTime, event.created_at);
-              } catch (error) {
-                console.error('[ZapManager] イベント処理エラー:', error);
-              }
+              newEvents.push(event);
+              newEventsCount++;
+              state.lastEventTime = Math.min(state.lastEventTime, event.created_at);
             }
           },
           oneose: () => {
@@ -281,36 +260,23 @@ class ZapSubscriptionManager {
         });
       });
 
-      // すべてのイベントを取得後、まとめて処理
+      // 新しいイベントをソートして表示
       if (newEventsCount > 0) {
-        // 新しいイベントをソート
         newEvents.sort((a, b) => b.created_at - a.created_at);
-
-        // リファレンス情報を一括取得
-        await this.updateEventReferenceBatch(newEvents, viewId);
-
-        // イベントを一括で追加
+        
+        // まず先にイベントを表示
         for (const event of newEvents) {
-          await this.handleZapEvent(event, viewId);
+          cacheManager.addZapEvent(viewId, event);
+          await this.processZapEvent(event, viewId);
         }
 
-        // キャッシュ全体を再ソート
-        const allEvents = cacheManager.getZapEvents(viewId);
-        allEvents.sort((a, b) => b.created_at - a.created_at);
-
-        // UIを一括更新
-        try {
+        // 参照情報は非同期で取得
+        this.updateEventReferenceBatch(newEvents, viewId).then(() => {
+          // 参照情報が取得できたらまとめて更新
+          const allEvents = cacheManager.getZapEvents(viewId);
           renderZapListFromCache(allEvents, viewId);
-        } catch (error) {
-          console.error('[ZapManager] UIの更新に失敗:', error);
-        }
+        });
       }
-
-      console.log('[ZapManager] 追加ロード完了:', {
-        newEventsCount,
-        totalCacheSize: cacheManager.getZapEvents(viewId).length,
-        lastEventTime: state.lastEventTime
-      });
 
       return newEventsCount;
 

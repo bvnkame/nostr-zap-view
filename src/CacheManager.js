@@ -37,6 +37,7 @@ class BaseCache {
 export class CacheManager {
   #instance = null;
   #profileUpdateCallbacks = new Map();
+  #referenceFetching = new Map();
 
   constructor() {
     if (this.#instance) return this.#instance;
@@ -123,6 +124,27 @@ export class CacheManager {
   setReference(eventId, reference) { this.setCacheItem('reference', eventId, reference); }
   getReference(eventId) { return this.getCacheItem('reference', eventId); }
   clearReference(eventId) { this.deleteCacheItem('reference', eventId); }
+
+  // 参照情報の取得とフェッチを一元管理
+  async getOrFetchReference(eventId, fetchFn) {
+    const cached = this.getCacheItem('reference', eventId);
+    if (cached) return cached;
+
+    // 同じイベントのフェッチが進行中の場合はそれを返す
+    const fetching = this.#referenceFetching.get(eventId);
+    if (fetching) return fetching;
+
+    const promise = fetchFn().then(reference => {
+      if (reference) {
+        this.setCacheItem('reference', eventId, reference);
+      }
+      this.#referenceFetching.delete(eventId);
+      return reference;
+    });
+
+    this.#referenceFetching.set(eventId, promise);
+    return promise;
+  }
 
   // ZapInfo methods
   setZapInfo(eventId, info) { this.setCacheItem('zapInfo', eventId, info); }

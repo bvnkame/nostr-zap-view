@@ -191,6 +191,16 @@ button {
   padding: 2px 0;
 }
 
+.zap-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.reference-container {
+  display: flex;
+  flex-direction: column;
+}
+
 .zap-sender {
   gap: 12px;
   height: 46px;
@@ -421,7 +431,7 @@ button {
   white-space: nowrap;
 }
 
-/* 共通のフ��ックスボックス設定 */
+/* 共通のフレックスボックス設定 */
 .zap-sender,
 .stats-item,
 .zap-details,

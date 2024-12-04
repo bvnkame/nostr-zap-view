@@ -23,7 +23,17 @@ class ZapItemBuilder {
     li.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
     li.setAttribute("data-pubkey", zapInfo.pubkey);
     if (event?.id) li.setAttribute("data-event-id", event.id);
-    li.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+
+    // 基本的なZap情報のコンテナを作成
+    const zapContent = document.createElement('div');
+    zapContent.className = 'zap-content';
+    zapContent.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+    li.appendChild(zapContent);
+
+    // 参照情報用のプレースホルダーを追加
+    const referenceContainer = document.createElement('div');
+    referenceContainer.className = 'reference-container';
+    li.appendChild(referenceContainer);
 
     return li;
   }
@@ -126,7 +136,7 @@ export class ZapListUI {
       this.#removeNoZapsMessage(list);
       const zapInfo = await this.#handleZapInfo(event);
       const li = this.itemBuilder.createListItem(zapInfo, event);
-      list.appendChild(li); // 変更: prepend から append に変更
+      list.appendChild(li);
       await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
     } catch (error) {
       console.error("Failed to append zap:", error);
@@ -226,5 +236,46 @@ export class ZapListUI {
 
   initializeZapPlaceholders(count) {  // メソッド名を統一
     // プレースホルダー初期化のロジック
+  }
+
+  updateZapReference(event) {
+    const zapElement = this.#getElement(`[data-event-id="${event.id}"]`);
+    if (!zapElement || !event.reference) return;
+
+    const referenceContainer = zapElement.querySelector('.reference-container');
+    if (referenceContainer) {
+      referenceContainer.innerHTML = DialogComponents.createReferenceComponent({ reference: event.reference });
+    }
+  }
+
+  async batchUpdate(events) {
+    const list = this.#getElement(".dialog-zap-list");
+    if (!list) return;
+
+    try {
+      const fragment = document.createDocumentFragment();
+      const profileUpdates = [];
+
+      for (const event of events) {
+        const zapInfo = await this.#handleZapInfo(event);
+        const li = this.itemBuilder.createListItem(zapInfo, event);
+        fragment.appendChild(li);
+
+        if (zapInfo.pubkey) {
+          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+        }
+      }
+
+      // 既存のトリガーを保持
+      const existingTrigger = list.querySelector('.load-more-trigger');
+      list.innerHTML = '';
+      list.appendChild(fragment);
+      if (existingTrigger) list.appendChild(existingTrigger);
+
+      // プロフィール情報を更新
+      await this.#updateProfiles(profileUpdates);
+    } catch (error) {
+      console.error("Failed to batch update:", error);
+    }
   }
 }
