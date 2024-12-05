@@ -232,27 +232,15 @@ class ZapSubscriptionManager {
 
     await Promise.all([
       profilePool.processEventProfiles(events),
-      this._processBatchReferences(events, viewId),
       ...events.map(event => statsManager.handleZapEvent(event, viewId))
     ]);
 
     await this._updateUI(events, viewId);
   }
 
-  async _processBatchReferences(events, viewId) {
-    const config = this.getViewConfig(viewId);
-    if (!this._isValidReferenceConfig(config)) return;
-
-    const fetchPromises = events.map(event => this._processEventReference(event, viewId));
-    await Promise.allSettled(fetchPromises);
-  }
-
   async _updateUI(events, viewId) {
     if (!this.zapListUI) return;
-
     await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-    events.filter(e => e.reference)
-          .forEach(event => this.zapListUI.updateZapReference(event));
   }
 
   async loadMoreZaps(viewId) {
@@ -338,22 +326,6 @@ class ZapSubscriptionManager {
       ?.shadowRoot?.querySelector('.dialog-zap-list');
   }
 
-  // 新しいメソッド: 残りのリファレンス情報を更新
-  async updateRemainingReferences(viewId) {
-    const allEvents = cacheManager.getZapEvents(viewId);
-    const eventsNeedingRefs = allEvents.filter(event => !event.reference);
-    
-    if (eventsNeedingRefs.length > 0) {
-      this.updateEventReferenceBatch(eventsNeedingRefs, viewId).then(() => {
-        eventsNeedingRefs.forEach(event => {
-          if (event.reference && this.zapListUI) {
-            this.zapListUI.updateZapReference(event);
-          }
-        });
-      });
-    }
-  }
-
   // バッチ処理の最適化
   async processBatch(events, viewId) {
     try {
@@ -369,15 +341,11 @@ class ZapSubscriptionManager {
         await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
       }
 
-      await Promise.all([
-        this.updateEventReferenceBatch(sortedEvents, viewId),
-        ...sortedEvents.flatMap(event => [
-          statsManager.handleZapEvent(event, viewId),
-          profilePool.verifyNip05Async(event.pubkey)
-        ])
-      ]);
-
-      this.updateUIReferences(sortedEvents);
+      await Promise.all(
+        sortedEvents.map(event => 
+          statsManager.handleZapEvent(event, viewId)
+        )
+      );
     } catch (error) {
       console.error("バッチ処理エラー:", error);
     }
