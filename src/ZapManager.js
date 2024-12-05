@@ -28,64 +28,6 @@ class ZapSubscriptionManager {
     return this.viewConfigs.get(viewId);
   }
 
-  async processZapEvent(event, viewId, shouldUpdateUI = true) {
-    try {
-      // リアルタイムイベントとしてマーク
-      event.isRealTimeEvent = true;
-
-      await Promise.all([
-        this._processEventReference(event, viewId),
-        profilePool.processBatchProfiles([event]),
-        statsManager.handleZapEvent(event, viewId)
-      ]);
-
-      shouldUpdateUI && this.zapListUI?.appendZap(event);
-      return true;
-    } catch (error) {
-      console.error("Zap処理エラー:", error);
-      return false;
-    }
-  }
-
-  async handleZapEvent(event, viewId) {
-    if (!cacheManager.addZapEvent(viewId, event)) return;
-    await this.processZapEvent(event, viewId);
-  }
-
-  async _processEventReference(event, viewId) {
-    const config = this.getViewConfig(viewId);
-    if (!this._isValidReferenceConfig(config)) return false;
-
-    const reference = await this._fetchReferenceWithCache(event, config);
-    if (reference) {
-      event.reference = reference;
-      return true;
-    }
-    return false;
-  }
-
-  async _fetchReferenceWithCache(event, config) {
-    const fetchFn = async () => {
-      if (!event?.tags?.length) return null;
-
-      const tagTypes = ['a', 'e'];
-      for (const type of tagTypes) {
-        const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
-        if (tag?.[1] && (type !== 'e' || /^[0-9a-f]{64}$/.test(tag[1].toLowerCase()))) {
-          return await eventPool.fetchReference(config.relayUrls, event, type);
-        }
-      }
-      return null;
-    };
-
-    try {
-      return await cacheManager.getOrFetchReference(event.id, fetchFn);
-    } catch (error) {
-      console.error("Reference fetch failed:", error);
-      return null;
-    }
-  }
-
   async updateEventReference(event, viewId) {
     try {
       const config = this.getViewConfig(viewId);
@@ -231,7 +173,7 @@ class ZapSubscriptionManager {
     await this._updateUI(events, viewId);
   }
 
-  async _updateUI(events, viewId) {
+  async _updateUI(_events, viewId) {
     if (!this.zapListUI) return;
     await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
   }
@@ -307,30 +249,6 @@ class ZapSubscriptionManager {
   _getListElement(viewId) {
     return document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
       ?.shadowRoot?.querySelector('.dialog-zap-list');
-  }
-
-  async processBatch(events, viewId) {
-    try {
-      const pubkeys = [...new Set(events.map(event => event.pubkey))];
-      const [, sortedEvents] = await Promise.all([
-        profilePool.fetchProfiles(pubkeys),
-        Promise.resolve(events.sort((a, b) => b.created_at - a.created_at))
-      ]);
-
-      sortedEvents.forEach(event => cacheManager.addZapEvent(viewId, event));
-
-      if (this.zapListUI) {
-        await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
-      }
-
-      await Promise.all(
-        sortedEvents.map(event => 
-          statsManager.handleZapEvent(event, viewId)
-        )
-      );
-    } catch (error) {
-      console.error("バッチ処理エラー:", error);
-    }
   }
 
   async finalizeInitialization(viewId, lastEventTime) {
@@ -452,9 +370,6 @@ class ZapSubscriptionManager {
     });
   }
 
-  _isValidReferenceConfig(config) {
-    return config?.relayUrls?.length && !isEventIdentifier(config?.identifier || '');
-  }
 }
 
 const subscriptionManager = new ZapSubscriptionManager();

@@ -307,10 +307,12 @@ export class CacheManager {
     // リアルタイムイベントはリストの先頭に追加
     if (event.isRealTimeEvent) {
       events.unshift(event);
+      console.log('Real-time event added:', event);
     } else {
       events.push(event);
       // created_atでソート（リアルタイムでないイベントの場合のみ）
       events.sort((a, b) => b.created_at - a.created_at);
+      console.log('Event added:', event);
     }
     
     this.setZapEvents(viewId, events, true);

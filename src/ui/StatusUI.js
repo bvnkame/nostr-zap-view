@@ -1,5 +1,4 @@
 import { formatNumber } from "../utils.js";
-import { API_CONFIG } from "../AppSettings.js";
 
 export class StatusUI {
   constructor(rootElement) {

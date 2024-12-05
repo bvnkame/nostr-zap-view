@@ -133,6 +133,14 @@ export class StatsManager {
   }
 
   async handleZapEvent(event, viewId) {
+    // イベント処理開始のデバッグ情報
+    console.debug("StatsManager: Processing Zap event:", {
+      eventId: event.id,
+      viewId,
+      isRealTime: event.isRealTimeEvent,
+      timestamp: event.created_at
+    });
+
     try {
       // ViewState から現在の統計情報を取得
       const viewState = cacheManager.getOrCreateViewState(viewId);
