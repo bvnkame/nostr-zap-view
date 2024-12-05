@@ -29,12 +29,16 @@ async function handleButtonClick(button, viewId) {
     subscriptionManager.setViewConfig(viewId, config);
 
     // 1. ダイアログとスケルトンUIの表示
-    createDialog(viewId);
+    const dialog = createDialog(viewId);
+    if (!dialog) throw new Error(ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
+    
     showDialog(viewId);
     
     // キャッシュされたZapのカラーモード更新
     const cachedEvents = cacheManager.getZapEvents(viewId);
-    await updateCachedZapsColorMode(cachedEvents, config);
+    if (cachedEvents.length > 0) {
+      await updateCachedZapsColorMode(cachedEvents, config);
+    }
 
     // カラーモード設定のデバッグ情報
     console.debug('Color mode:', {

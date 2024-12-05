@@ -1,11 +1,8 @@
 import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
 import { ProfileUI } from "./ProfileUI.js";
-import { 
-  createNoZapsMessage,
-  isColorModeEnabled 
-} from "../utils.js";
-import { APP_CONFIG } from "../AppSettings.js";
+import { createNoZapsMessage } from "../utils.js";
+import { APP_CONFIG, ZAP_AMOUNT_CONFIG, ViewerConfig } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
@@ -34,7 +31,8 @@ export class ZapListUI {
     this.shadowRoot = shadowRoot;
     this.profileUI = profileUI || new ProfileUI();
     this.viewId = viewId;
-    this.itemBuilder = new ZapItemBuilder(viewId, this.#isColorModeEnabled());
+    this.isColorModeEnabled = this.#determineColorMode();
+    this.itemBuilder = new ZapItemBuilder(viewId, this.isColorModeEnabled);
     this.profileUpdateUnsubscribe = null;
     this.#initializeProfileUpdates();
   }
@@ -204,13 +202,6 @@ export class ZapListUI {
     await Promise.allSettled(updates);
   }
 
-  #isColorModeEnabled() {
-    const button = document.querySelector(
-      `button[data-zap-view-id="${this.viewId}"]`
-    );
-    return isColorModeEnabled(button, APP_CONFIG.DEFAULT_OPTIONS.colorMode);
-  }
-
   #isValidPlaceholder(element) {
     return element && element.classList.contains('placeholder');
   }
@@ -336,6 +327,13 @@ export class ZapListUI {
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
+  }
+
+  #determineColorMode() {
+    const button = document.querySelector(
+      `button[data-zap-view-id="${this.viewId}"]`
+    );
+    return ViewerConfig.determineColorMode(button);
   }
 
 }

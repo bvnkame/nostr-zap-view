@@ -23,7 +23,7 @@ export class ZapInfo {
     return THRESHOLDS.find(t => amount >= t.value)?.className || DEFAULT_CLASS;
   }
 
-  async extractInfo(config) {
+  async extractInfo(config = {}) {
     const eventId = this.event.id;
     const cachedInfo = cacheManager.getZapInfo(eventId);
     if (cachedInfo) return cachedInfo;

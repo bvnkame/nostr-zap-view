@@ -34,7 +34,7 @@ export const ZAP_CONFIG = {
 
 // Add new settings for zap amount thresholds
 export const ZAP_AMOUNT_CONFIG = {
-  DEFAULT_COLOR_MODE: true,  // グローバルデフォルト値
+  DEFAULT_COLOR_MODE: true,
   THRESHOLDS: [
     { value: 10000, className: "zap-amount-10k" },
     { value: 5000, className: "zap-amount-5k" },
@@ -45,7 +45,7 @@ export const ZAP_AMOUNT_CONFIG = {
     { value: 100, className: "zap-amount-100" },
   ],
   DEFAULT_CLASS: "zap-amount-default",
-  DISABLED_CLASS: ""  // カラーモード無効時のクラス
+  DISABLED_CLASS: ""
 };
 
 // Add new settings for zap dialog
@@ -102,6 +102,14 @@ export class ViewerConfig {
     return typeof count === "number" && !isNaN(count) && count > 0;
   }
 
+  static determineColorMode(button) {
+    if (!button) return ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;
+    const colorModeAttr = button.getAttribute("data-zap-color-mode");
+    return colorModeAttr === null 
+      ? ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE 
+      : colorModeAttr === "true";
+  }
+
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
@@ -110,10 +118,7 @@ export class ViewerConfig {
       maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
-    const colorModeAttr = button.getAttribute("data-zap-color-mode");
-    config.isColorModeEnabled = colorModeAttr === null 
-      ? ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE 
-      : colorModeAttr === "true";
+    config.isColorModeEnabled = ViewerConfig.determineColorMode(button);
     return config;
   }
 }
