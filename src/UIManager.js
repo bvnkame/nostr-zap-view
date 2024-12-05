@@ -63,15 +63,9 @@ class NostrZapViewDialog extends HTMLElement {
     }
 
     // DOMとスタイルの初期化
-    const styleSheet = document.createElement("style");
-    styleSheet.textContent = styles;
-    this.shadowRoot.appendChild(styleSheet);
+    this.#initializeDOM();
 
-    const template = document.createElement("template");
-    template.innerHTML = DialogComponents.getDialogTemplate();
-    this.shadowRoot.appendChild(template.content.cloneNode(true));
-
-    // UIコンポーネントの初期化
+    // UIコンポーネントの初期化（ZapListUIにconfigを渡す）
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
@@ -86,6 +80,23 @@ class NostrZapViewDialog extends HTMLElement {
 
     // 統計情報の初期化は別途行う
     this.#initializeStats();
+  }
+
+  #initializeDOM() {
+    try {
+      // スタイルシートの追加
+      const styleSheet = document.createElement("style");
+      styleSheet.textContent = styles;
+      this.shadowRoot.appendChild(styleSheet);
+
+      // ダイアログテンプレートの追加
+      const template = document.createElement("template");
+      template.innerHTML = DialogComponents.getDialogTemplate();
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+    } catch (error) {
+      console.error("Failed to initialize DOM:", error);
+      throw new Error("DOM initialization failed");
+    }
   }
 
   async #initializeStats() {

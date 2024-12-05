@@ -1,8 +1,7 @@
 import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
-import { ProfileUI } from "./ProfileUI.js";
 import { createNoZapsMessage } from "../utils.js";
-import { ViewerConfig, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "../AppSettings.js";
+import { DIALOG_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
@@ -34,37 +33,34 @@ class ZapItemBuilder {
 }
 
 export class ZapListUI {
-  constructor(shadowRoot, profileUI, viewId, config = null) {
+  constructor(shadowRoot, profileUI, viewId, config) {
     if (!shadowRoot) throw new Error('shadowRoot is required');
+    if (!config) throw new Error('config is required');
+    
     this.shadowRoot = shadowRoot;
-    this.profileUI = profileUI || new ProfileUI();
+    this.profileUI = profileUI;
     this.viewId = viewId;
-    
-    // configの初期化を修正
-    const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
-    const colorMode = ViewerConfig.determineColorMode(button);
-    console.log(`ZapListUI initializing with colorMode:`, colorMode);
-    
-    this.config = config || { isColorModeEnabled: colorMode };
-    console.log('ZapListUI final config:', this.config);
+    this.config = config;
     
     this.itemBuilder = new ZapItemBuilder(viewId, this.config);
     this.profileUpdateUnsubscribe = null;
     this.#initializeProfileUpdates();
   }
 
+  // プロフィール更新の購読を簡略化
   #initializeProfileUpdates() {
-    this.profileUpdateUnsubscribe = cacheManager.subscribeToProfileUpdates(async (pubkey, profile) => {
-      try {
-        const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-        const updatePromises = Array.from(elements).map(element => 
-          this.profileUI.updateProfileElement(element, profile)
-        );
-        await Promise.allSettled(updatePromises);
-      } catch (error) {
-        console.error('Profile update error:', error, { pubkey, profile });
-      }
-    });
+    this.profileUpdateUnsubscribe = cacheManager.subscribeToProfileUpdates(
+      this.#handleProfileUpdate.bind(this)
+    );
+  }
+
+  async #handleProfileUpdate(pubkey, profile) {
+    const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+    await Promise.allSettled(
+      Array.from(elements).map(element => 
+        this.profileUI.updateProfileElement(element, profile)
+      )
+    );
   }
 
   destroy() {
@@ -339,13 +335,6 @@ export class ZapListUI {
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
-  }
-
-  #determineColorMode() {
-    const button = document.querySelector(
-      `button[data-zap-view-id="${this.viewId}"]`
-    );
-    return ViewerConfig.determineColorMode(button);
   }
 
 }
