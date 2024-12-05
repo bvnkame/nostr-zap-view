@@ -257,76 +257,61 @@ export class ZapListUI {
     if (!list) return;
 
     try {
-      // バッチサイズを定義
-      const BATCH_SIZE = 20;
       const existingTrigger = list.querySelector('.load-more-trigger');
       const existingItems = new Map(
         Array.from(list.querySelectorAll('.zap-list-item'))
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      // 一時的なコンテナを作成
-      const tempContainer = document.createElement('div');
-      tempContainer.style.display = 'none';
-      document.body.appendChild(tempContainer);
+      // 1. まず全てのイベントを表示する
+      const fragment = document.createDocumentFragment();
+      const updateQueue = [];
 
-      // バッチ処理用の関数
-      const processBatch = async (batch) => {
-        const fragment = document.createDocumentFragment();
-        const profileUpdates = [];
-
-        for (const event of batch) {
-          const existingItem = existingItems.get(event.id);
-          if (existingItem) {
-            if (event.reference) {
-              DialogComponents.addReferenceToElement(existingItem, event.reference);
-            }
-            fragment.appendChild(existingItem);
-            existingItems.delete(event.id);
-            continue;
-          }
-
-          const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+      for (const event of events) {
+        // 既存のアイテムを再利用
+        const existingItem = existingItems.get(event.id);
+        if (existingItem) {
+          fragment.appendChild(existingItem);
+          existingItems.delete(event.id);
           if (event.reference) {
-            DialogComponents.addReferenceToElement(li, event.reference);
+            updateQueue.push(() => this.updateZapReference(event));
           }
-          fragment.appendChild(li);
-          
-          if (zapInfo.pubkey) {
-            profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
-          }
+          continue;
         }
 
-        return { fragment, profileUpdates };
-      };
-
-      // バッチ処理の実行
-      for (let i = 0; i < events.length; i += BATCH_SIZE) {
-        const batch = events.slice(i, i + BATCH_SIZE);
-        const { fragment, profileUpdates } = await processBatch(batch);
+        // 新しいアイテムを作成
+        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+        fragment.appendChild(li);
         
-        if (i === 0) {
-          // 最初のバッチで全体をクリア
-          list.innerHTML = '';
-          list.appendChild(fragment);
-          if (existingTrigger) list.appendChild(existingTrigger);
-        } else {
-          // 後続のバッチは追加
-          if (existingTrigger) {
-            list.insertBefore(fragment, existingTrigger);
-          } else {
-            list.appendChild(fragment);
-          }
+        // 後で実行する更新をキューに追加
+        if (event.reference) {
+          updateQueue.push(() => this.updateZapReference(event));
         }
-
-        // プロフィール更新を非同期で開始
-        this.#updateProfiles(profileUpdates).catch(console.error);
-
-        // UIの更新を待つ
-        await new Promise(resolve => requestAnimationFrame(resolve));
+        if (zapInfo.pubkey) {
+          updateQueue.push(() => this.#updateProfileIfNeeded(zapInfo.pubkey, li));
+        }
       }
 
-      tempContainer.remove();
+      // UIを即座に更新
+      list.innerHTML = '';
+      list.appendChild(fragment);
+      if (existingTrigger) list.appendChild(existingTrigger);
+
+      // 2. バックグラウンドで更新を実行
+      requestIdleCallback(() => {
+        const BATCH_SIZE = 10;
+        const processBatch = async (startIndex) => {
+          const batch = updateQueue.slice(startIndex, startIndex + BATCH_SIZE);
+          if (batch.length === 0) return;
+
+          await Promise.all(batch.map(update => update()));
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          await processBatch(startIndex + BATCH_SIZE);
+        };
+
+        processBatch(0).catch(console.error);
+      });
+
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
