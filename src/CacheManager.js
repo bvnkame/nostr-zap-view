@@ -347,7 +347,6 @@ export class CacheManager {
   getThemeState(viewId) {
     return this.getViewState(viewId, {
       theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
-      maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
       isInitialized: false
     });
   }

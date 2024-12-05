@@ -105,7 +105,6 @@ export class StatsManager {
       displayZapStats(viewState.currentStats, viewId);
       await renderZapListFromCache(
         viewState.zapEventsCache,
-        config.maxCount,
         viewId
       );
     } catch (error) {

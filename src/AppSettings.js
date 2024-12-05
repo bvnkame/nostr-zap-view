@@ -9,8 +9,7 @@ export const APP_CONFIG = {
   },
   DEFAULT_OPTIONS: {
     theme: "light",
-    maxCount: 5,
-    colorMode: true, // カラーモードのデフォルト値を明確に定義
+    colorMode: true,
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
   ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
@@ -88,18 +87,10 @@ export const BATCH_CONFIG = {
 };
 
 export class ViewerConfig {
-  constructor(identifier, maxCount, relayUrls) {
+  constructor(identifier, relayUrls) {
     this.identifier = identifier;
-    // Use default value if maxCount is invalid
-    this.maxCount = this.validateMaxCount(maxCount)
-      ? maxCount
-      : APP_CONFIG.DEFAULT_OPTIONS.maxCount;
     this.relayUrls = relayUrls;
     this.isColorModeEnabled = ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;  // デフォルト値を使用
-  }
-
-  validateMaxCount(count) {
-    return typeof count === "number" && !isNaN(count) && count > 0;
   }
 
   static determineColorMode(button) {
@@ -112,10 +103,8 @@ export class ViewerConfig {
 
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
-    const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
     const config = new ViewerConfig(
       button.getAttribute("data-nzv-id"),
-      maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
     config.isColorModeEnabled = ViewerConfig.determineColorMode(button);

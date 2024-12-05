@@ -4,24 +4,25 @@ import { ZapListUI } from "./ui/ZapListUI.js";
 import { DialogComponents } from "./DialogComponents.js";
 import { APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
-import { formatIdentifier, isValidCount } from "./utils.js";
+import { formatIdentifier } from "./utils.js";  // isValidCountを削除
 import { cacheManager } from "./CacheManager.js";
 import { subscriptionManager } from "./ZapManager.js"; // 追加: ZapSubscriptionManager をインポート
 import { statsManager } from "./StatsManager.js"; // 追加: statsManager をインポート
 
 class NostrZapViewDialog extends HTMLElement {
-  static get observedAttributes() {
-    return ["data-theme", "data-max-count"];
-  }
+  #state;
 
-  #state = {
-    isInitialized: false,
-    theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
-    maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
-  };
+  static get observedAttributes() {
+    return ["data-theme"];
+  }
 
   constructor() {
     super();
+    this.#state = {
+      isInitialized: false,
+      theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
+    };
+    
     this.attachShadow({ mode: "open" });
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
@@ -40,9 +41,6 @@ class NostrZapViewDialog extends HTMLElement {
       case "data-theme":
         this.#updateTheme(newValue);
         break;
-      case "data-max-count":
-        this.#updateMaxCount(parseInt(newValue, 10));
-        break;
     }
   }
 
@@ -50,12 +48,6 @@ class NostrZapViewDialog extends HTMLElement {
     const state = cacheManager.updateThemeState(this.viewId, { theme });
     if (state.isInitialized) {
       this.#applyTheme();
-    }
-  }
-
-  #updateMaxCount(count) {
-    if (isValidCount(count)) {
-      cacheManager.updateThemeState(this.viewId, { maxCount: count });
     }
   }
 
