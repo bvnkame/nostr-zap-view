@@ -1,10 +1,4 @@
-import { 
-  escapeHTML, 
-  isEventIdentifier, 
-  encodeNevent,
-  encodeNaddr,
-  isWithin24Hours 
-} from "./utils.js";
+import { escapeHTML, isEventIdentifier, encodeNevent, encodeNaddr, isWithin24Hours } from "./utils.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 import { cacheManager } from "./CacheManager.js";
@@ -21,18 +15,63 @@ const REFERENCE_KIND_MAPPING = {
 };
 
 export class DialogComponents {
-  // UI Components
-  static createUIComponents(zapInfo, viewId) {
+  // Public APIs
+  static createUIComponents(zapInfo, viewId, identifier) {
+    // リファレンスの詳細なデバッグ出力
+    console.debug('ZapInfo for reference:', {
+      hasReference: 'reference' in zapInfo,
+      referenceType: zapInfo.reference ? typeof zapInfo.reference : 'undefined',
+      rawReference: zapInfo.reference
+    });
+
+    const normalizedReference = this.#getNormalizedReference(zapInfo);
+    
     return {
-      iconComponent: this.#createIconComponent(),
+      iconComponent: '<div class="zap-placeholder-icon skeleton"></div>',
       nameComponent: this.#createNameComponent(zapInfo),
-      pubkeyComponent: this.createPubkeyComponent(zapInfo, viewId),
-      referenceComponent: this.createReferenceComponent(zapInfo),
+      pubkeyComponent: this.#createPubkeyComponent(zapInfo, identifier),
+      referenceComponent: this.#createReferenceComponent(normalizedReference),
     };
   }
 
-  static #createIconComponent() {
-    return '<div class="zap-placeholder-icon skeleton"></div>';
+  // 外部から呼び出し可能なパブリックメソッドとして追加
+  static createReferenceComponent(reference) {
+    const normalizedRef = this.#getNormalizedReference({ reference });
+    return this.#createReferenceComponent(normalizedRef);
+  }
+
+  // Private methods
+  static #getNormalizedReference(zapInfo) {
+    if (!zapInfo) return null;
+
+    // zapInfo自体がreferenceとして有効な場合
+    if (this.#isValidReference(zapInfo)) {
+      return zapInfo;
+    }
+
+    // zapInfo.referenceがオブジェクトとして存在する場合
+    if (zapInfo.reference && typeof zapInfo.reference === 'object') {
+      // reference.referenceをチェック
+      if (zapInfo.reference.reference && this.#isValidReference(zapInfo.reference.reference)) {
+        return zapInfo.reference.reference;
+      }
+      // reference自体をチェック
+      if (this.#isValidReference(zapInfo.reference)) {
+        return zapInfo.reference;
+      }
+    }
+
+    return null;
+  }
+
+  static #isValidReference(obj) {
+    return obj && 
+           typeof obj === 'object' &&
+           'id' in obj &&
+           'tags' in obj &&
+           Array.isArray(obj.tags) &&
+           'content' in obj &&
+           'kind' in obj;
   }
 
   static #createNameComponent({ senderName }) {
@@ -41,8 +80,7 @@ export class DialogComponents {
       : '<div class="zap-placeholder-name skeleton"></div>';
   }
 
-  static createPubkeyComponent({ pubkey, displayIdentifier, reference }, viewId) {
-    const identifier = DialogComponents.getIdentifierFromButton(viewId);
+  static #createPubkeyComponent({ pubkey, displayIdentifier, reference }, identifier) {
     const shouldShowReference = !isEventIdentifier(identifier);
     const commonAttrs = `class="sender-pubkey" data-pubkey="${pubkey}"`;
     
@@ -51,16 +89,11 @@ export class DialogComponents {
       : `<span ${commonAttrs} data-nip05-target="true">${displayIdentifier}</span>`;
   }
 
-  static getIdentifierFromButton(viewId) {
-    return document
-      .querySelector(`button[data-zap-view-id="${viewId}"]`)
-      ?.getAttribute("data-nzv-id") || "";
-  }
+  static #createReferenceComponent(reference) {
+    if (!reference || !this.#isValidReference(reference)) {
+      return "";
+    }
 
-  // Reference Handling
-  static createReferenceComponent({ reference }) {
-    if (!reference) return "";
-    
     const cacheKey = reference.id;
     const cachedComponent = cacheManager.getReferenceComponent(cacheKey);
     if (cachedComponent) return cachedComponent;
@@ -79,12 +112,17 @@ export class DialogComponents {
   }
 
   static #getReferenceUrl(reference) {
+    // 引数の検証
+    if (!reference?.tags) return '';
+
     if (reference.kind === 31990) {
       return this.#extractRTagUrl(reference) || '';
     }
 
-    // Check if this is an a-tag referenced event
-    const dTag = reference.tags.find(t => t[0] === 'd');
+    // d-tagのチェック
+    const dTag = Array.isArray(reference.tags) ? 
+      reference.tags.find(t => Array.isArray(t) && t[0] === 'd') : null;
+
     if (dTag) {
       return `https://njump.me/${encodeNaddr(
         reference.kind,
@@ -93,11 +131,11 @@ export class DialogComponents {
       )}`;
     }
 
-    return `https://njump.me/${encodeNevent(
+    return reference.id ? `https://njump.me/${encodeNevent(
       reference.id,
       reference.kind,
       reference.pubkey
-    )}`;
+    )}` : '';
   }
 
   static #extractRTagUrl(reference) {
@@ -107,6 +145,8 @@ export class DialogComponents {
   }
 
   static #getReferenceContent(reference) {
+    if (!reference?.tags || !reference?.content) return '';
+
     const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
     if (!tagKey) return reference.content;
 
@@ -114,14 +154,16 @@ export class DialogComponents {
       try {
         const contentObj = JSON.parse(reference.content);
         return contentObj.name || reference.content;
-      } catch (e) {
-        console.error('Failed to parse kind 40 content:', e);
+      } catch {
         return reference.content;
       }
     }
 
     if (tagKey === 'content') return reference.content;
-    return reference.tags.find(t => t[0] === tagKey)?.[1] || reference.content;
+
+    const tag = Array.isArray(reference.tags) ?
+      reference.tags.find(t => Array.isArray(t) && t[0] === tagKey) : null;
+    return tag?.[1] || reference.content;
   }
 
   static #buildReferenceHTML(url, content) {
@@ -151,8 +193,8 @@ export class DialogComponents {
     `;
   }
 
-  static createZapItemHTML(zapInfo, colorClass, viewId) {
-    const components = this.createUIComponents(zapInfo, viewId);
+  static createZapItemHTML(zapInfo, colorClass, viewId, identifier) {
+    const components = this.createUIComponents(zapInfo, viewId, identifier);
     const [amount, unit] = zapInfo.satsText.split(" ");
     const isNew = isWithin24Hours(zapInfo.created_at);
 

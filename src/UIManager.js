@@ -62,24 +62,22 @@ class NostrZapViewDialog extends HTMLElement {
       return;
     }
 
-    // DOMとスタイルの初期化
+    const identifier = this.getAttribute("data-nzv-id");
     this.#initializeDOM();
+    this.#initializeUIComponents(config);
+    this.#setupEventListeners();
+    this.#state.isInitialized = true;
+    
+    if (identifier) {
+      await this.#initializeStats(identifier);
+    }
+  }
 
-    // UIコンポーネントの初期化（ZapListUIにconfigを渡す）
+  #initializeUIComponents(config) {
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
     subscriptionManager.setZapListUI(this.zapListUI);
-
-    // イベントリスナーの設定
-    this.#setupEventListeners();
-
-    // 初期化完了フラグを設定
-    this.#state.isInitialized = true;
-    console.log(`Dialog initialization complete for viewId: ${this.viewId}`);
-
-    // 統計情報の初期化は別途行う
-    this.#initializeStats();
   }
 
   #initializeDOM() {
@@ -99,8 +97,7 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  async #initializeStats() {
-    const identifier = this.getAttribute("data-nzv-id");
+  async #initializeStats(identifier) {
     if (identifier) {
       try {
         const stats = await statsManager.initializeStats(identifier, this.viewId, true);
