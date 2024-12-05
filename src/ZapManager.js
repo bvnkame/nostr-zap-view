@@ -251,7 +251,13 @@ class ZapSubscriptionManager {
 
     state.isLoading = true;
     try {
-      return await this._executeLoadMore(viewId, state, config);
+      const loadedCount = await this._executeLoadMore(viewId, state, config);
+      if (loadedCount > 0) {
+        const events = cacheManager.getZapEvents(viewId).slice(-loadedCount);
+        await this.updateEventReferenceBatch(events, viewId);
+        this.updateUIReferences(events);
+      }
+      return loadedCount;
     } finally {
       state.isLoading = false;
     }
@@ -271,7 +277,7 @@ class ZapSubscriptionManager {
       entries => {
         const entry = entries[0];
         if (entry.isIntersecting) {
-          // ローディング状態をチェック
+          // ローディング状態をチェッ���
           const state = cacheManager.getLoadState(viewId);
           if (!state.isLoading) {
             this.loadMoreZaps(viewId).then(count => {
