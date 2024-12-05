@@ -16,13 +16,7 @@ const REFERENCE_KIND_MAPPING = {
 
 export class DialogComponents {
   // Public APIs
-  static createUIComponents(zapInfo, viewId, identifier) {
-    // リファレンスの詳細なデバッグ出力
-    console.debug('ZapInfo for reference:', {
-      hasReference: 'reference' in zapInfo,
-      referenceType: zapInfo.reference ? typeof zapInfo.reference : 'undefined',
-      rawReference: zapInfo.reference
-    });
+  static createUIComponents(zapInfo, _viewId, identifier) {
 
     const normalizedReference = this.#getNormalizedReference(zapInfo);
     

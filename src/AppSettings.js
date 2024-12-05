@@ -108,7 +108,6 @@ export class ViewerConfig {
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
     const colorMode = ViewerConfig.determineColorMode(button);
-    console.log(`fromButton - data-zap-color-mode: ${colorMode}`);
     return new ViewerConfig(
       button.getAttribute("data-nzv-id"),
       button.getAttribute("data-relay-urls").split(","),

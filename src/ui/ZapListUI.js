@@ -9,16 +9,13 @@ class ZapItemBuilder {
   constructor(viewId, config) {
     this.viewId = viewId;
     this.config = config;
-    console.log('ZapItemBuilder initialized with config:', this.config);
   }
 
   async createListItem(event) {
-    console.log('Creating list item with config:', this.config);
     const zapInfo = await ZapInfo.createFromEvent(event, defaultIcon, {
       isColorModeEnabled: this.config?.isColorModeEnabled
     });
 
-    console.log(`createListItem - eventId: ${event.id}, colorClass: ${zapInfo.colorClass}`);
 
     const li = document.createElement("li");
     

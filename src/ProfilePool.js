@@ -60,7 +60,6 @@ export class ProfilePool {
     
     try {
       const connectedCount = await this.#profileProcessor.connectToRelays();
-      console.log(`Profile relays connected (${connectedCount}/${this.#config.RELAYS.length})`);
       this.#isInitialized = true;
     } catch (error) {
       console.error('ProfilePool initialization error:', error);

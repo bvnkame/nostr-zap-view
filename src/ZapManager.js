@@ -2,11 +2,11 @@ import {
   showNoZapsMessage
 } from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";  // DIALOG_CONFIGを追加
+import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
-import { eventPool } from "./EventPool.js";  // パスを更新
+import { eventPool } from "./EventPool.js";
 import { cacheManager } from "./CacheManager.js";
-import { profilePool } from "./ProfilePool.js"; // 追加: ProfilePoolからprofilePoolをインポート
+import { profilePool } from "./ProfilePool.js";
 
 class ZapSubscriptionManager {
   constructor() {
@@ -19,20 +19,15 @@ class ZapSubscriptionManager {
     this.zapListUI = zapListUI;
   }
 
-  // 設定管理
   setViewConfig(viewId, config) {
-    console.log(`Setting view config for ${viewId}:`, config);
     this.viewConfigs.set(viewId, config);
     cacheManager.initializeZapView(viewId);
   }
 
   getViewConfig(viewId) {
-    const config = this.viewConfigs.get(viewId);
-    console.log(`Getting view config for ${viewId}:`, config);
-    return config;
+    return this.viewConfigs.get(viewId);
   }
 
-  // コア処理をシンプルに保持
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
       await Promise.all([
@@ -53,7 +48,6 @@ class ZapSubscriptionManager {
     await this.processZapEvent(event, viewId);
   }
 
-  // 統合されたリファレンス処理
   async _processEventReference(event, viewId) {
     const config = this.getViewConfig(viewId);
     if (!this._isValidReferenceConfig(config)) return false;
@@ -153,15 +147,12 @@ class ZapSubscriptionManager {
     const identifier = config?.identifier || '';
     if (isEventIdentifier(identifier)) return;
 
-    // イベントごとにリファレンス情報を取得
     const fetchPromises = events.map(event => this.updateEventReference(event, viewId));
     await Promise.allSettled(fetchPromises);
   }
 
-  // initializeSubscriptionsメソッドを最適化
   async initializeSubscriptions(config, viewId) {
     try {
-      // デバッグ情報を追加
       console.debug("Initializing subscription:", { config, viewId });
 
       if (!this._isValidFilter(config)) {
@@ -188,12 +179,11 @@ class ZapSubscriptionManager {
       await this.finalizeInitialization(viewId, lastEventTime);
     } catch (error) {
       console.error("サブスクリプション初期化エラー:", error);
-      throw error; // エラーを上位に伝播させる
+      throw error;
     }
   }
 
   _isValidFilter(config) {
-    // フィルターの検証を緩和
     return config && 
            config.relayUrls && 
            Array.isArray(config.relayUrls) && 
@@ -223,7 +213,6 @@ class ZapSubscriptionManager {
     });
   }
 
-  // バッチ処理の最適化
   async _processBatchEvents(events, viewId) {
     if (!events?.length) return;
 
@@ -270,14 +259,13 @@ class ZapSubscriptionManager {
 
     const trigger = document.createElement('div');
     trigger.className = 'load-more-trigger';
-    trigger.style.cssText = 'height: 10px; margin-top: 20px;'; // トリガー要素の視認性を改善
+    trigger.style.cssText = 'height: 10px; margin-top: 20px;';
     list.appendChild(trigger);
 
     const observer = new IntersectionObserver(
       entries => {
         const entry = entries[0];
         if (entry.isIntersecting) {
-          // ローディング状態をチェッ���
           const state = cacheManager.getLoadState(viewId);
           if (!state.isLoading) {
             this.loadMoreZaps(viewId).then(count => {
@@ -312,27 +300,11 @@ class ZapSubscriptionManager {
     }
   }
 
-  // 無限スクロールの最適化
-  _createIntersectionCallback(viewId) {
-    let isLoading = false;
-    return debounce(async (entries) => {
-      if (!entries[0].isIntersecting || isLoading) return;
-      try {
-        isLoading = true;
-        const loadedCount = await this.loadMoreZaps(viewId);
-        if (loadedCount === 0) this._cleanupInfiniteScroll(viewId);
-      } finally {
-        isLoading = false;
-      }
-    }, 300);
-  }
-
   _getListElement(viewId) {
     return document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
       ?.shadowRoot?.querySelector('.dialog-zap-list');
   }
 
-  // バッチ処理の最適化
   async processBatch(events, viewId) {
     try {
       const pubkeys = [...new Set(events.map(event => event.pubkey))];
@@ -450,7 +422,6 @@ class ZapSubscriptionManager {
     if (cacheManager.addZapEvent(viewId, event)) {
       batchEvents.push(event);
       
-      // リファレンス情報の更新のみを担当
       this.updateEventReference(event, viewId).then(hasReference => {
         if (hasReference && this.zapListUI && event.reference) {
           this.zapListUI.updateZapReference(event);
@@ -482,15 +453,5 @@ class ZapSubscriptionManager {
   }
 }
 
-// デバウンス関数
-function debounce(fn, delay) {
-  let timeoutId;
-  return function (...args) {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn.apply(this, args), delay);
-  };
-}
-
-// ZapSubscriptionManager を初期化する際に zapListUI を設定
 const subscriptionManager = new ZapSubscriptionManager();
 export { subscriptionManager };

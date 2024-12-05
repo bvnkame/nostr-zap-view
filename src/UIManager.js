@@ -127,7 +127,6 @@ class NostrZapViewDialog extends HTMLElement {
   #getConfig() {
     if (!this.viewId) return null;
     const config = subscriptionManager.getViewConfig(this.viewId);
-    console.log('NostrZapViewDialog getting config:', { viewId: this.viewId, config });
     return config;
   }
 
@@ -267,7 +266,6 @@ customElements.define("nzv-dialog", NostrZapViewDialog);
 // ダイアログ操作のヘルパー関数
 const dialogManager = {
   create: async (viewId, config) => {
-    console.log('Creating dialog for viewId:', viewId, 'with config:', config);
     
     if (!viewId || !config) {
       console.error('Invalid viewId or config:', { viewId, config });

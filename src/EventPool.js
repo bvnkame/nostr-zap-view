@@ -44,7 +44,6 @@ export class EventPool {
     try {
       await this.#initializeProcessors(zapRelayUrls);
       this.#isConnected = true;
-      console.log("Zap relays connected");
     } catch (error) {
       this.#handleError("Relay connection error", error);
     }
@@ -219,7 +218,6 @@ export class EventPool {
         {
           ...handlers,
           oneose: () => {
-            console.log("[ZapPool] リレー購読完了:", { viewId });
             handlers.oneose();
           },
         }
@@ -230,21 +228,6 @@ export class EventPool {
     }
   }
 
-  async #processCachedReference(relayUrls, eventId) {
-    try {
-      const cachedRef = cacheManager.getReference(eventId);
-      if (cachedRef) return cachedRef;
-
-      const reference = await this.#processReference(relayUrls, eventId, this.#etagProcessor);
-      if (reference) {
-        cacheManager.setReference(eventId, reference);
-      }
-      return reference;
-    } catch (error) {
-      this.#handleError("Reference processing error", error);
-      return null;
-    }
-  }
 
   async #processReference(relayUrls, value, processor) {
     try {
@@ -256,12 +239,6 @@ export class EventPool {
     }
   }
 
-  #logSubscription(config, decoded) {
-    console.log("[ZapPool] REQ送信:", {
-      relayUrls: config.relayUrls,
-      req: decoded.req,
-    });
-  }
 
   #handleError(message, error) {
     console.error(message + ":", error);

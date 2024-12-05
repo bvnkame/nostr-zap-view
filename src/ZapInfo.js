@@ -19,7 +19,6 @@ export class ZapInfo {
       ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
       !!isColorModeEnabled;
 
-    console.log(`getAmountColorClass - amount: ${amount}, isColorModeEnabled: ${colorMode}`);
 
     if (!colorMode) return ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
     return this.#calculateAmountColorClass(amount);
@@ -67,7 +66,6 @@ export class ZapInfo {
         )
       };
 
-      console.log(`extractInfo - eventId: ${eventId}, colorClass: ${info.colorClass}`);
 
       cacheManager.setZapInfo(eventId, info);
       return info;
