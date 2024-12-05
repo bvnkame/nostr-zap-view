@@ -2,18 +2,25 @@ import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
 import { ProfileUI } from "./ProfileUI.js";
 import { createNoZapsMessage } from "../utils.js";
-import { ViewerConfig } from "../AppSettings.js";
+import { ViewerConfig, ZAP_AMOUNT_CONFIG, DIALOG_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
 class ZapItemBuilder {
-  constructor(viewId, isColorModeEnabled) {
+  constructor(viewId, config) {
     this.viewId = viewId;
-    this.isColorModeEnabled = isColorModeEnabled;
+    this.config = config;
+    console.log('ZapItemBuilder initialized with config:', this.config);
   }
 
   async createListItem(event) {
-    const zapInfo = await ZapInfo.createFromEvent(event, defaultIcon);
+    console.log('Creating list item with config:', this.config);
+    const zapInfo = await ZapInfo.createFromEvent(event, defaultIcon, {
+      isColorModeEnabled: this.config?.isColorModeEnabled
+    });
+
+    console.log(`createListItem - eventId: ${event.id}, colorClass: ${zapInfo.colorClass}`);
+
     const li = document.createElement("li");
     
     li.className = `zap-list-item ${zapInfo.colorClass}${zapInfo.comment ? " with-comment" : ""}`;
@@ -27,12 +34,21 @@ class ZapItemBuilder {
 }
 
 export class ZapListUI {
-  constructor(shadowRoot, profileUI, viewId) {
+  constructor(shadowRoot, profileUI, viewId, config = null) {
+    if (!shadowRoot) throw new Error('shadowRoot is required');
     this.shadowRoot = shadowRoot;
     this.profileUI = profileUI || new ProfileUI();
     this.viewId = viewId;
-    this.isColorModeEnabled = this.#determineColorMode();
-    this.itemBuilder = new ZapItemBuilder(viewId, this.isColorModeEnabled);
+    
+    // configの初期化を修正
+    const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+    const colorMode = ViewerConfig.determineColorMode(button);
+    console.log(`ZapListUI initializing with colorMode:`, colorMode);
+    
+    this.config = config || { isColorModeEnabled: colorMode };
+    console.log('ZapListUI final config:', this.config);
+    
+    this.itemBuilder = new ZapItemBuilder(viewId, this.config);
     this.profileUpdateUnsubscribe = null;
     this.#initializeProfileUpdates();
   }

@@ -87,27 +87,32 @@ export const BATCH_CONFIG = {
 };
 
 export class ViewerConfig {
-  constructor(identifier, relayUrls) {
+  constructor(identifier, relayUrls, colorMode = null) {
     this.identifier = identifier;
     this.relayUrls = relayUrls;
-    this.isColorModeEnabled = ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;  // デフォルト値を使用
+    // boolean型に確実に変換
+    this.isColorModeEnabled = colorMode === null ? 
+      ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+      String(colorMode).toLowerCase() === "true";
   }
 
   static determineColorMode(button) {
     if (!button) return ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;
     const colorModeAttr = button.getAttribute("data-zap-color-mode");
-    return colorModeAttr === null 
-      ? ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE 
-      : colorModeAttr === "true";
+    // boolean型に確実に変換
+    return colorModeAttr === null ? 
+      ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+      String(colorModeAttr).toLowerCase() === "true";
   }
 
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
-    const config = new ViewerConfig(
+    const colorMode = ViewerConfig.determineColorMode(button);
+    console.log(`fromButton - data-zap-color-mode: ${colorMode}`);
+    return new ViewerConfig(
       button.getAttribute("data-nzv-id"),
-      button.getAttribute("data-relay-urls").split(",")
+      button.getAttribute("data-relay-urls").split(","),
+      colorMode
     );
-    config.isColorModeEnabled = ViewerConfig.determineColorMode(button);
-    return config;
   }
 }

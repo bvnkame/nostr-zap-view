@@ -22,14 +22,28 @@ import { ZapInfo } from "./ZapInfo.js";
  */
 async function handleButtonClick(button, viewId) {
   try {
+    const colorMode = ViewerConfig.determineColorMode(button);
+    console.log(`Initial color mode for ${viewId}:`, colorMode);
+    
     const config = ViewerConfig.fromButton(button);
+    console.log(`Config created for ${viewId}:`, config);
+    
     subscriptionManager.setViewConfig(viewId, config);
 
-    // 1. ダイアログとスケルトンUIの表示
-    const dialog = createDialog(viewId);
+    // ダイアログの作成と初期化を待機
+    const dialog = await createDialog(viewId);
     if (!dialog) throw new Error(ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
+
+    // ダイアログが完全に初期化されるまで待機
+    await new Promise(resolve => {
+      if (dialog.getOperations()) {
+        resolve();
+      } else {
+        dialog.addEventListener('dialog-initialized', resolve, { once: true });
+      }
+    });
     
-    showDialog(viewId);
+    await showDialog(viewId);
     
     // キャッシュされたZapのカラーモード更新
     const cachedEvents = cacheManager.getZapEvents(viewId);
@@ -110,6 +124,12 @@ function initializeApp() {
     if (!button.hasAttribute("data-zap-view-id")) {
       const viewId = `nostr-zap-view-${index}`;
       button.setAttribute("data-zap-view-id", viewId);
+
+      // カラーモード設定の初期化
+      if (!button.hasAttribute("data-zap-color-mode")) {
+        button.setAttribute("data-zap-color-mode", ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE.toString());
+      }
+
       button.addEventListener("click", () => {
         handleButtonClick(button, viewId);
       });

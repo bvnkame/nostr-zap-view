@@ -8,13 +8,20 @@ export class ZapInfo {
     this.defaultIcon = defaultIcon;
   }
 
-  static async createFromEvent(event, defaultIcon) {
+  static async createFromEvent(event, defaultIcon, config = {}) {
     const zapInfo = new ZapInfo(event, defaultIcon);
-    return await zapInfo.extractInfo();
+    return await zapInfo.extractInfo(config);
   }
 
-  static getAmountColorClass(amount, isColorModeEnabled = ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE) {
-    if (!isColorModeEnabled) return ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
+  static getAmountColorClass(amount, isColorModeEnabled) {
+    // 明示的にbooleanに変換
+    const colorMode = isColorModeEnabled === undefined ? 
+      ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+      !!isColorModeEnabled;
+
+    console.log(`getAmountColorClass - amount: ${amount}, isColorModeEnabled: ${colorMode}`);
+
+    if (!colorMode) return ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
     return this.#calculateAmountColorClass(amount);
   }
 
@@ -26,7 +33,14 @@ export class ZapInfo {
   async extractInfo(config = {}) {
     const eventId = this.event.id;
     const cachedInfo = cacheManager.getZapInfo(eventId);
-    if (cachedInfo) return cachedInfo;
+    if (cachedInfo) {
+      // キャッシュされた情報のカラーモードを更新
+      cachedInfo.colorClass = ZapInfo.getAmountColorClass(
+        cachedInfo.satsAmount,
+        config.isColorModeEnabled
+      );
+      return cachedInfo;
+    }
 
     try {
       const { pubkey, content, satsText } = await parseZapEvent(this.event);
@@ -53,6 +67,8 @@ export class ZapInfo {
         )
       };
 
+      console.log(`extractInfo - eventId: ${eventId}, colorClass: ${info.colorClass}`);
+
       cacheManager.setZapInfo(eventId, info);
       return info;
 
@@ -69,7 +85,8 @@ export class ZapInfo {
     await Promise.all(
       events.map(async event => {
         const zapInfo = new ZapInfo(event, defaultIcon);
-        const info = await zapInfo.extractInfo(isColorModeEnabled);
+        // 修正: isColorModeEnabled をオブジェクトとして渡す
+        const info = await zapInfo.extractInfo({ isColorModeEnabled });
         results.set(event.id, info);
       })
     );

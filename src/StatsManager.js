@@ -95,35 +95,20 @@ export class StatsManager {
     return formattedStats;
   }
 
-  async initializeStats(identifier, viewId, showSkeleton = true) {
+  async initializeStats(identifier, viewId, showSkeleton = false) {
     try {
-      if (showSkeleton) {
-        displayZapStats({ skeleton: true }, viewId);
+      // getZapStatsを使用して統計情報を取得
+      const stats = await this.getZapStats(identifier, viewId);
+      
+      if (stats) {
+        // UIを更新
+        this.displayStats(stats, viewId);
       }
-
-      // キャッシュチェックを内部メソッドに変更
-      const cached = await this.#checkCachedStats(viewId, identifier);
-      if (cached) {
-        this.#currentStats.set(viewId, cached);
-        displayZapStats(cached, viewId);
-        return cached;
-      }
-
-      const stats = await this.fetchStats(identifier);
-      const initialStats = stats?.error ? { timeout: stats.timeout } : stats;
-
-      if (!stats?.error) {
-        this.#currentStats.set(viewId, initialStats);
-        cacheManager.updateStatsCache(viewId, identifier, initialStats);
-      }
-
-      displayZapStats(initialStats, viewId);
-      return initialStats;
+      
+      return stats;
     } catch (error) {
-      console.error("Failed to initialize stats:", error);
-      const timeoutStats = { error: true, timeout: true };
-      displayZapStats(timeoutStats, viewId);
-      return timeoutStats;
+      console.error("Stats initialization failed:", error);
+      return null;
     }
   }
 
@@ -147,38 +132,48 @@ export class StatsManager {
     return this.#currentStats.get(viewId);
   }
 
-  async handleZapEvent(event, state, viewId) {
-    const amountMsats = this.extractAmountFromBolt11(
-      event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
-    );
+  async handleZapEvent(event, viewId) {
+    try {
+      // ViewState から現在の統計情報を取得
+      const viewState = cacheManager.getOrCreateViewState(viewId);
+      
+      const amountMsats = this.extractAmountFromBolt11(
+        event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
+      );
 
-    if (amountMsats <= 0) return;
+      if (amountMsats <= 0) return;
 
-    // リアルタイムイベントの場合のみ現在の統計情報に加算
-    if (event.isRealTimeEvent) {
-      // 統計情報が未初期化の場合は初期化
-      if (!state.currentStats || state.currentStats.error) {
-        state.currentStats = await this.getZapStats(cacheManager.getViewIdentifier(viewId), viewId) || {
-          count: 0,
-          msats: 0,
-          maxMsats: 0
+      // リアルタイムイベントの場合のみ現在の統計情報に加算
+      if (event.isRealTimeEvent) {
+        // 統計情報が未初期化の場合は初期化
+        if (!viewState.currentStats || viewState.currentStats.error) {
+          viewState.currentStats = await this.getZapStats(
+            cacheManager.getViewIdentifier(viewId), 
+            viewId
+          ) || {
+            count: 0,
+            msats: 0,
+            maxMsats: 0
+          };
+        }
+
+        // 現在の統計情報に加算
+        viewState.currentStats = {
+          count: viewState.currentStats.count + 1,
+          msats: viewState.currentStats.msats + amountMsats,
+          maxMsats: Math.max(viewState.currentStats.maxMsats, amountMsats)
         };
+
+        // キャッシュとUIを更新
+        cacheManager.updateStatsCache(viewId, cacheManager.getViewIdentifier(viewId), viewState.currentStats);
+        this.displayStats(viewState.currentStats, viewId);
       }
 
-      // 現在の統計情報に加算
-      state.currentStats = {
-        count: state.currentStats.count + 1,
-        msats: state.currentStats.msats + amountMsats,
-        maxMsats: Math.max(state.currentStats.maxMsats, amountMsats)
-      };
-
-      // キャッシュとUIを更新
-      cacheManager.updateStatsCache(viewId, cacheManager.getViewIdentifier(viewId), state.currentStats);
-      this.displayStats(state.currentStats, viewId);
+      event.isStatsCalculated = true;
+      event.amountMsats = amountMsats;
+    } catch (error) {
+      console.error("Failed to handle zap event stats:", error);
     }
-
-    event.isStatsCalculated = true;
-    event.amountMsats = amountMsats;
   }
 
   extractAmountFromBolt11(bolt11) {

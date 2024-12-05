@@ -10,6 +10,7 @@ import { profilePool } from "./ProfilePool.js"; // 追加: ProfilePoolからprof
 
 class ZapSubscriptionManager {
   constructor() {
+    this.viewConfigs = new Map();
     this.configStore = new Map();
     this.observers = new Map();
   }
@@ -20,12 +21,15 @@ class ZapSubscriptionManager {
 
   // 設定管理
   setViewConfig(viewId, config) {
-    this.configStore.set(viewId, config);
+    console.log(`Setting view config for ${viewId}:`, config);
+    this.viewConfigs.set(viewId, config);
     cacheManager.initializeZapView(viewId);
   }
 
   getViewConfig(viewId) {
-    return this.configStore.get(viewId);
+    const config = this.viewConfigs.get(viewId);
+    console.log(`Getting view config for ${viewId}:`, config);
+    return config;
   }
 
   // コア処理をシンプルに保持
