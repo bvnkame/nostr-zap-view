@@ -430,7 +430,6 @@ class ZapSubscriptionManager {
   _setupBufferInterval(batchEvents, viewId) {
     return setInterval(() => {
       if (batchEvents.length > 0) {
-        const eventsToProcess = batchEvents.splice(0);
         if (this.zapListUI) {
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
             .catch(console.error);
@@ -453,7 +452,6 @@ class ZapSubscriptionManager {
       });
 
       if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
-        const eventsToProcess = batchEvents.splice(0);
         if (this.zapListUI) {
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
             .catch(console.error);
