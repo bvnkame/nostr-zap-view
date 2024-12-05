@@ -1,5 +1,9 @@
-import { APP_CONFIG, ZAP_CONFIG } from "./AppSettings.js";
-import { ViewerConfig } from "./AppSettings.js";
+import { 
+  APP_CONFIG, 
+  ZAP_CONFIG, 
+  ZAP_AMOUNT_CONFIG, // 追加: カラーモード設定をインポート
+  ViewerConfig 
+} from "./AppSettings.js";
 import {
   createDialog,
   initializeZapPlaceholders,
@@ -22,26 +26,21 @@ import { ZapInfo } from "./ZapInfo.js";  // ZapInfoクラスをインポート
 async function handleButtonClick(button, viewId) {
   try {
     const config = ViewerConfig.fromButton(button);
-    const colorMode = button.getAttribute("data-zap-color-mode");
-    console.debug('Color mode setting:', colorMode, 'Parsed:', config.isColorModeEnabled);
-    
     subscriptionManager.setViewConfig(viewId, config);
 
     // 1. ダイアログとスケルトンUIの表示
     createDialog(viewId);
     showDialog(viewId);
     
-    // カラーモードの設定をキャッシュされたZapInfoに適用（ZapInfo.jsのメソッドを直接使用）
-    const isColorMode = config.isColorModeEnabled;
+    // キャッシュされたZapのカラーモード更新
     const cachedEvents = cacheManager.getZapEvents(viewId);
-    cachedEvents.forEach(event => {
-      const zapInfo = cacheManager.getZapInfo(event.id);
-      if (zapInfo && typeof zapInfo.satsAmount === 'number') {
-        const newColorClass = ZapInfo.getAmountColorClass(zapInfo.satsAmount, isColorMode);
-        console.debug('Updating color class:', {eventId: event.id, isColorMode, newColorClass});
-        zapInfo.colorClass = newColorClass;
-        cacheManager.setZapInfo(event.id, zapInfo);
-      }
+    await updateCachedZapsColorMode(cachedEvents, config);
+
+    // カラーモード設定のデバッグ情報
+    console.debug('Color mode:', {
+      fromAttribute: button.getAttribute("data-zap-color-mode"),
+      configured: config.isColorModeEnabled,
+      default: ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE
     });
 
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
@@ -87,6 +86,24 @@ async function handleButtonClick(button, viewId) {
     }
   } catch (error) {
     console.error(`Failed to handle click for viewId ${viewId}:`, error);
+  }
+}
+
+// カラーモード更新用のヘルパー関数
+async function updateCachedZapsColorMode(events, config) {
+  try {
+    events.forEach(event => {
+      const zapInfo = cacheManager.getZapInfo(event.id);
+      if (zapInfo?.satsAmount != null) {
+        zapInfo.colorClass = ZapInfo.getAmountColorClass(
+          zapInfo.satsAmount,
+          config.isColorModeEnabled
+        );
+        cacheManager.setZapInfo(event.id, zapInfo);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to update color mode:', error);
   }
 }
 

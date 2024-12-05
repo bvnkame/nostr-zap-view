@@ -13,20 +13,17 @@ export class ZapInfo {
     return await zapInfo.extractInfo();
   }
 
-  static getAmountColorClass(amount, isColorModeEnabled = true) {  // デフォルトをtrueに戻す
-    if (isColorModeEnabled === false) return "";  // 明示的にfalseの場合のみ空文字
+  static getAmountColorClass(amount, isColorModeEnabled = ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE) {
+    if (!isColorModeEnabled) return ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
     return this.#calculateAmountColorClass(amount);
   }
 
   static #calculateAmountColorClass(amount) {
-    const thresholds = ZAP_AMOUNT_CONFIG.THRESHOLDS;
-    for (const threshold of thresholds) {
-      if (amount >= threshold.value) return threshold.className;
-    }
-    return "zap-amount-default"; // 既定のクラスを追加
+    const { THRESHOLDS, DEFAULT_CLASS } = ZAP_AMOUNT_CONFIG;
+    return THRESHOLDS.find(t => amount >= t.value)?.className || DEFAULT_CLASS;
   }
 
-  async extractInfo(isColorModeEnabled = true) {  // デフォルトをtrueに戻す
+  async extractInfo(config) {
     const eventId = this.event.id;
     const cachedInfo = cacheManager.getZapInfo(eventId);
     if (cachedInfo) return cachedInfo;
@@ -50,7 +47,10 @@ export class ZapInfo {
         senderName: null,
         senderIcon: null,
         reference,
-        colorClass: ZapInfo.getAmountColorClass(satsAmount, isColorModeEnabled)  // === trueを削除
+        colorClass: ZapInfo.getAmountColorClass(
+          satsAmount, 
+          config?.isColorModeEnabled
+        )
       };
 
       cacheManager.setZapInfo(eventId, info);
@@ -64,7 +64,7 @@ export class ZapInfo {
     }
   }
 
-  static async batchExtractInfo(events, defaultIcon, isColorModeEnabled = true) {  // デフォルトをtrueに戻す
+  static async batchExtractInfo(events, defaultIcon, isColorModeEnabled = true) {
     const results = new Map();
     await Promise.all(
       events.map(async event => {

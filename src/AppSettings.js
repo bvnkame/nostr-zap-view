@@ -10,7 +10,7 @@ export const APP_CONFIG = {
   DEFAULT_OPTIONS: {
     theme: "light",
     maxCount: 5,
-    colorMode: true, // Added: Default value for color mode
+    colorMode: true, // カラーモードのデフォルト値を明確に定義
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
   ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
@@ -34,6 +34,7 @@ export const ZAP_CONFIG = {
 
 // Add new settings for zap amount thresholds
 export const ZAP_AMOUNT_CONFIG = {
+  DEFAULT_COLOR_MODE: true,  // グローバルデフォルト値
   THRESHOLDS: [
     { value: 10000, className: "zap-amount-10k" },
     { value: 5000, className: "zap-amount-5k" },
@@ -42,7 +43,9 @@ export const ZAP_AMOUNT_CONFIG = {
     { value: 500, className: "zap-amount-500" },
     { value: 200, className: "zap-amount-200" },
     { value: 100, className: "zap-amount-100" },
-  ]
+  ],
+  DEFAULT_CLASS: "zap-amount-default",
+  DISABLED_CLASS: ""  // カラーモード無効時のクラス
 };
 
 // Add new settings for zap dialog
@@ -92,6 +95,7 @@ export class ViewerConfig {
       ? maxCount
       : APP_CONFIG.DEFAULT_OPTIONS.maxCount;
     this.relayUrls = relayUrls;
+    this.isColorModeEnabled = ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;  // デフォルト値を使用
   }
 
   validateMaxCount(count) {
@@ -107,7 +111,9 @@ export class ViewerConfig {
       button.getAttribute("data-relay-urls").split(",")
     );
     const colorModeAttr = button.getAttribute("data-zap-color-mode");
-    config.isColorModeEnabled = colorModeAttr === null ? true : colorModeAttr === "true";
+    config.isColorModeEnabled = colorModeAttr === null 
+      ? ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE 
+      : colorModeAttr === "true";
     return config;
   }
 }
