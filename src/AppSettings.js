@@ -13,7 +13,7 @@ export const APP_CONFIG = {
     colorMode: true, // Added: Default value for color mode
   },
   INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 25, // 一度に読み込む件数を減らす
+  ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
   LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   INFINITE_SCROLL: {
     ROOT_MARGIN: '500px', // スクロール検知の余裕を調整
