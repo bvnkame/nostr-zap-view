@@ -199,10 +199,17 @@ export class ZapListUI {
   }
 
   async #updateProfiles(profileUpdates) {
-    const updates = profileUpdates.map(({ pubkey, element }) => 
-      this.#updateProfileIfNeeded(pubkey, element)
-    );
-    await Promise.allSettled(updates);
+    const PROFILE_BATCH_SIZE = 10;
+    for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
+      const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);
+      await Promise.all(
+        batch.map(({ pubkey, element }) => 
+          this.#updateProfileIfNeeded(pubkey, element)
+        )
+      );
+      // UIの更新を待つ
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
   }
 
   #isValidPlaceholder(element) {
@@ -250,49 +257,76 @@ export class ZapListUI {
     if (!list) return;
 
     try {
+      // バッチサイズを定義
+      const BATCH_SIZE = 20;
+      const existingTrigger = list.querySelector('.load-more-trigger');
       const existingItems = new Map(
         Array.from(list.querySelectorAll('.zap-list-item'))
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      const fragment = document.createDocumentFragment();
-      const profileUpdates = [];
+      // 一時的なコンテナを作成
+      const tempContainer = document.createElement('div');
+      tempContainer.style.display = 'none';
+      document.body.appendChild(tempContainer);
 
-      for (const event of events) {
-        // 既存のアイテムがあれば再利用
-        const existingItem = existingItems.get(event.id);
-        if (existingItem) {
-          // DialogComponentsのメソッドを使用して参照情報を更新
-          if (event.reference) {
-            DialogComponents.addReferenceToElement(existingItem, event.reference);
+      // バッチ処理用の関数
+      const processBatch = async (batch) => {
+        const fragment = document.createDocumentFragment();
+        const profileUpdates = [];
+
+        for (const event of batch) {
+          const existingItem = existingItems.get(event.id);
+          if (existingItem) {
+            if (event.reference) {
+              DialogComponents.addReferenceToElement(existingItem, event.reference);
+            }
+            fragment.appendChild(existingItem);
+            existingItems.delete(event.id);
+            continue;
           }
-          fragment.appendChild(existingItem);
-          existingItems.delete(event.id);
-          continue;
+
+          const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+          if (event.reference) {
+            DialogComponents.addReferenceToElement(li, event.reference);
+          }
+          fragment.appendChild(li);
+          
+          if (zapInfo.pubkey) {
+            profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+          }
         }
 
-        // 新しいアイテムを作成
-        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+        return { fragment, profileUpdates };
+      };
+
+      // バッチ処理の実行
+      for (let i = 0; i < events.length; i += BATCH_SIZE) {
+        const batch = events.slice(i, i + BATCH_SIZE);
+        const { fragment, profileUpdates } = await processBatch(batch);
         
-        if (event.reference) {
-          DialogComponents.addReferenceToElement(li, event.reference);
+        if (i === 0) {
+          // 最初のバッチで全体をクリア
+          list.innerHTML = '';
+          list.appendChild(fragment);
+          if (existingTrigger) list.appendChild(existingTrigger);
+        } else {
+          // 後続のバッチは追加
+          if (existingTrigger) {
+            list.insertBefore(fragment, existingTrigger);
+          } else {
+            list.appendChild(fragment);
+          }
         }
 
-        fragment.appendChild(li);
+        // プロフィール更新を非同期で開始
+        this.#updateProfiles(profileUpdates).catch(console.error);
 
-        if (zapInfo.pubkey) {
-          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
-        }
+        // UIの更新を待つ
+        await new Promise(resolve => requestAnimationFrame(resolve));
       }
 
-      // 既存のトリガーを保持
-      const existingTrigger = list.querySelector('.load-more-trigger');
-      list.innerHTML = '';
-      list.appendChild(fragment);
-      if (existingTrigger) list.appendChild(existingTrigger);
-
-      // プロフィール情報を更新
-      await this.#updateProfiles(profileUpdates);
+      tempContainer.remove();
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
