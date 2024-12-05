@@ -5,7 +5,6 @@ import {
 } from "./AppSettings.js";
 import {
   createDialog,
-  initializeZapStats,
   showDialog,
   renderZapListFromCache,
 } from "./UIManager.js";
@@ -38,8 +37,6 @@ async function handleButtonClick(button, viewId) {
       await updateCachedZapsColorMode(cachedEvents, config);
     }
 
-    initializeZapStats(viewId);
-
     // キャッシュされたデータがある場合、プロフィール取得を先に開始
     if (cachedEvents.length > 0) {
       const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
@@ -59,6 +56,7 @@ async function handleButtonClick(button, viewId) {
 
     // 3. 非同期でデータ取得を開始
     if (!button.hasAttribute("data-initialized")) {
+      const identifier = button.getAttribute("data-nzv-id");
       const initTasks = [
         // リレー接続
         eventPool.connectToRelays(config.relayUrls),
@@ -67,7 +65,7 @@ async function handleButtonClick(button, viewId) {
         // プロフィールプールの初期化
         !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
         // 統計情報の取得
-        statsManager.initializeStats(config.identifier, viewId),
+        statsManager.initializeStats(identifier, viewId, true) // スケルトン表示を有効化
       ];
 
       Promise.all(initTasks)

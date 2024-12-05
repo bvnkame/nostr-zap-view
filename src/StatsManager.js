@@ -4,12 +4,14 @@ import { safeNip19Decode } from "./utils.js";
 import { cacheManager } from "./CacheManager.js"; // Add import
 
 export class StatsManager {
+  #currentStats = new Map();
+
   constructor() {
     // キャッシュ関連のプロパティを削除
   }
 
   async getZapStats(identifier, viewId) {
-    const cached = await this.handleCachedStats(viewId, identifier);
+    const cached = await this.#checkCachedStats(viewId, identifier);
     if (cached) {
       return cached;
     }
@@ -93,32 +95,43 @@ export class StatsManager {
     return formattedStats;
   }
 
-  async handleCachedZaps(viewId, config) {
-    const viewState = this.getOrCreateViewState(viewId);
+  async initializeStats(identifier, viewId, showSkeleton = true) {
     try {
-      if (!viewState.currentStats) {
-        const stats = await this.getZapStats(config.identifier, viewId);
-        // 初期データはそのまま使用
-        viewState.currentStats = stats?.error ? { timeout: stats.timeout } : stats;
+      if (showSkeleton) {
+        displayZapStats({ skeleton: true }, viewId);
       }
 
-      displayZapStats(viewState.currentStats, viewId);
-      await renderZapListFromCache(
-        viewState.zapEventsCache,
-        viewId
-      );
+      // キャッシュチェックを内部メソッドに変更
+      const cached = await this.#checkCachedStats(viewId, identifier);
+      if (cached) {
+        this.#currentStats.set(viewId, cached);
+        displayZapStats(cached, viewId);
+        return cached;
+      }
+
+      const stats = await this.fetchStats(identifier);
+      const initialStats = stats?.error ? { timeout: stats.timeout } : stats;
+
+      if (!stats?.error) {
+        this.#currentStats.set(viewId, initialStats);
+        cacheManager.updateStatsCache(viewId, identifier, initialStats);
+      }
+
+      displayZapStats(initialStats, viewId);
+      return initialStats;
     } catch (error) {
-      console.error("Failed to handle cached zaps:", error);
-      displayZapStats({ timeout: true }, viewId);
+      console.error("Failed to initialize stats:", error);
+      const timeoutStats = { error: true, timeout: true };
+      displayZapStats(timeoutStats, viewId);
+      return timeoutStats;
     }
   }
 
-  async handleCachedStats(viewId, identifier) {
+  async #checkCachedStats(viewId, identifier) {
     const cached = cacheManager.getCachedStats(viewId, identifier);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
-      // viewStateを更新
       const viewState = cacheManager.getOrCreateViewState(viewId);
       viewState.currentStats = cached.stats;
       cacheManager.updateViewState(viewId, { currentStats: cached.stats });
@@ -128,32 +141,10 @@ export class StatsManager {
     return null;
   }
 
-  async initializeStats(identifier, viewId) {
-    try {
-      // キャッシュをチェック
-      const cached = await this.handleCachedStats(viewId, identifier);
-      if (cached) {
-        displayZapStats(cached, viewId);
-        return cached;
-      }
+  // handleCachedStatsメソッドを削除（#checkCachedStatsに統合）
 
-      // キャッシュがない場合は新規取得
-      const stats = await this.getZapStats(identifier, viewId);
-      const initialStats = stats?.error ? { timeout: stats.timeout } : stats;
-      
-      if (!stats?.error) {
-        const viewState = cacheManager.getOrCreateViewState(viewId);
-        viewState.currentStats = initialStats;
-        cacheManager.updateStatsCache(viewId, identifier, initialStats);
-      }
-      displayZapStats(initialStats, viewId);
-      
-      return initialStats;
-    } catch (error) {
-      console.error("Failed to fetch initial stats:", error);
-      displayZapStats({ timeout: true }, viewId);
-      return { error: true, timeout: true };
-    }
+  getCurrentStats(viewId) {
+    return this.#currentStats.get(viewId);
   }
 
   async handleZapEvent(event, state, viewId) {

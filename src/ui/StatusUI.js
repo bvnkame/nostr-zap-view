@@ -6,35 +6,16 @@ export class StatusUI {
     this.root = rootElement;
   }
 
-  initializeStats() {
-    const statsDiv = this.root.querySelector(".zap-stats");
-    if (!statsDiv) return;
-
-    // キャッシュが存在しない場合のみスケルトン表示を行う
-    const currentStats = statsDiv.innerHTML.trim();
-    if (!currentStats || currentStats === "") {
-      this.showSkeletonStats(statsDiv);
-
-      // タイムアウト用のタイマーを設定
-      setTimeout(() => {
-        // まだスケルトン表示が残っている場合はタイムアウト表示に切り替え
-        if (statsDiv.querySelector(".stats-skeleton")) {
-          statsDiv.innerHTML = this.createTimeoutStats();
-        }
-      }, API_CONFIG.REQUEST_TIMEOUT);
-    }
-  }
-
   displayStats(stats) {
     const statsDiv = this.root.querySelector(".zap-stats");
     if (!statsDiv) return;
 
-    // エラー状態とタイムアウト状態の判定を厳密に行う
-    const isTimeout =
-      !stats ||
-      (stats.error === true && stats.timeout === true) ||
-      (!stats.hasOwnProperty("count") && !stats.hasOwnProperty("msats"));
+    if (stats.skeleton) {
+      this.showSkeletonStats(statsDiv);
+      return;
+    }
 
+    const isTimeout = !stats || stats.error;
     statsDiv.innerHTML = isTimeout
       ? this.createTimeoutStats()
       : this.createNormalStats(stats);

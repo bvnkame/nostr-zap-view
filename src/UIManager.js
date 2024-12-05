@@ -72,12 +72,11 @@ class NostrZapViewDialog extends HTMLElement {
     template.innerHTML = DialogComponents.getDialogTemplate();
     this.shadowRoot.appendChild(template.content.cloneNode(true));
 
-    // キャッシュされた統計情報を確認
+    // 統計情報の初期化処理を修正
     const viewId = this.getAttribute("data-view-id");
     const identifier = this.getAttribute("data-nzv-id");
-    const cached = await statsManager.handleCachedStats(viewId, identifier);
-    if (cached) {
-      this.statusUI.displayStats(cached);
+    if (identifier) {
+      await statsManager.initializeStats(identifier, viewId, true);
     }
 
     this.#setupEventListeners();
@@ -119,10 +118,6 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  initializeZapStats() {
-    this.statusUI.initializeStats();
-  }
-
   displayZapStats(stats) {
     this.statusUI.displayStats(stats);
   }
@@ -159,7 +154,6 @@ class NostrZapViewDialog extends HTMLElement {
     return {
       closeDialog: () => this.closeDialog(),
       showDialog: () => this.showDialog(),
-      initializeZapStats: () => this.initializeZapStats(),
       replacePlaceholderWithZap: (event, index) => this.zapListUI.replacePlaceholder(event, index),
       renderZapListFromCache: (cache) => this.renderZapListFromCache(cache),
       prependZap: (event) => this.zapListUI.prependZap(event),
@@ -209,16 +203,15 @@ const dialogAPI = createDialogAPI();
 export const createDialog = (viewId) => dialogAPI.create(viewId);
 export const closeDialog = (viewId) => dialogAPI.execute(viewId, 'closeDialog');
 export const showDialog = (viewId) => dialogAPI.execute(viewId, 'showDialog');
-export const initializeZapStats = (viewId) => 
-  dialogAPI.execute(viewId, 'initializeZapStats');
+export const displayZapStats = (stats, viewId) => 
+  dialogAPI.execute(viewId, 'displayZapStats', stats);
 export const replacePlaceholderWithZap = (event, index, viewId) => 
   dialogAPI.execute(viewId, 'replacePlaceholderWithZap', event, index);
 export const renderZapListFromCache = (cache, viewId) => 
   dialogAPI.execute(viewId, 'renderZapListFromCache', cache);
 export const prependZap = (event, viewId) => 
   dialogAPI.execute(viewId, 'prependZap', event);
-export const displayZapStats = (stats, viewId) => 
-  dialogAPI.execute(viewId, 'displayZapStats', stats);
+// 重複している displayZapStats の宣言を削除
 export const showNoZapsMessage = (viewId) => {
   try {
     const dialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
