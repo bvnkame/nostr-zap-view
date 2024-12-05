@@ -52,12 +52,12 @@ export class StatsManager {
   async _fetchFromApi(identifier) {
     const decoded = safeNip19Decode(identifier);
     if (!decoded) return null;
-    
+
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
     const endpoint = `https://api.nostr.band/v0/stats/${
       isProfile ? "profile" : "event"
     }/${identifier}`;
-    
+
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
@@ -99,12 +99,12 @@ export class StatsManager {
     try {
       // getZapStatsを使用して統計情報を取得
       const stats = await this.getZapStats(identifier, viewId);
-      
+
       if (stats) {
         // UIを更新
         this.displayStats(stats, viewId);
       }
-      
+
       return stats;
     } catch (error) {
       console.error("Stats initialization failed:", error);
@@ -136,7 +136,7 @@ export class StatsManager {
     try {
       // ViewState から現在の統計情報を取得
       const viewState = cacheManager.getOrCreateViewState(viewId);
-      
+
       const amountMsats = this.extractAmountFromBolt11(
         event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
       );
@@ -148,7 +148,7 @@ export class StatsManager {
         // 統計情報が未初期化の場合は初期化
         if (!viewState.currentStats || viewState.currentStats.error) {
           viewState.currentStats = await this.getZapStats(
-            cacheManager.getViewIdentifier(viewId), 
+            cacheManager.getViewIdentifier(viewId),
             viewId
           ) || {
             count: 0,

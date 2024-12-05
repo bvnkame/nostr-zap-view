@@ -30,9 +30,13 @@ class ZapSubscriptionManager {
 
   async processZapEvent(event, viewId, shouldUpdateUI = true) {
     try {
+      // リアルタイムイベントとしてマーク
+      event.isRealTimeEvent = true;
+
       await Promise.all([
         this._processEventReference(event, viewId),
-        profilePool.processBatchProfiles([event])
+        profilePool.processBatchProfiles([event]),
+        statsManager.handleZapEvent(event, viewId)
       ]);
 
       shouldUpdateUI && this.zapListUI?.appendZap(event);

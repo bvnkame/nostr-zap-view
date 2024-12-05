@@ -304,10 +304,15 @@ export class CacheManager {
       return false;
     }
 
-    // 既存のイベントリストを維持しながら追加
-    events.push(event);
-    // created_atでソート
-    events.sort((a, b) => b.created_at - a.created_at);
+    // リアルタイムイベントはリストの先頭に追加
+    if (event.isRealTimeEvent) {
+      events.unshift(event);
+    } else {
+      events.push(event);
+      // created_atでソート（リアルタイムでないイベントの場合のみ）
+      events.sort((a, b) => b.created_at - a.created_at);
+    }
+    
     this.setZapEvents(viewId, events, true);
     return true;
   }
