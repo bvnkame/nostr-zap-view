@@ -22,74 +22,59 @@ import { ZapInfo } from "./ZapInfo.js";
  */
 async function handleButtonClick(button, viewId) {
   try {
-    const colorMode = ViewerConfig.determineColorMode(button);
-    console.log(`Initial color mode for ${viewId}:`, colorMode);
-    
     const config = ViewerConfig.fromButton(button);
-    console.log(`Config created for ${viewId}:`, config);
-    
+    if (!config) {
+      throw new Error('Failed to create config from button');
+    }
+
+    // configを設定してからダイアログを作成
     subscriptionManager.setViewConfig(viewId, config);
-
-    // ダイアログの作成と初期化を待機
-    const dialog = await createDialog(viewId);
-    if (!dialog) throw new Error(ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
-
-    // ダイアログが完全に初期化されるまで待機
-    await new Promise(resolve => {
-      if (dialog.getOperations()) {
-        resolve();
-      } else {
-        dialog.addEventListener('dialog-initialized', resolve, { once: true });
-      }
-    });
+    const dialog = await createDialog(viewId, config);
     
+    if (!dialog) {
+      throw new Error(ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
+    }
+
+    // 基本初期化完了後にダイアログを表示
     await showDialog(viewId);
-    
-    // キャッシュされたZapのカラーモード更新
-    const cachedEvents = cacheManager.getZapEvents(viewId);
-    if (cachedEvents.length > 0) {
-      await updateCachedZapsColorMode(cachedEvents, config);
-    }
 
-    // キャッシュされたデータがある場合、プロフィール取得を先に開始
-    if (cachedEvents.length > 0) {
-      const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
-      profilePool.fetchProfiles(pubkeys);
-    }
+    // 残りの処理を非同期で実���
+    setTimeout(async () => {
+      // カラーモードの設定
+      const colorMode = ViewerConfig.determineColorMode(button);
+      
+      // キャッシュ処理
+      const cachedEvents = cacheManager.getZapEvents(viewId);
+      if (cachedEvents.length > 0) {
+        await updateCachedZapsColorMode(cachedEvents, config);
+        const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
+        profilePool.fetchProfiles(pubkeys);
+      }
 
-    // 2. キャッシュされたデータの表示（あれば）
-    const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
-      viewId,
-      config,
-      renderZapListFromCache
-    );
+      // キャッシュデータの表示と追加データの取得
+      const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
+        viewId,
+        config,
+        renderZapListFromCache
+      );
 
-    if (hasEnoughCachedEvents) {
-      subscriptionManager.setupInfiniteScroll(viewId);
-    }
+      if (hasEnoughCachedEvents) {
+        subscriptionManager.setupInfiniteScroll(viewId);
+      }
 
-    // 3. 非同期でデータ取得を開始
-    if (!button.hasAttribute("data-initialized")) {
-      const identifier = button.getAttribute("data-nzv-id");
-      const initTasks = [
-        // リレー接続
-        eventPool.connectToRelays(config.relayUrls),
-        // Zapイベントの購読開始
-        subscriptionManager.initializeSubscriptions(config, viewId),
-        // プロフィールプールの初期化
-        !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
-        // 統計情報の取得
-        statsManager.initializeStats(identifier, viewId, true) // スケルトン表示を有効化
-      ];
-
-      Promise.all(initTasks)
-        .then(() => {
+      // バックグラウンドでの初期化
+      if (!button.hasAttribute("data-initialized")) {
+        const identifier = button.getAttribute("data-nzv-id");
+        Promise.all([
+          eventPool.connectToRelays(config.relayUrls),
+          subscriptionManager.initializeSubscriptions(config, viewId),
+          !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
+          statsManager.initializeStats(identifier, viewId, true)
+        ]).then(() => {
           button.setAttribute("data-initialized", "true");
-        })
-        .catch((error) => {
-          console.error("Failed to initialize:", error);
         });
-    }
+      }
+    }, 0);
   } catch (error) {
     console.error(`Failed to handle click for viewId ${viewId}:`, error);
   }

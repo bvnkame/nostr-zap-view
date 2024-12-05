@@ -31,10 +31,25 @@ class NostrZapViewDialog extends HTMLElement {
     }
 
     // 初期化を追跡可能なPromiseとして保持
-    this.#initializationPromise = this.#initialize();
+    this.#initializationPromise = this.#initializeBasicDOM();
     
     try {
       await this.#initializationPromise;
+      this.#state.isBasicInitialized = true;
+      
+      // フルUIの初期化を実行
+      const config = subscriptionManager.getViewConfig(this.viewId);
+      if (!config) {
+        throw new Error("Config is required for initialization");
+      }
+      await this.#initializeFullUI(config);
+      
+      // 統計情報の初期化
+      const identifier = this.getAttribute("data-nzv-id");
+      if (identifier) {
+        await this.#initializeStats(identifier);
+      }
+      
       this.dispatchEvent(new CustomEvent('dialog-initialized', { 
         detail: { viewId: this.viewId }
       }));
@@ -44,64 +59,63 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #initialize() {
-    // 早期リターンを追加
     if (!this.viewId) {
       console.error("Cannot initialize dialog without viewId");
       return;
     }
 
-    // configの取得を先に行う
     const config = subscriptionManager.getViewConfig(this.viewId);
-    console.log('NostrZapViewDialog initializing with config:', {
-      viewId: this.viewId,
-      config
-    });
-
     if (!config) {
-      console.error(`Config not found for viewId: ${this.viewId}`);
-      return;
+      throw new Error("Config is required for initialization");
     }
 
-    const identifier = this.getAttribute("data-nzv-id");
-    this.#initializeDOM();
-    this.#initializeUIComponents(config);
-    this.#setupEventListeners();
+    // 基本UIの初期化を同期的に実行
+    await this.#initializeBasicDOM();
+    this.#state.isBasicInitialized = true;
+
+    // フルUIの初期化を実行
+    await this.#initializeFullUI(config);
     this.#state.isInitialized = true;
-    
+
+    const identifier = this.getAttribute("data-nzv-id");
     if (identifier) {
       await this.#initializeStats(identifier);
     }
   }
 
-  #initializeUIComponents(config) {
+  async #initializeBasicDOM() {
+    return new Promise(resolve => {
+      // 基本的なダイアログ構造の初期化
+      const template = document.createElement("template");
+      template.innerHTML = DialogComponents.getDialogTemplate();
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+      
+      this.#setupEventListeners();
+      
+      // マイクロタスクで完了を確認
+      queueMicrotask(() => resolve());
+    });
+  }
+
+  async #initializeFullUI(config) {
+    // スタイルシートの追加
+    const styleSheet = document.createElement("style");
+    styleSheet.textContent = styles;
+    this.shadowRoot.appendChild(styleSheet);
+
+    // UIコンポーネントの初期化
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
     subscriptionManager.setZapListUI(this.zapListUI);
   }
 
-  #initializeDOM() {
-    try {
-      // スタイルシートの追加
-      const styleSheet = document.createElement("style");
-      styleSheet.textContent = styles;
-      this.shadowRoot.appendChild(styleSheet);
-
-      // ダイアログテンプレートの追加
-      const template = document.createElement("template");
-      template.innerHTML = DialogComponents.getDialogTemplate();
-      this.shadowRoot.appendChild(template.content.cloneNode(true));
-    } catch (error) {
-      console.error("Failed to initialize DOM:", error);
-      throw new Error("DOM initialization failed");
-    }
-  }
-
   async #initializeStats(identifier) {
     if (identifier) {
       try {
         const stats = await statsManager.initializeStats(identifier, this.viewId, true);
-        if (stats && this.#state.isInitialized) {
+        this.#state.isInitialized = true; // 初期化完了を設定
+        if (stats) {
           this.statusUI.displayStats(stats);
         }
       } catch (error) {
@@ -155,12 +169,16 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   // Public API methods
-  showDialog() {
+  async showDialog() {
+    await this.#initializationPromise; // 基本初期化の完了を待つ
     const dialog = this.#getElement(".dialog");
-    if (dialog && !dialog.open) {
-      this.#updateDialogTitle();
-      dialog.showModal();
+    if (!dialog || dialog.open || !this.#state.isBasicInitialized) {
+      console.warn("Cannot show dialog - not properly initialized");
+      return;
     }
+
+    dialog.showModal();
+    this.#updateDialogTitle();
   }
 
   closeDialog() {
@@ -213,21 +231,29 @@ class NostrZapViewDialog extends HTMLElement {
 
   // UI操作メソッド
   getOperations() {
-    // 初期化が完了していない場合はnullを返す
-    if (!this.#state.isInitialized) {
-      console.warn(`Operations not available - dialog not initialized for viewId: ${this.viewId}`);
+    // 基本初期化チェック
+    if (!this.#state.isBasicInitialized) {
+      console.warn(`Basic initialization not complete for viewId: ${this.viewId}`);
       return null;
     }
 
-    return {
+    const operations = {
       closeDialog: () => this.closeDialog(),
       showDialog: () => this.showDialog(),
-      replacePlaceholderWithZap: (event, index) => this.zapListUI?.replacePlaceholder(event, index),
-      renderZapListFromCache: (cache) => this.zapListUI?.renderZapListFromCache(cache),
-      prependZap: (event) => this.zapListUI?.prependZap(event),
-      displayZapStats: (stats) => this.statusUI?.displayStats(stats),
-      showNoZapsMessage: () => this.zapListUI?.showNoZapsMessage()
     };
+
+    // 完全な初期化が完了している場合のみ追加の操作を提供
+    if (this.#state.isInitialized) {
+      Object.assign(operations, {
+        replacePlaceholderWithZap: (event, index) => this.zapListUI?.replacePlaceholder(event, index),
+        renderZapListFromCache: (cache) => this.zapListUI?.renderZapListFromCache(cache),
+        prependZap: (event) => this.zapListUI?.prependZap(event),
+        displayZapStats: (stats) => this.statusUI?.displayStats(stats),
+        showNoZapsMessage: () => this.zapListUI?.showNoZapsMessage()
+      });
+    }
+
+    return operations;
   }
 
   // 初期化の完了を待機するメソッドを追加
@@ -248,12 +274,11 @@ const dialogManager = {
       return Promise.reject(new Error('Invalid viewId or config'));
     }
 
-    // 既存のダイアログをチェック
-    const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
-    if (existingDialog) return Promise.resolve(existingDialog);
-
     // configを先に設定
     subscriptionManager.setViewConfig(viewId, config);
+
+    const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+    if (existingDialog) return existingDialog;
 
     const dialog = document.createElement("nzv-dialog");
     dialog.setAttribute("data-view-id", viewId);
@@ -265,9 +290,8 @@ const dialogManager = {
     }
 
     document.body.appendChild(dialog);
-    
-    // 初期化完了を待機
     await dialog.waitForInitialization();
+    
     return dialog;
   },
 
@@ -292,6 +316,9 @@ export async function createDialog(viewId) {
       throw new Error(`View configuration not found for viewId: ${viewId}`);
     }
 
+    // configを先に設定
+    subscriptionManager.setViewConfig(viewId, config);
+
     const dialog = await dialogManager.create(viewId, config);
     return dialog;
   } catch (error) {
@@ -302,18 +329,19 @@ export async function createDialog(viewId) {
 
 export async function showDialog(viewId) {
   try {
-    const dialog = await dialogManager.get(viewId);
+    const dialog = dialogManager.get(viewId);
     if (!dialog) {
       throw new Error('Dialog not found');
     }
 
+    // 基本初期化の完了だけを待つ
     await dialog.waitForInitialization();
     const operations = dialog.getOperations();
-    if (!operations) {
-      throw new Error('Dialog not properly initialized');
+    if (!operations?.showDialog) {
+      throw new Error('Basic dialog operations not available');
     }
 
-    await operations.showDialog();
+    operations.showDialog();
   } catch (error) {
     console.error('Failed to show dialog:', error);
   }

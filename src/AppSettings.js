@@ -49,6 +49,7 @@ export const ZAP_AMOUNT_CONFIG = {
 
 // Add new settings for zap dialog
 export const DIALOG_CONFIG = {
+  DEFAULT_TITLE: "Zap List",
   NO_ZAPS_MESSAGE: "まだZapがありません",
   // 他の必要な設定...
 };

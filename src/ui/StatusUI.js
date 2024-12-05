@@ -10,7 +10,8 @@ export class StatusUI {
     const statsDiv = this.root.querySelector(".zap-stats");
     if (!statsDiv) return;
 
-    if (stats.skeleton) {
+    // スケルトン表示の場合
+    if (stats?.skeleton) {
       this.showSkeletonStats(statsDiv);
       return;
     }
