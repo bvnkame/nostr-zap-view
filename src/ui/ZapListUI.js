@@ -92,13 +92,7 @@ export class ZapListUI {
         // キャッシュされたreferenceがあれば表示
         const cachedReference = cacheManager.getReference(event.id);
         if (cachedReference) {
-          const zapContent = li.querySelector('.zap-content');
-          if (zapContent) {
-            const referenceHTML = DialogComponents.createReferenceComponent({ 
-              reference: cachedReference 
-            });
-            zapContent.insertAdjacentHTML('beforeend', referenceHTML);
-          }
+          DialogComponents.addReferenceToElement(li, cachedReference);
         }
 
         fragment.appendChild(li);
@@ -250,25 +244,8 @@ export class ZapListUI {
     const zapElement = this.getElementByEventId(event.id);
     if (!zapElement || !event.reference) return;
 
-    const zapContent = zapElement.querySelector('.zap-content');
-    if (!zapContent) return;
-
-    // 既存の参照情報を確実に削除
-    this.#cleanupExistingReferences(zapContent);
-
-    // 新しい参照情報を追加
-    const referenceHTML = DialogComponents.createReferenceComponent({ 
-      reference: event.reference 
-    });
-    zapContent.insertAdjacentHTML('beforeend', referenceHTML);
-
-    // 参照情報をキャッシュに保存
+    DialogComponents.addReferenceToElement(zapElement, event.reference);
     cacheManager.setReference(event.id, event.reference);
-  }
-
-  #cleanupExistingReferences(container) {
-    const existingReferences = container.querySelectorAll('.zap-reference');
-    existingReferences.forEach(ref => ref.remove());
   }
 
   async batchUpdate(events) {
@@ -288,16 +265,9 @@ export class ZapListUI {
         // 既存のアイテムがあれば再利用
         const existingItem = existingItems.get(event.id);
         if (existingItem) {
-          // 既存のアイテムの参照情報をクリーンアップ
-          const zapContent = existingItem.querySelector('.zap-content');
-          if (zapContent) {
-            this.#cleanupExistingReferences(zapContent);
-            if (event.reference) {
-              const referenceHTML = DialogComponents.createReferenceComponent({ 
-                reference: event.reference 
-              });
-              zapContent.insertAdjacentHTML('beforeend', referenceHTML);
-            }
+          // DialogComponentsのメソッドを使用して参照情報を更新
+          if (event.reference) {
+            DialogComponents.addReferenceToElement(existingItem, event.reference);
           }
           fragment.appendChild(existingItem);
           existingItems.delete(event.id);
@@ -308,13 +278,7 @@ export class ZapListUI {
         const { li, zapInfo } = await this.itemBuilder.createListItem(event);
         
         if (event.reference) {
-          const zapContent = li.querySelector('.zap-content');
-          if (zapContent) {
-            const referenceHTML = DialogComponents.createReferenceComponent({ 
-              reference: event.reference 
-            });
-            zapContent.insertAdjacentHTML('beforeend', referenceHTML);
-          }
+          DialogComponents.addReferenceToElement(li, event.reference);
         }
 
         fragment.appendChild(li);

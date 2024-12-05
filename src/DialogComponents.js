@@ -40,6 +40,22 @@ export class DialogComponents {
     return this.#createReferenceComponent(normalizedRef);
   }
 
+  // 新しいメソッドを追加
+  static addReferenceToElement(element, reference) {
+    if (!element || !reference) return;
+
+    const zapContent = element.querySelector('.zap-content');
+    if (!zapContent) return;
+
+    // 既存の参照を削除
+    const existingReferences = zapContent.querySelectorAll('.zap-reference');
+    existingReferences.forEach(ref => ref.remove());
+
+    // 新しい参照を追加
+    const referenceHTML = this.createReferenceComponent({ reference });
+    zapContent.insertAdjacentHTML('beforeend', referenceHTML);
+  }
+
   // Private methods
   static #getNormalizedReference(zapInfo) {
     if (!zapInfo) return null;
