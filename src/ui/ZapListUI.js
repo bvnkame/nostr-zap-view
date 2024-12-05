@@ -234,10 +234,6 @@ export class ZapListUI {
     }
   }
 
-  initializeZapPlaceholders(count) {  // メソッド名を統一
-    // プレースホルダー初期化のロジック
-  }
-
   updateZapReference(event) {
     const zapElement = this.getElementByEventId(event.id);
     if (!zapElement || !event.reference) return;

@@ -1,22 +1,20 @@
 import { 
   APP_CONFIG, 
   ZAP_CONFIG, 
-  ZAP_AMOUNT_CONFIG, // 追加: カラーモード設定をインポート
   ViewerConfig 
 } from "./AppSettings.js";
 import {
   createDialog,
-  initializeZapPlaceholders,
   initializeZapStats,
   showDialog,
-  renderZapListFromCache, // renderZapListFromCacheを追加
+  renderZapListFromCache,
 } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
 import { profilePool } from "./ProfilePool.js";
-import { eventPool } from "./EventPool.js"; // パスを更新
+import { eventPool } from "./EventPool.js";
 import { cacheManager } from "./CacheManager.js";
-import { ZapInfo } from "./ZapInfo.js";  // ZapInfoクラスをインポート
+import { ZapInfo } from "./ZapInfo.js";
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
@@ -40,14 +38,6 @@ async function handleButtonClick(button, viewId) {
       await updateCachedZapsColorMode(cachedEvents, config);
     }
 
-    // カラーモード設定のデバッグ情報
-    console.debug('Color mode:', {
-      fromAttribute: button.getAttribute("data-zap-color-mode"),
-      configured: config.isColorModeEnabled,
-      default: ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE
-    });
-
-    initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
     initializeZapStats(viewId);
 
     // キャッシュされたデータがある場合、プロフィール取得を先に開始

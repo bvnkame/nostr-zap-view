@@ -167,7 +167,6 @@ class NostrZapViewDialog extends HTMLElement {
     return {
       closeDialog: () => this.closeDialog(),
       showDialog: () => this.showDialog(),
-      initializeZapPlaceholders: (count) => this.zapListUI.initializeZapPlaceholders(count),
       initializeZapStats: () => this.initializeZapStats(),
       replacePlaceholderWithZap: (event, index) => this.zapListUI.replacePlaceholder(event, index),
       renderZapListFromCache: (cache) => this.renderZapListFromCache(cache),
@@ -218,8 +217,6 @@ const dialogAPI = createDialogAPI();
 export const createDialog = (viewId) => dialogAPI.create(viewId);
 export const closeDialog = (viewId) => dialogAPI.execute(viewId, 'closeDialog');
 export const showDialog = (viewId) => dialogAPI.execute(viewId, 'showDialog');
-export const initializeZapPlaceholders = (count, viewId) => 
-  dialogAPI.execute(viewId, 'initializeZapPlaceholders', count);
 export const initializeZapStats = (viewId) => 
   dialogAPI.execute(viewId, 'initializeZapStats');
 export const replacePlaceholderWithZap = (event, index, viewId) => 
