@@ -103,11 +103,19 @@ class NostrZapViewDialog extends HTMLElement {
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
 
-    // UIコンポーネントの初期化
+    // UI��ンポーネントの初期化
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
     subscriptionManager.setZapListUI(this.zapListUI);
+
+    // UIコンポーネントの初期化の後に
+    const zapEvents = cacheManager.getZapEvents(this.viewId);
+    if (!zapEvents?.length) {
+      this.zapListUI.showNoZapsMessage();
+    } else {
+      await this.zapListUI.renderZapListFromCache(zapEvents);
+    }
   }
 
   async #initializeStats(identifier) {
@@ -350,7 +358,7 @@ export const closeDialog = (viewId) => dialogManager.execute(viewId, 'closeDialo
 export const displayZapStats = (stats, viewId) => dialogManager.execute(viewId, 'displayZapStats', stats);
 export const replacePlaceholderWithZap = (event, index, viewId) => 
   dialogManager.execute(viewId, 'replacePlaceholderWithZap', event, index);
-export const renderZapListFromCache = (cache, viewId) => 
-  dialogManager.execute(viewId, 'renderZapListFromCache', cache);
+export const renderZapListFromCache = async (cache, viewId) => 
+  await dialogManager.execute(viewId, 'renderZapListFromCache', cache);
 export const prependZap = (event, viewId) => dialogManager.execute(viewId, 'prependZap', event);
 export const showNoZapsMessage = (viewId) => dialogManager.execute(viewId, 'showNoZapsMessage');

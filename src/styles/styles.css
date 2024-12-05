@@ -302,12 +302,18 @@ button {
   max-width: 100%;
 }
 
+.no-zaps-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
 .no-zaps-message {
-  margin-top: 20px;
-  margin-bottom: 35px;
   text-align: center;
   color: var(--pubkey-text);
-  font-size: 1.4rem;
+  font-size: 1.8rem;
   font-weight: 700;
 }
 

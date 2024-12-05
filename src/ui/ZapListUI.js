@@ -73,7 +73,10 @@ export class ZapListUI {
 
   async renderZapListFromCache(zapEventsCache) {
     const list = this.#getElement(".dialog-zap-list");
-    if (!list || !zapEventsCache?.length) {
+    if (!list) return;
+
+    // キャッシュが存在しないか空の場合はNoZapsMessageを表示
+    if (!zapEventsCache?.length) {
       this.showNoZapsMessage();
       return;
     }
@@ -174,11 +177,28 @@ export class ZapListUI {
     }
   }
 
-  showNoZapsMessage() {
+  async showNoZapsMessage() {
     const list = this.#getElement(".dialog-zap-list");
-    if (list) {
-      list.innerHTML = createNoZapsMessage(DIALOG_CONFIG);
+    if (!list) return;
+
+    // 3秒待機
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    // 遅延後に再度キャッシュを確認
+    const zapEvents = cacheManager.getZapEvents(this.viewId);
+    if (zapEvents?.length) {
+      // Zapイベントが見つかった場合は表示
+      await this.renderZapListFromCache(zapEvents);
+      return;
     }
+
+    // Zapイベントが見つからない場合はメッセージを表示
+    list.innerHTML = `
+      <div class="no-zaps-container">
+        ${createNoZapsMessage(DIALOG_CONFIG)}
+      </div>
+    `;
+    list.style.minHeight = '100px';
   }
 
   #getUniqueEvents(events) {
@@ -263,7 +283,7 @@ export class ZapListUI {
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      // 1. まず全てのイベントを表示する
+      // 1. まず全てのイ��ントを表示する
       const fragment = document.createDocumentFragment();
       const updateQueue = [];
 
