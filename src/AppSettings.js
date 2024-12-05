@@ -49,9 +49,8 @@ export const ZAP_AMOUNT_CONFIG = {
 
 // Add new settings for zap dialog
 export const DIALOG_CONFIG = {
-  DEFAULT_TITLE: "Zap List",
+  DEFAULT_TITLE: "To ",
   NO_ZAPS_MESSAGE: "まだZapがありません",
-  // 他の必要な設定...
 };
 
 // Timeout settings for metadata requests
