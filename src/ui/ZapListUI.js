@@ -2,7 +2,7 @@ import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
 import { ProfileUI } from "./ProfileUI.js";
 import { createNoZapsMessage } from "../utils.js";
-import { APP_CONFIG, ZAP_AMOUNT_CONFIG, ViewerConfig } from "../AppSettings.js";
+import { ViewerConfig } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
