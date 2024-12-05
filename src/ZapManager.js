@@ -15,6 +15,7 @@ class ZapSubscriptionManager {
     this.observers = new Map();
   }
 
+  // 基本設定メソッド
   setZapListUI(zapListUI) {
     this.zapListUI = zapListUI;
   }
@@ -28,6 +29,7 @@ class ZapSubscriptionManager {
     return this.viewConfigs.get(viewId);
   }
 
+  // イベント参照関連メソッド
   async updateEventReference(event, viewId) {
     try {
       const config = this.getViewConfig(viewId);
@@ -97,6 +99,16 @@ class ZapSubscriptionManager {
     await Promise.allSettled(fetchPromises);
   }
 
+  updateUIReferences(events) {
+    if (!this.zapListUI) return;
+    events.forEach(event => {
+      if (event.reference) {
+        this.zapListUI.updateZapReference(event);
+      }
+    });
+  }
+
+  // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
     try {
       console.debug("Initializing subscription:", { config, viewId });
@@ -129,6 +141,28 @@ class ZapSubscriptionManager {
     }
   }
 
+  async finalizeInitialization(viewId, lastEventTime) {
+    cacheManager.updateLoadState(viewId, {
+      isInitialFetchComplete: true,
+      lastEventTime
+    });
+
+    const cachedEvents = cacheManager.getZapEvents(viewId);
+    if (cachedEvents.length === 0) {
+      showNoZapsMessage(viewId);
+    } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+      this.setupInfiniteScroll(viewId);
+    }
+  }
+
+  _initializeLoadState(viewId) {
+    cacheManager.updateLoadState(viewId, {
+      isInitialFetchComplete: false,
+      lastEventTime: null,
+      isLoading: false
+    });
+  }
+
   _isValidFilter(config) {
     return config && 
            config.relayUrls && 
@@ -137,47 +171,75 @@ class ZapSubscriptionManager {
            config.identifier;
   }
 
-  async _collectInitialEvents(viewId, config, decoded) {
-    const batchEvents = [];
-    let lastEventTime = null;
-    
-    return new Promise((resolve) => {
-      const bufferInterval = this._setupBufferInterval(batchEvents, viewId);
-      
-      eventPool.subscribeToZaps(viewId, config, decoded, {
-        onevent: (event) => {
-          const currentLastTime = this._handleInitialEvent(event, batchEvents, lastEventTime, viewId);
-          if (currentLastTime !== null) {
-            lastEventTime = currentLastTime;
-          }
-        },
-        oneose: () => {
-          clearInterval(bufferInterval);
-          resolve({ batchEvents: [...batchEvents], lastEventTime });
-        }
-      });
-    });
+  // 無限スクロール関連メソッド
+  setupInfiniteScroll(viewId) {
+    try {
+      this._cleanupInfiniteScroll(viewId);
+      const list = this._getListElement(viewId);
+      if (!list) return;
+
+      const trigger = this._createLoadTrigger();
+      list.appendChild(trigger);
+      this._observeLoadTrigger(trigger, viewId, list);
+    } catch (error) {
+      console.error('Failed to setup infinite scroll:', error);
+    }
   }
 
-  async _processBatchEvents(events, viewId) {
-    if (!events?.length) return;
-
-    events.sort((a, b) => b.created_at - a.created_at);
-    events.forEach(event => cacheManager.addZapEvent(viewId, event));
-
-    await Promise.all([
-      profilePool.processEventProfiles(events),
-      ...events.map(event => statsManager.handleZapEvent(event, viewId))
-    ]);
-
-    await this._updateUI(events, viewId);
+  _createLoadTrigger() {
+    const trigger = document.createElement('div');
+    trigger.className = 'load-more-trigger';
+    trigger.style.cssText = 'height: 10px; margin-top: 20px;';
+    return trigger;
   }
 
-  async _updateUI(_events, viewId) {
-    if (!this.zapListUI) return;
-    await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
+  _observeLoadTrigger(trigger, viewId, list) {
+    const observer = new IntersectionObserver(
+      entries => this._handleIntersection(entries[0], viewId),
+      {
+        root: list,
+        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
+        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
+      }
+    );
+
+    observer.observe(trigger);
+    this.observers.set(viewId, observer);
   }
 
+  async _handleIntersection(entry, viewId) {
+    if (!entry.isIntersecting) return;
+
+    const state = cacheManager.getLoadState(viewId);
+    if (state.isLoading) return;
+
+    try {
+      const count = await this.loadMoreZaps(viewId);
+      if (count === 0) {
+        this._cleanupInfiniteScroll(viewId);
+      }
+    } catch (error) {
+      console.error('Infinite scroll load failed:', error);
+      this._cleanupInfiniteScroll(viewId);
+    }
+  }
+
+  _cleanupInfiniteScroll(viewId) {
+    const observer = this.observers.get(viewId);
+    if (!observer) return;
+
+    observer.disconnect();
+    const list = this._getListElement(viewId);
+    list?.querySelector('.load-more-trigger')?.remove();
+    this.observers.delete(viewId);
+  }
+
+  _getListElement(viewId) {
+    return document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
+      ?.shadowRoot?.querySelector('.dialog-zap-list');
+  }
+
+  // イベント処理関連メソッド
   async loadMoreZaps(viewId) {
     const state = cacheManager.getLoadState(viewId);
     const config = this.getViewConfig(viewId);
@@ -196,77 +258,6 @@ class ZapSubscriptionManager {
     } finally {
       state.isLoading = false;
     }
-  }
-
-  setupInfiniteScroll(viewId) {
-    this._cleanupInfiniteScroll(viewId);
-    const list = this._getListElement(viewId);
-    if (!list) return;
-
-    const trigger = document.createElement('div');
-    trigger.className = 'load-more-trigger';
-    trigger.style.cssText = 'height: 10px; margin-top: 20px;';
-    list.appendChild(trigger);
-
-    const observer = new IntersectionObserver(
-      entries => {
-        const entry = entries[0];
-        if (entry.isIntersecting) {
-          const state = cacheManager.getLoadState(viewId);
-          if (!state.isLoading) {
-            this.loadMoreZaps(viewId).then(count => {
-              if (count === 0) {
-                this._cleanupInfiniteScroll(viewId);
-              }
-            });
-          }
-        }
-      },
-      {
-        root: list,
-        rootMargin: APP_CONFIG.INFINITE_SCROLL.ROOT_MARGIN,
-        threshold: APP_CONFIG.INFINITE_SCROLL.THRESHOLD
-      }
-    );
-
-    observer.observe(trigger);
-    this.observers.set(viewId, observer);
-  }
-
-  _cleanupInfiniteScroll(viewId) {
-    const observer = this.observers.get(viewId);
-    if (observer) {
-      observer.disconnect();
-      const list = this._getListElement(viewId);
-      const trigger = list?.querySelector('.load-more-trigger');
-      if (trigger) {
-        trigger.remove();
-      }
-      this.observers.delete(viewId);
-    }
-  }
-
-  _getListElement(viewId) {
-    return document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)
-      ?.shadowRoot?.querySelector('.dialog-zap-list');
-  }
-
-  async finalizeInitialization(viewId, lastEventTime) {
-    cacheManager.updateLoadState(viewId, {
-      isInitialFetchComplete: true,
-      lastEventTime
-    });
-
-    const cachedEvents = cacheManager.getZapEvents(viewId);
-    if (cachedEvents.length === 0) {
-      showNoZapsMessage(viewId);
-    } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-      this.setupInfiniteScroll(viewId);
-    }
-  }
-
-  _canLoadMore(state, config) {
-    return config && !state.isLoading && state.lastEventTime;
   }
 
   async _executeLoadMore(viewId, state, config) {
@@ -319,23 +310,26 @@ class ZapSubscriptionManager {
     });
   }
 
-  _initializeLoadState(viewId) {
-    cacheManager.updateLoadState(viewId, {
-      isInitialFetchComplete: false,
-      lastEventTime: null,
-      isLoading: false
-    });
-  }
-
-  _setupBufferInterval(batchEvents, viewId) {
-    return setInterval(() => {
-      if (batchEvents.length > 0) {
-        if (this.zapListUI) {
-          this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
-            .catch(console.error);
+  async _collectInitialEvents(viewId, config, decoded) {
+    const batchEvents = [];
+    let lastEventTime = null;
+    
+    return new Promise((resolve) => {
+      const bufferInterval = this._setupBufferInterval(batchEvents, viewId);
+      
+      eventPool.subscribeToZaps(viewId, config, decoded, {
+        onevent: (event) => {
+          const currentLastTime = this._handleInitialEvent(event, batchEvents, lastEventTime, viewId);
+          if (currentLastTime !== null) {
+            lastEventTime = currentLastTime;
+          }
+        },
+        oneose: () => {
+          clearInterval(bufferInterval);
+          resolve({ batchEvents: [...batchEvents], lastEventTime });
         }
-      }
-    }, 500);
+      });
+    });
   }
 
   _handleInitialEvent(event, batchEvents, lastEventTime, viewId) {
@@ -361,15 +355,41 @@ class ZapSubscriptionManager {
     return currentLastTime;
   }
 
-  updateUIReferences(events) {
-    if (!this.zapListUI) return;
-    events.forEach(event => {
-      if (event.reference) {
-        this.zapListUI.updateZapReference(event);
-      }
-    });
+  // UI更新関連メソッド
+  async _processBatchEvents(events, viewId) {
+    if (!events?.length) return;
+
+    events.sort((a, b) => b.created_at - a.created_at);
+    events.forEach(event => cacheManager.addZapEvent(viewId, event));
+
+    await Promise.all([
+      profilePool.processEventProfiles(events),
+      ...events.map(event => statsManager.handleZapEvent(event, viewId))
+    ]);
+
+    await this._updateUI(events, viewId);
   }
 
+  async _updateUI(_events, viewId) {
+    if (!this.zapListUI) return;
+    await this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId));
+  }
+
+  // ユーティリティメソッド
+  _setupBufferInterval(batchEvents, viewId) {
+    return setInterval(() => {
+      if (batchEvents.length > 0) {
+        if (this.zapListUI) {
+          this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
+            .catch(console.error);
+        }
+      }
+    }, 500);
+  }
+
+  _canLoadMore(state, config) {
+    return config && !state.isLoading && state.lastEventTime;
+  }
 }
 
 const subscriptionManager = new ZapSubscriptionManager();
