@@ -12,6 +12,7 @@ import { statsManager } from "./StatsManager.js";
 import { profilePool } from "./ProfilePool.js";
 import { eventPool } from "./EventPool.js"; // パスを更新
 import { cacheManager } from "./CacheManager.js";
+import { ZapInfo } from "./ZapInfo.js";  // ZapInfoクラスをインポート
 
 /**
  * ボタンクリック時の初期化とデータ取得を行う
@@ -21,16 +22,32 @@ import { cacheManager } from "./CacheManager.js";
 async function handleButtonClick(button, viewId) {
   try {
     const config = ViewerConfig.fromButton(button);
+    const colorMode = button.getAttribute("data-zap-color-mode");
+    console.debug('Color mode setting:', colorMode, 'Parsed:', config.isColorModeEnabled);
+    
     subscriptionManager.setViewConfig(viewId, config);
 
     // 1. ダイアログとスケルトンUIの表示
     createDialog(viewId);
     showDialog(viewId);
+    
+    // カラーモードの設定をキャッシュされたZapInfoに適用（ZapInfo.jsのメソッドを直接使用）
+    const isColorMode = config.isColorModeEnabled;
+    const cachedEvents = cacheManager.getZapEvents(viewId);
+    cachedEvents.forEach(event => {
+      const zapInfo = cacheManager.getZapInfo(event.id);
+      if (zapInfo && typeof zapInfo.satsAmount === 'number') {
+        const newColorClass = ZapInfo.getAmountColorClass(zapInfo.satsAmount, isColorMode);
+        console.debug('Updating color class:', {eventId: event.id, isColorMode, newColorClass});
+        zapInfo.colorClass = newColorClass;
+        cacheManager.setZapInfo(event.id, zapInfo);
+      }
+    });
+
     initializeZapPlaceholders(APP_CONFIG.INITIAL_LOAD_COUNT, viewId);
     initializeZapStats(viewId);
 
     // キャッシュされたデータがある場合、プロフィール取得を先に開始
-    const cachedEvents = cacheManager.getZapEvents(viewId);
     if (cachedEvents.length > 0) {
       const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
       profilePool.fetchProfiles(pubkeys);

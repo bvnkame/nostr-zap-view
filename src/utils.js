@@ -243,12 +243,7 @@ export function isColorModeEnabled(button, defaultColorMode) {
     : colorModeAttr === "true";
 }
 
-export function getAmountColorClass(amount, thresholds) {
-  for (const threshold of thresholds) {
-    if (amount >= threshold.value) return threshold.className;
-  }
-  return "";
-}
+// getAmountColorClass関数を削除
 
 export function createNoZapsMessage(dialogConfig) {
   return dialogConfig.NO_ZAPS_MESSAGE;

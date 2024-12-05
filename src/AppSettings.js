@@ -101,10 +101,13 @@ export class ViewerConfig {
   static fromButton(button) {
     if (!button) throw new Error(ZAP_CONFIG.ERRORS.BUTTON_NOT_FOUND);
     const maxCount = parseInt(button.getAttribute("data-max-count"), 10);
-    return new ViewerConfig(
+    const config = new ViewerConfig(
       button.getAttribute("data-nzv-id"),
       maxCount, // Handle parseInt result in constructor even if NaN
       button.getAttribute("data-relay-urls").split(",")
     );
+    const colorModeAttr = button.getAttribute("data-zap-color-mode");
+    config.isColorModeEnabled = colorModeAttr === null ? true : colorModeAttr === "true";
+    return config;
   }
 }
