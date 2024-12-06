@@ -332,4 +332,9 @@ export const replacePlaceholderWithZap = (event, index, viewId) =>
 export const renderZapListFromCache = async (cache, viewId) => 
   await dialogManager.execute(viewId, 'renderZapListFromCache', cache);
 export const prependZap = (event, viewId) => dialogManager.execute(viewId, 'prependZap', event);
-export const showNoZapsMessage = (viewId) => dialogManager.execute(viewId, 'showNoZapsMessage');
+export const showNoZapsMessage = (viewId) => {
+  const dialog = dialogManager.get(viewId);
+  const operations = dialog?.getOperations();
+  if (!operations?.showNoZapsMessage) return;
+  operations.showNoZapsMessage();
+};

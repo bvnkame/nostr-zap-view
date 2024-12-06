@@ -1,6 +1,3 @@
-import { 
-  showNoZapsMessage
-} from "./UIManager.js";
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
 import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
@@ -149,7 +146,9 @@ class ZapSubscriptionManager {
 
     const cachedEvents = cacheManager.getZapEvents(viewId);
     if (cachedEvents.length === 0) {
-      showNoZapsMessage(viewId);
+      if (this.zapListUI) {
+        await this.zapListUI.showNoZapsMessage();
+      }
     } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
       this.setupInfiniteScroll(viewId);
     }

@@ -152,21 +152,29 @@ export class ZapListUI {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    // 3秒待機
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // 遅延後に再度キャッシュを確認
+    const delay = this.config.noZapsDelay || 3000;
+    await this.#delayAndCheckCache(delay);
+
+    // キャッシュを再確認
     const zapEvents = cacheManager.getZapEvents(this.viewId);
     if (zapEvents?.length) {
-      // Zapイベントが見つかった場合は表示
       await this.renderZapListFromCache(zapEvents);
       return;
     }
 
-    // Zapイベントが見つからない場合はメッセージを表示
+    // カスタマイズ可能なNoZapsメッセージを表示
+    this.#displayNoZapsMessage(list);
+  }
+
+  async #delayAndCheckCache(delay) {
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+
+  #displayNoZapsMessage(list) {
+    const customMessage = this.config.noZapsMessage || DIALOG_CONFIG.NO_ZAPS_MESSAGE;
     list.innerHTML = `
       <div class="no-zaps-container">
-        ${createNoZapsMessage(DIALOG_CONFIG)}
+        ${createNoZapsMessage({ NO_ZAPS_MESSAGE: customMessage })}
       </div>
     `;
     list.style.minHeight = '100px';
