@@ -347,6 +347,11 @@ class ZapSubscriptionManager {
       if (event.isRealTimeEvent) {
         const config = this.getViewConfig(viewId);
         statsManager.handleZapEvent(event, viewId, config?.identifier);
+
+        // すぐにUIを更新
+        if (this.zapListUI) {
+          this.zapListUI.prependZap(event).catch(console.error);
+        }
       }
 
       if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
