@@ -145,28 +145,52 @@ const ZapUtils = {
     if (!descriptionTag) return { pubkey: null, content: "" };
 
     try {
-      // 制御文字の除去と不正なエスケープシーケンスの修正
+      // より強固なJSON文字列のサニタイズ
       const sanitizedDescription = descriptionTag
-        .replace(/[\u0000-\u001F\u007F]/g, "") // 制御文字の除去
-        .replace(/\\([^"\\\/bfnrtu])/g, "$1"); // 不正なエスケープシーケンスの修正
+        // 制御文字の除去
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+        // バックスラッシュのエスケープを修正
+        .replace(/\\\\/g, '\\')
+        // 不正なエスケープシーケンスの修正
+        .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
+        // 重複したエスケープの修正
+        .replace(/\\+(["\\/bfnrt])/g, '\\$1')
+        // Unicode エスケープシーケンスの修正
+        .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
 
-      const parsed = JSON.parse(sanitizedDescription);
+      let parsed;
+      try {
+        parsed = JSON.parse(sanitizedDescription);
+      } catch {
+        // 最後の手段としてJSONを再構築
+        const match = sanitizedDescription.match(/"pubkey"\s*:\s*"([^"]+)"|"content"\s*:\s*"([^"]+)"/g);
+        if (!match) throw new Error('Invalid JSON structure');
+
+        parsed = {};
+        match.forEach(item => {
+          const [key, value] = item.split(':').map(s => s.trim().replace(/"/g, ''));
+          parsed[key] = value;
+        });
+      }
 
       // pubkeyの型チェックと正規化
-      const pubkey =
-        typeof parsed.pubkey === "string"
-          ? parsed.pubkey
-          : typeof parsed.pubkey === "object" && parsed.pubkey !== null
-          ? parsed.pubkey.toString()
-          : null;
+      let pubkey = null;
+      if (parsed.pubkey) {
+        pubkey = typeof parsed.pubkey === "string" 
+          ? parsed.pubkey 
+          : String(parsed.pubkey);
+      }
 
-      return {
-        pubkey: pubkey,
-        content: typeof parsed.content === "string" ? parsed.content : "",
-      };
+      // contentの型チェックと正規化
+      const content = typeof parsed.content === "string" 
+        ? parsed.content.trim() 
+        : "";
+
+      return { pubkey, content };
     } catch (error) {
       console.warn("Description tag parse warning:", error, {
         tag: descriptionTag,
+        sanitized: sanitizedDescription
       });
       return { pubkey: null, content: "" };
     }
@@ -377,28 +401,52 @@ function parseDescriptionTag(event) {
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
-    // 制御文字の除去と不正なエスケープシーケンスの修正
+    // より強固なJSON文字列のサニタイズ
     const sanitizedDescription = descriptionTag
-      .replace(/[\u0000-\u001F\u007F]/g, "") // 制御文字の除去
-      .replace(/\\([^"\\\/bfnrtu])/g, "$1"); // 不正なエスケープシーケンスの修正
+      // 制御文字の除去
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+      // バックスラッシュのエスケープを修正
+      .replace(/\\\\/g, '\\')
+      // 不正なエスケープシーケンスの修正
+      .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
+      // 重複したエスケープの修正
+      .replace(/\\+(["\\/bfnrt])/g, '\\$1')
+      // Unicode エスケープシーケンスの修正
+      .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
 
-    const parsed = JSON.parse(sanitizedDescription);
+    let parsed;
+    try {
+      parsed = JSON.parse(sanitizedDescription);
+    } catch {
+      // 最後の手段としてJSONを再構築
+      const match = sanitizedDescription.match(/"pubkey"\s*:\s*"([^"]+)"|"content"\s*:\s*"([^"]+)"/g);
+      if (!match) throw new Error('Invalid JSON structure');
+
+      parsed = {};
+      match.forEach(item => {
+        const [key, value] = item.split(':').map(s => s.trim().replace(/"/g, ''));
+        parsed[key] = value;
+      });
+    }
 
     // pubkeyの型チェックと正規化
-    const pubkey =
-      typeof parsed.pubkey === "string"
-        ? parsed.pubkey
-        : typeof parsed.pubkey === "object" && parsed.pubkey !== null
-        ? parsed.pubkey.toString()
-        : null;
+    let pubkey = null;
+    if (parsed.pubkey) {
+      pubkey = typeof parsed.pubkey === "string" 
+        ? parsed.pubkey 
+        : String(parsed.pubkey);
+    }
 
-    return {
-      pubkey: pubkey,
-      content: typeof parsed.content === "string" ? parsed.content : "",
-    };
+    // contentの型チェックと正規化
+    const content = typeof parsed.content === "string" 
+      ? parsed.content.trim() 
+      : "";
+
+    return { pubkey, content };
   } catch (error) {
     console.warn("Description tag parse warning:", error, {
       tag: descriptionTag,
+      sanitized: sanitizedDescription
     });
     return { pubkey: null, content: "" };
   }
