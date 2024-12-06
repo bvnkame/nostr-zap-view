@@ -372,11 +372,14 @@ class ZapSubscriptionManager {
     events.sort((a, b) => b.created_at - a.created_at);
     events.forEach(event => cacheManager.addZapEvent(viewId, event));
 
-    // リアルタイムイベントでない場合は統計処理をスキップ
-    await Promise.all([
-      profilePool.processEventProfiles(events)
-      // statsManager.handleZapEventの呼び出しを削除
-    ]);
+    try {
+      await Promise.all([
+        profilePool.processBatchProfiles(events)
+        // statsManager.handleZapEventの呼び出しを削除
+      ]);
+    } catch (error) {
+      console.warn('Profile processing failed:', error);
+    }
 
     await this._updateUI(events, viewId);
   }

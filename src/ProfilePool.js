@@ -12,10 +12,6 @@ import { SimplePool } from "nostr-tools/pool";
  * @property {string} [about]
  */
 
-/**
- * Class to manage Nostr profile information
- * Singleton pattern is adopted to share one instance throughout the application
- */
 export class ProfilePool {
   static instance = null;
   #config;
@@ -25,7 +21,13 @@ export class ProfilePool {
 
   constructor() {
     if (ProfilePool.instance) return ProfilePool.instance;
+    
+    this.#initializePool();
+    ProfilePool.instance = this;
+    return this;
+  }
 
+  #initializePool() {
     this.#config = PROFILE_CONFIG;
     this.#simplePool = new SimplePool();
 
@@ -40,51 +42,40 @@ export class ProfilePool {
         RELAYS: this.#config.RELAYS || []
       }
     });
-
-    ProfilePool.instance = this;
-    return this;
   }
 
-  // Add public getter
+  // Core Methods
   get isInitialized() {
     return this.#isInitialized;
   }
 
-  // Change from private to public method
   async initialize() {
-    return this.#initialize();
-  }
-
-  async #initialize() {
     if (this.#isInitialized) return;
     
     try {
-      const connectedCount = await this.#profileProcessor.connectToRelays();
+      await this.#profileProcessor.connectToRelays();
       this.#isInitialized = true;
     } catch (error) {
-      console.error('ProfilePool initialization error:', error);
       this.#isInitialized = false;
-      throw error;
+      throw new Error('ProfilePool initialization error: ' + error.message);
     }
   }
 
+  // Profile Fetching Methods
   async fetchProfiles(pubkeys) {
     if (!Array.isArray(pubkeys) || pubkeys.length === 0) return [];
 
     const now = Date.now();
     const results = new Array(pubkeys.length);
-    const fetchQueue = [];
-
-    for (let i = 0; i < pubkeys.length; i++) {
-      const pubkey = pubkeys[i];
+    const fetchQueue = pubkeys.reduce((queue, pubkey, i) => {
       const cached = cacheManager.getProfile(pubkey);
-      
       if (this.#isValidCache(cached, now)) {
         results[i] = cached;
       } else {
-        fetchQueue.push({ index: i, pubkey });
+        queue.push({ index: i, pubkey });
       }
-    }
+      return queue;
+    }, []);
 
     if (fetchQueue.length > 0) {
       await this.#processFetchQueue(fetchQueue, results, pubkeys);
@@ -93,8 +84,55 @@ export class ProfilePool {
     return results;
   }
 
+  // Batch Processing Methods
+  async processBatchProfiles(events) {
+    const pubkeys = this.#extractValidPubkeys(events);
+    if (pubkeys.length === 0) return;
+
+    try {
+      await Promise.all([
+        this.fetchProfiles(pubkeys),
+        ...pubkeys.map(pubkey => this.verifyNip05Async(pubkey))
+      ]);
+    } catch (error) {
+      console.warn('Batch profile processing failed:', error);
+    }
+  }
+
+  // NIP-05 Verification Methods
+  async verifyNip05Async(pubkey) {
+    const cachedNip05 = cacheManager.getNip05(pubkey);
+    if (cachedNip05 !== undefined) return cachedNip05;
+
+    const pendingFetch = cacheManager.getNip05PendingFetch(pubkey);
+    if (pendingFetch) return pendingFetch;
+
+    const fetchPromise = this.#processNip05Verification(pubkey);
+    cacheManager.setNip05PendingFetch(pubkey, fetchPromise);
+    return fetchPromise;
+  }
+
+  getNip05(pubkey) {
+    return cacheManager.getNip05(pubkey);
+  }
+
+  // Utility Methods
+  clearCache() {
+    cacheManager.clearAll();
+    this.#profileProcessor.clearPendingFetches();
+  }
+
+  // Private Helper Methods
   #isValidCache(cached, now) {
     return cached && cached._lastUpdated && (now - cached._lastUpdated < 1800000);
+  }
+
+  #extractValidPubkeys(events) {
+    return [...new Set(
+      events
+        ?.map(event => event?.pubkey)
+        ?.filter(pubkey => pubkey && typeof pubkey === 'string' && pubkey.length === 64)
+    )] || [];
   }
 
   async #processFetchQueue(fetchQueue, results, pubkeys) {
@@ -157,18 +195,6 @@ export class ProfilePool {
     }
   }
 
-  async verifyNip05Async(pubkey) {
-    const cachedNip05 = cacheManager.getNip05(pubkey);
-    if (cachedNip05 !== undefined) return cachedNip05;
-
-    const pendingFetch = cacheManager.getNip05PendingFetch(pubkey);
-    if (pendingFetch) return pendingFetch;
-
-    const fetchPromise = this.#processNip05Verification(pubkey);
-    cacheManager.setNip05PendingFetch(pubkey, fetchPromise);
-    return fetchPromise;
-  }
-
   async #processNip05Verification(pubkey) {
     try {
       const [profile] = await this.fetchProfiles([pubkey]);
@@ -204,70 +230,11 @@ export class ProfilePool {
     }
   }
 
-  _resolvePromise(pubkey, profile) {
-    const resolver = this.resolvers.get(pubkey);
-    if (resolver) {
-      resolver(profile);
-      this.resolvers.delete(pubkey);
-    }
-  }
-
-  _handleFetchError(pubkeys) {
-    pubkeys.forEach(pubkey => {
-      const defaultProfile = this.#createDefaultProfile();
-      cacheManager.setProfile(pubkey, defaultProfile);
-      this._resolvePromise(pubkey, defaultProfile);
-    });
-  }
-
   #createDefaultProfile() {
     return {
       name: "anonymous",
       display_name: "anonymous",
     };
-  }
-
-  clearCache() {
-    cacheManager.clearAll();
-    this.#profileProcessor.clearPendingFetches();
-  }
-
-  /**
-   * Get NIP-05 address
-   * Returns cached verified and escaped NIP-05 address
-   * @param {string} pubkey - Public key
-   * @returns {string|null} Verified and escaped NIP-05 address
-   */
-  getNip05(pubkey) {
-    return cacheManager.getNip05(pubkey);
-  }
-
-  // 新しく追加: 複数のプロファイルを並行処理
-  async processBatchProfiles(events) {
-    if (!Array.isArray(events) || events.length === 0) return;
-
-    const pubkeys = [...new Set(
-      events
-        .map(event => event?.pubkey)
-        .filter(pubkey => pubkey && typeof pubkey === 'string' && pubkey.length === 64)
-    )];
-
-    if (pubkeys.length === 0) return;
-
-    try {
-      await Promise.all([
-        this.fetchProfiles(pubkeys),
-        ...pubkeys.map(pubkey => this.verifyNip05Async(pubkey))
-      ]);
-    } catch (error) {
-      console.warn('Batch profile processing failed:', error);
-    }
-  }
-
-  // 新しく追加: プロファイルとNIP-05の検証を一括処理
-  async processEventProfiles(events) {
-    const pubkeys = [...new Set(events.map(event => event.pubkey))];
-    await this.processBatchProfiles(pubkeys);
   }
 }
 
