@@ -44,12 +44,16 @@ class NostrZapViewDialog extends HTMLElement {
       }
       await this.#initializeFullUI(config);
       
-      // 統計情報の初期化
+      // 統計情報の初期化 - 既に初期化されている場合は既存のデータを使用
       const identifier = this.getAttribute("data-nzv-id");
       if (identifier) {
-        await this.#initializeStats(identifier);
+        const stats = await statsManager.getCurrentStats(this.viewId);
+        if (stats) {
+          this.statusUI.displayStats(stats);
+        }
       }
       
+      this.#state.isInitialized = true;
       this.dispatchEvent(new CustomEvent('dialog-initialized', { 
         detail: { viewId: this.viewId }
       }));
@@ -79,7 +83,7 @@ class NostrZapViewDialog extends HTMLElement {
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
 
-    // UI��ンポーネントの初期化
+    // UIコンポーネントの初期化
     this.statusUI = new StatusUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
@@ -93,21 +97,6 @@ class NostrZapViewDialog extends HTMLElement {
       await this.zapListUI.renderZapListFromCache(zapEvents);
     }
   }
-
-  async #initializeStats(identifier) {
-    if (identifier) {
-      try {
-        const stats = await statsManager.initializeStats(identifier, this.viewId, true);
-        this.#state.isInitialized = true; // 初期化完了を設定
-        if (stats) {
-          this.statusUI.displayStats(stats);
-        }
-      } catch (error) {
-        console.error("Failed to initialize stats:", error);
-      }
-    }
-  }
-
 
   static get observedAttributes() {
     return ["data-theme"];

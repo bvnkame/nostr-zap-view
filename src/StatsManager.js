@@ -5,6 +5,7 @@ import { cacheManager } from "./CacheManager.js"; // Add import
 
 export class StatsManager {
   #currentStats = new Map();
+  #initializationStatus = new Map();  // 追加: 初期化状態を追跡
 
   constructor() {
     // キャッシュ関連のプロパティを削除
@@ -27,6 +28,7 @@ export class StatsManager {
     try {
       const response = await this._fetchFromApi(identifier);
       const stats = this._formatStats(response);
+      console.log("Fetched Zap stats:", stats);
       return stats || this.createTimeoutError();
     } catch (error) {
       return this.handleFetchError(error);
@@ -92,20 +94,31 @@ export class StatsManager {
   }
 
   async initializeStats(identifier, viewId, showSkeleton = false) {
-    try {
-      // getZapStatsを使用して統計情報を取得
-      const stats = await this.getZapStats(identifier, viewId);
-
-      if (stats) {
-        // UIを更新
-        this.displayStats(stats, viewId);
-      }
-
-      return stats;
-    } catch (error) {
-      console.error("Stats initialization failed:", error);
-      return null;
+    // 既に初期化中または完了している場合は進行中のPromiseを返す
+    if (this.#initializationStatus.has(viewId)) {
+      return this.#initializationStatus.get(viewId);
     }
+
+    const initPromise = (async () => {
+      try {
+        const stats = await this.getZapStats(identifier, viewId);
+        if (stats) {
+          this.displayStats(stats, viewId);
+          this.#currentStats.set(viewId, stats);
+        }
+        return stats;
+      } catch (error) {
+        console.error("Stats initialization failed:", error);
+        return null;
+      } finally {
+        // 初期化完了後にステータスをクリア
+        this.#initializationStatus.delete(viewId);
+      }
+    })();
+
+    // 進行中の初期化を追跡
+    this.#initializationStatus.set(viewId, initPromise);
+    return initPromise;
   }
 
   async #checkCachedStats(viewId, identifier) {
