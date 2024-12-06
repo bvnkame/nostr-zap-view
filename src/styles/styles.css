@@ -110,13 +110,6 @@ button {
   font-size: 1rem;
 }
 
-.zap-placeholder-comment {
-  color: var(--pubkey-text);
-  font-size: 0.9375rem;
-  height: 32px;
-  display: inline-block;
-}
-
 .zap-stats {
   min-height: 80px;
   padding: 6px 14px;
@@ -358,27 +351,9 @@ button {
   width: 110px;
 }
 
-.zap-placeholder-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
 .zap-placeholder-name {
   height: 30px;
   width: 140px;
-}
-
-.zap-placeholder-amount {
-  height: 32px;
-  width: 60px;
-}
-
-.zap-placeholder-comment {
-  height: 22px;
-  width: 180px;
-  margin: 4px 0;
 }
 
 .skeleton {
@@ -404,27 +379,14 @@ button {
   }
 }
 
+.zap-placeholder-name {
+  border-radius: 2px;
+}
+
 .zap-placeholder-name.skeleton {
   width: 120px;
   height: 19px;
   margin: 2px 0;
-}
-
-.sender-pubkey.skeleton {
-  width: 80px;
-  height: 12px;
-}
-
-.zap-amount.skeleton {
-  width: 60px;
-  height: 24px;
-}
-
-.zap-placeholder-name,
-.zap-placeholder-amount,
-.sender-pubkey.skeleton,
-.zap-amount.skeleton {
-  border-radius: 2px;
 }
 
 /* 共通のテキストオーバーフロー処理 */
