@@ -313,6 +313,8 @@ export class CacheManager {
     this.loadStateCache = new LoadStateCache(); // 追加
     this.zapInfoCache = new ZapInfoCache(); // 追加
     this.imageCache = new ImageCache(); // 追加
+    this.nip05Cache = new BaseCache(); // Add this line
+    this.nip05PendingCache = new BaseCache(); // Add this line
 
     // 汎用キャッシュの初期化
     const CACHE_NAMES = [
@@ -408,6 +410,28 @@ export class CacheManager {
   getImageCache(url) { return this.imageCache.getImage(url); }
   hasImageCache(url) { return this.imageCache.hasImage(url); }
 
+  // Add these new methods
+  setNip05(pubkey, value) {
+    this.nip05Cache.set(pubkey, value);
+  }
+
+  getNip05(pubkey) {
+    return this.nip05Cache.get(pubkey);
+  }
+
+  // Add these NIP-05 pending fetch methods
+  setNip05PendingFetch(pubkey, promise) {
+    this.nip05PendingCache.set(pubkey, promise);
+  }
+
+  getNip05PendingFetch(pubkey) {
+    return this.nip05PendingCache.get(pubkey);
+  }
+
+  deleteNip05PendingFetch(pubkey) {
+    this.nip05PendingCache.delete(pubkey);
+  }
+
   // View状態管理の委譲メソッド（統合版）
   getOrCreateViewState(viewId, defaultState = {}) {
     if (!this.viewStates.has(viewId)) {
@@ -454,6 +478,8 @@ export class CacheManager {
     this.loadStateCache.clear();
     this.zapInfoCache.clear();
     this.imageCache.clear();
+    this.nip05Cache.clear(); // Add this line
+    this.nip05PendingCache.clear(); // Add this line
     Object.values(this.#caches).forEach(cache => cache.clear());
     this.viewStats.clear();
     this.viewStates.clear();
