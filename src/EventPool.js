@@ -52,6 +52,12 @@ export class EventPool {
   }
 
   #createSubscription(viewId, config, decoded, handlers) {
+    console.log('Sending Zap subscription request:', {
+      viewId,
+      relayUrls: config.relayUrls,
+      filter: decoded.req
+    });
+    
     this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
       config.relayUrls,
       [decoded.req],
@@ -106,6 +112,11 @@ export class EventPool {
     }
 
     try {
+      console.log('Sending reference event request:', {
+        relayUrls,
+        filter
+      });
+
       const events = await this.#zapPool.querySync(
         relayUrls,
         filter,

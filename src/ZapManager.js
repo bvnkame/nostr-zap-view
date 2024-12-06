@@ -148,8 +148,10 @@ class ZapSubscriptionManager {
     if (cachedEvents.length === 0) {
       if (this.zapListUI) {
         await this.zapListUI.showNoZapsMessage();
+        console.debug("No cached events found:", { viewId });
       }
     } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+      console.debug("Cached events found:", { count: cachedEvents.length, viewId });
       this.setupInfiniteScroll(viewId);
     }
   }
