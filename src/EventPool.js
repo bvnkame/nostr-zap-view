@@ -7,161 +7,99 @@ import {
 import { cacheManager } from "./CacheManager.js";
 
 export class EventPool {
-  // Core components
+  // Private fields declaration
   #zapPool;
   #isConnected;
-
-  // Processors
+  #subscriptions;
+  #state;
+  #referenceFetching;
   #etagProcessor;
   #aTagProcessor;
 
-  // State management
-  #subscriptions;
-  #state;
-  #referenceFetching; // 追加: プライベートプロパティとして定義
-
   constructor() {
+    // 初期化
     this.#zapPool = new SimplePool();
+    this.#initializeState();
+    this.#initializeProcessors();
+  }
+
+  // Private initialization methods
+  #initializeState() {
     this.#subscriptions = new Map();
     this.#state = new Map();
+    this.#referenceFetching = new Map();
     this.#isConnected = false;
-    this.#referenceFetching = new Map(); // 初期化を追加
+  }
 
+  #initializeProcessors() {
     const processorConfig = {
       pool: this.#zapPool,
       batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
       batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
     };
-
     this.#etagProcessor = new ETagReferenceProcessor(processorConfig);
     this.#aTagProcessor = new ATagReferenceProcessor(processorConfig);
   }
 
-  // Connection management
-  async connectToRelays(zapRelayUrls) {
-    if (this.#isConnected) return;
-
-    try {
-      await this.#initializeProcessors(zapRelayUrls);
-      this.#isConnected = true;
-    } catch (error) {
-      this.#handleError("Relay connection error", error);
+  // Private initialization and state management methods
+  #initializeSubscriptionState(viewId) {
+    if (!this.#subscriptions.has(viewId)) {
+      this.#subscriptions.set(viewId, { zap: null });
+    }
+    if (!this.#state.has(viewId)) {
+      this.#state.set(viewId, { isZapClosed: false });
     }
   }
 
-  async #initializeProcessors(zapRelayUrls) {
-    [this.#etagProcessor, this.#aTagProcessor].forEach(processor => 
-      processor.setRelayUrls(zapRelayUrls)
+  #createSubscription(viewId, config, decoded, handlers) {
+    this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
+      config.relayUrls,
+      [decoded.req],
+      handlers
     );
-
-    return Promise.all([
-      this.#etagProcessor.connectToRelays(),
-      this.#aTagProcessor.connectToRelays()
-    ]);
   }
 
-  // Subscription management
-  subscribeToZaps(viewId, config, decoded, handlers) {
-    try {
-      // デバッグ情報を追加
-      console.debug("Subscription attempt:", { viewId, config, decoded });
+  #validateEvent(event) {
+    return event && event.id && Array.isArray(event.tags);
+  }
 
-      this.#initializeSubscriptionState(viewId);
-      this.closeSubscription(viewId);
-
-      const state = this.#state.get(viewId);
-      state.isZapClosed = false;
-
-      // フィルターの検証を修正
-      if (!this._isValidSubscription(decoded)) {
-        console.warn("Invalid subscription:", decoded);
-        throw new Error("無効なサブスクリプション設定");
-      }
-
-      this.#createSubscription(viewId, config, decoded, handlers);
-    } catch (error) {
-      this.#handleError("Subscription error", error);
+  #createReferenceFilter(type, tag) {
+    if (type === 'a') {
+      const [kind, pubkey, identifier] = tag[1].split(':');
+      return {
+        kinds: [parseInt(kind)],
+        authors: [pubkey],
+        '#d': [identifier]
+      };
+    } else if (type === 'e' && /^[0-9a-f]{64}$/.test(tag[1].toLowerCase())) {
+      return { ids: [tag[1].toLowerCase()] };
     }
+    return null;
   }
 
-  _isValidSubscription(decoded) {
-    // 検証ロジックを緩和
-    return decoded && 
-           decoded.req && 
-           typeof decoded.req === 'object' &&  // reqがオブジェクトであることを確認
-           Array.isArray(decoded.req.kinds);   // kinds配列が存在することを確認
+  async #handleReferenceFetch(eventId, relayUrls, filter) {
+    const promise = this.#fetchEventWithFilter(relayUrls, filter)
+      .then(result => {
+        if (result) {
+          cacheManager.setReference(eventId, result);
+        }
+        this.#referenceFetching.delete(eventId);
+        return result;
+      });
+
+    this.#referenceFetching.set(eventId, promise);
+    return promise;
   }
 
-  closeSubscription(viewId) {
-    const subscription = this.#subscriptions.get(viewId);
-    const state = this.#state.get(viewId);
-
-    if (!subscription?.zap || !state) return;
-
-    if (!state.isZapClosed) {
-      subscription.zap.close();
-      state.isZapClosed = true;
+  #handleReferenceError(eventId, error) {
+    console.error('Reference fetch error:', error);
+    if (eventId) {
+      this.#referenceFetching.delete(eventId);
     }
+    return null;
   }
 
-  // Reference handling
-  async fetchReference(relayUrls, event, type) {
-    try {
-      // フィールドがnullでないことを確認
-      if (!event || !event.id || !event.tags) {
-        console.warn("無効なイベントデータ:", event);
-        return null;
-      }
-
-      if (!event?.tags || !Array.isArray(event.tags)) {
-        return null;
-      }
-
-      const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
-      if (!tag) return null;
-
-      // キャッシュチェック
-      const cached = cacheManager.getReference(event.id);
-      if (cached) return cached;
-
-      // 進行中のフェッチチェック
-      const pending = this.#referenceFetching.get(event.id);
-      if (pending) return pending;
-
-      let filter;
-      if (type === 'a') {
-        const [kind, pubkey, identifier] = tag[1].split(':');
-        filter = {
-          kinds: [parseInt(kind)],
-          authors: [pubkey],
-          '#d': [identifier]
-        };
-      } else if (type === 'e' && /^[0-9a-f]{64}$/.test(tag[1].toLowerCase())) {
-        filter = { ids: [tag[1].toLowerCase()] };
-      } else {
-        return null;
-      }
-
-      const promise = this.fetchEventWithFilter(relayUrls, filter)
-        .then(result => {
-          if (result) {
-            cacheManager.setReference(event.id, result);
-          }
-          this.#referenceFetching.delete(event.id);
-          return result;
-        });
-
-      this.#referenceFetching.set(event.id, promise);
-      return promise;
-    } catch (error) {
-      console.error('Reference fetch error:', error);
-      this.#referenceFetching.delete(event.id);
-      return null;
-    }
-  }
-
-  // 最適化されたイベント取得メソッド
-  async fetchEventWithFilter(relayUrls, filter) {
+  async #fetchEventWithFilter(relayUrls, filter) {
     if (!Array.isArray(relayUrls) || relayUrls.length === 0) {
       console.warn('No relay URLs provided for event fetch');
       return null;
@@ -183,76 +121,99 @@ export class EventPool {
     }
   }
 
-  // 参照関連の処理をEventPoolクラスに統合
-  extractReferenceFromTags(event) {
-    if (!event?.tags) return null;
+  // Connection management
+  async connectToRelays(zapRelayUrls) {
+    if (this.#isConnected) return;
+    try {
+      await this.#setupProcessors(zapRelayUrls);
+      this.#isConnected = true;
+    } catch (error) {
+      this.#handleError("リレー接続エラー", error);
+    }
+  }
 
-    const [eTag, pTag] = [
-      event.tags.find(tag => tag[0] === "e"),
-      event.tags.find(tag => tag[0] === "p")
-    ];
+  async #setupProcessors(zapRelayUrls) {
+    const processors = [this.#etagProcessor, this.#aTagProcessor];
+    processors.forEach(p => p.setRelayUrls(zapRelayUrls));
+    return Promise.all(processors.map(p => p.connectToRelays()));
+  }
 
-    if (!eTag) return null;
+  // Subscription management
+  closeSubscription(viewId) {
+    const subscription = this.#subscriptions.get(viewId);
+    const state = this.#state.get(viewId);
 
+    if (!subscription?.zap || !state) return;
+
+    if (!state.isZapClosed) {
+      subscription.zap.close();
+      state.isZapClosed = true;
+    }
+  }
+
+  subscribeToZaps(viewId, config, decoded, handlers) {
+    try {
+      this.#validateSubscription(decoded);
+      this.#initializeSubscriptionState(viewId);
+      this.closeSubscription(viewId);
+      
+      const state = this.#state.get(viewId);
+      state.isZapClosed = false;
+      
+      this.#createSubscription(viewId, config, decoded, this.#wrapHandlers(handlers));
+    } catch (error) {
+      this.#handleError("サブスクリプションエラー", error);
+    }
+  }
+
+  #validateSubscription(decoded) {
+    if (!decoded?.req?.kinds || !Array.isArray(decoded.req.kinds)) {
+      throw new Error("無効なサブスクリプション設定");
+    }
+  }
+
+  // Reference handling
+  async fetchReference(relayUrls, event, type) {
+    try {
+      if (!this.#validateEvent(event)) return null;
+
+      const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
+      if (!tag) return null;
+
+      const cached = cacheManager.getReference(event.id);
+      if (cached) return cached;
+
+      const pending = this.#referenceFetching.get(event.id);
+      if (pending) return pending;
+
+      const filter = this.#createReferenceFilter(type, tag);
+      if (!filter) return null;
+
+      return this.#handleReferenceFetch(event.id, relayUrls, filter);
+    } catch (error) {
+      return this.#handleReferenceError(event?.id, error);
+    }
+  }
+
+  // Utility methods
+  #wrapHandlers(handlers) {
+    const subscriptionStartTime = Math.floor(Date.now() / 1000);
     return {
-      id: eTag[1],
-      kind: parseInt(eTag[3], 10) || 1,
-      pubkey: pTag?.[1] || event.pubkey || "",
-      content: event.content || "",
-      tags: event.tags || [],
+      ...handlers,
+      onevent: (event) => {
+        event.isRealTimeEvent = event.created_at >= subscriptionStartTime;
+        handlers.onevent(event);
+      },
+      oneose: handlers.oneose
     };
   }
 
-  // Private helper methods
-  #createSubscription(viewId, config, decoded, handlers) {
-    try {
-      // デバッグ情報を追加
-      console.debug("Creating subscription:", {
-        relayUrls: config.relayUrls,
-        filter: decoded.req
-      });
-
-      // サブスクリプション開始時刻を記録
-      const subscriptionStartTime = Math.floor(Date.now() / 1000);
-
-      const wrappedHandlers = {
-        ...handlers,
-        onevent: (event) => {
-          // イベント作成時刻がサブスクリプション開始時刻以降ならリアルタイム
-          event.isRealTimeEvent = event.created_at >= subscriptionStartTime;
-          handlers.onevent(event);
-        },
-        oneose: () => {
-          handlers.oneose();
-        }
-      };
-
-      this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
-        config.relayUrls,
-        [decoded.req],
-        wrappedHandlers
-      );
-    } catch (error) {
-      console.error("Subscription creation failed:", error);
-      throw error;
-    }
-  }
-
   #handleError(message, error) {
-    console.error(message + ":", error);
+    console.error(`${message}:`, error);
     throw error;
   }
 
-  #initializeSubscriptionState(viewId) {
-    if (!this.#subscriptions.has(viewId)) {
-      this.#subscriptions.set(viewId, { zap: null });
-    }
-    if (!this.#state.has(viewId)) {
-      this.#state.set(viewId, { isZapClosed: false });
-    }
-  }
-
-  // Getter
+  // Getters
   get zapPool() {
     return this.#zapPool;
   }
