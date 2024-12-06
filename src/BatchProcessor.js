@@ -277,24 +277,30 @@ export class ATagReferenceProcessor extends BatchProcessor {
   async onBatchProcess(items) {
     if (!items?.length) return;
 
-    const filters = [];
     const validItems = [];
+    const filterConditions = {
+      kinds: [],
+      authors: [],
+      '#d': []
+    };
 
     items.slice(0, this.batchSize).forEach(aTagValue => {
       const parsed = this._parseAtagValue(aTagValue);
       if (parsed) {
-        filters.push({
-          kinds: [parsed.kind],
-          authors: [parsed.pubkey],
-          '#d': [parsed.identifier]
-        });
+        filterConditions.kinds.push(parsed.kind);
+        filterConditions.authors.push(parsed.pubkey);
+        filterConditions['#d'].push(parsed.identifier);
         validItems.push(aTagValue);
       } else {
         this.resolveItem(aTagValue, null);
       }
     });
 
-    if (filters.length === 0) return;
+    if (validItems.length === 0) return;
+
+    // 単一のフィルターオブジェクトにマージ
+    const filter = [filterConditions];
+    console.log('ATag filter:', filter);
 
     const eventHandler = (event, processedItems) => {
       const aTagValue = validItems.find(item => {
@@ -315,7 +321,7 @@ export class ATagReferenceProcessor extends BatchProcessor {
       }
     };
 
-    await this._createSubscriptionPromise(validItems, this.relayUrls, filters, eventHandler);
+    await this._createSubscriptionPromise(validItems, this.relayUrls, filter, eventHandler);
   }
 }
 
