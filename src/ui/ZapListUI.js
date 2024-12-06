@@ -30,6 +30,7 @@ class ZapItemBuilder {
 }
 
 export class ZapListUI {
+  // 1. 基本構造
   constructor(shadowRoot, profileUI, viewId, config) {
     if (!shadowRoot) throw new Error('shadowRoot is required');
     if (!config) throw new Error('config is required');
@@ -44,22 +45,6 @@ export class ZapListUI {
     this.#initializeProfileUpdates();
   }
 
-  // プロフィール更新の購読を簡略化
-  #initializeProfileUpdates() {
-    this.profileUpdateUnsubscribe = cacheManager.subscribeToProfileUpdates(
-      this.#handleProfileUpdate.bind(this)
-    );
-  }
-
-  async #handleProfileUpdate(pubkey, profile) {
-    const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
-    await Promise.allSettled(
-      Array.from(elements).map(element => 
-        this.profileUI.updateProfileElement(element, profile)
-      )
-    );
-  }
-
   destroy() {
     if (this.profileUpdateUnsubscribe) {
       this.profileUpdateUnsubscribe();
@@ -67,34 +52,66 @@ export class ZapListUI {
     }
   }
 
+  // 2. リスト操作の基本メソッド
   #getElement(selector) {
     return this.shadowRoot.querySelector(selector);
   }
 
-  async renderZapListFromCache(zapEventsCache) {
+  getElementByEventId(eventId) {
+    return this.#getElement(`.zap-list-item[data-event-id="${eventId}"]`);
+  }
+
+  async #updateListContent(operation) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    // キャッシュが存在しないか空の場合はNoZapsMessageを表示
+    try {
+      this.#removeNoZapsMessage(list);
+      const result = await operation(list);
+      return result;
+    } catch (error) {
+      console.error("List operation failed:", error);
+      if (list.children.length === 0) {
+        this.showNoZapsMessage();
+      }
+    }
+  }
+
+  #updateList(list, fragment) {
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    list.innerHTML = '';
+    list.appendChild(fragment);
+    if (existingTrigger) list.appendChild(existingTrigger);
+  }
+
+  #removeNoZapsMessage(list) {
+    const noZapsMessage = list.querySelector(".no-zaps-message");
+    if (noZapsMessage) noZapsMessage.remove();
+  }
+
+  // 3. Zap要素の操作メソッド
+  async #createAndAddZapElement(event, insertFn) {
+    return this.#updateListContent(async (list) => {
+      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+      insertFn(list, li);
+      await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
+      return { li, zapInfo };
+    });
+  }
+
+  async renderZapListFromCache(zapEventsCache) {
     if (!zapEventsCache?.length) {
-      this.showNoZapsMessage();
-      return;
+      return this.showNoZapsMessage();
     }
 
-    try {
+    await this.#updateListContent(async (list) => {
       const fragment = document.createDocumentFragment();
       const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
       const profileUpdates = [];
 
       for (const event of uniqueEvents) {
         const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-        
-        // キャッシュされたreferenceがあれば表示
-        const cachedReference = cacheManager.getReference(event.id);
-        if (cachedReference) {
-          DialogComponents.addReferenceToElement(li, cachedReference);
-        }
-
+        this.#handleCachedReference(event.id, li);
         fragment.appendChild(li);
         if (zapInfo.pubkey) {
           profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
@@ -103,64 +120,18 @@ export class ZapListUI {
 
       this.#updateList(list, fragment);
       await this.#updateProfiles(profileUpdates);
-    } catch (error) {
-      console.error("Failed to render zap list:", error);
-      this.showNoZapsMessage();
-    }
+    });
   }
 
   async prependZap(event) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    try {
-      this.#removeNoZapsMessage(list);
-      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-      list.prepend(li);
-      await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
-    } catch (error) {
-      console.error("Failed to prepend zap:", error);
-    }
-  }
-
-  getElementByEventId(eventId) {
-    return this.#getElement(`.zap-list-item[data-event-id="${eventId}"]`);
+    return this.#createAndAddZapElement(event, (list, li) => list.prepend(li));
   }
 
   async appendZap(event) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    try {
-      this.#removeNoZapsMessage(list);
-      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-      
-      // 適切な挿入位置を探す
-      const position = this.#findInsertPosition(list, event.created_at);
-      if (position) {
-        list.insertBefore(li, position);
-      } else {
-        list.appendChild(li);
-      }
-      
-      await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
-    } catch (error) {
-      console.error("Failed to append zap:", error);
-    }
-  }
-
-  #findInsertPosition(list, timestamp) {
-    const items = list.querySelectorAll('.zap-list-item');
-    for (const item of items) {
-      const event = item.getAttribute('data-event');
-      if (event) {
-        const itemTime = JSON.parse(event).created_at;
-        if (timestamp > itemTime) {
-          return item;
-        }
-      }
-    }
-    return null;
+    return this.#createAndAddZapElement(event, (list, li) => {
+      const position = this.findInsertPosition(list, event.created_at);
+      position ? list.insertBefore(li, position) : list.appendChild(li);
+    });
   }
 
   async replacePlaceholderWithZap(event, index) {
@@ -201,77 +172,7 @@ export class ZapListUI {
     list.style.minHeight = '100px';
   }
 
-  #getUniqueEvents(events) {
-    return [...new Map(events.map(e => [e.id, e])).values()]
-      .sort((a, b) => b.created_at - a.created_at);
-  }
-
-  #updateList(list, fragment) {
-    const existingTrigger = list.querySelector('.load-more-trigger');
-    list.innerHTML = '';
-    list.appendChild(fragment);
-    if (existingTrigger) list.appendChild(existingTrigger);
-  }
-
-  #removeNoZapsMessage(list) {
-    const noZapsMessage = list.querySelector(".no-zaps-message");
-    if (noZapsMessage) noZapsMessage.remove();
-  }
-
-  async #updateProfiles(profileUpdates) {
-    const PROFILE_BATCH_SIZE = 10;
-    for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
-      const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);
-      await Promise.all(
-        batch.map(({ pubkey, element }) => 
-          this.#updateProfileIfNeeded(pubkey, element)
-        )
-      );
-      // UIの更新を待つ
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-  }
-
-  #isValidPlaceholder(element) {
-    return element && element.classList.contains('placeholder');
-  }
-
-  #updatePlaceholderContent(placeholder, zapInfo, eventId) {
-    const colorClass = this.itemBuilder.getAmountColorClass(zapInfo.satsAmount);
-    
-    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
-    placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
-    placeholder.setAttribute("data-event-id", eventId);
-    placeholder.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
-    placeholder.removeAttribute('data-index');
-  }
-
-  async #updateProfileIfNeeded(pubkey, element) {
-    if (pubkey) {
-      await this.#loadProfileAndUpdate(pubkey, element);
-    }
-  }
-
-  async #loadProfileAndUpdate(pubkey, element) {
-    if (!pubkey || !element) return;
-  
-    try {
-      // 即座にプロフィールを読み込んで表示
-      await this.profileUI.loadAndUpdate(pubkey, element);
-      // 更新は購読で処理されるため、ここでは初期表示のみ
-    } catch (error) {
-      console.error("Failed to load profile:", error);
-    }
-  }
-
-  updateZapReference(event) {
-    const zapElement = this.getElementByEventId(event.id);
-    if (!zapElement || !event.reference) return;
-
-    DialogComponents.addReferenceToElement(zapElement, event.reference);
-    cacheManager.setReference(event.id, event.reference);
-  }
-
+  // バッチ更新関連
   async batchUpdate(events) {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
@@ -283,7 +184,7 @@ export class ZapListUI {
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      // 1. まず全てのイ��ントを表示する
+      // 1. まず全てのイベントを表示する
       const fragment = document.createDocumentFragment();
       const updateQueue = [];
 
@@ -337,4 +238,92 @@ export class ZapListUI {
     }
   }
 
+  updateZapReference(event) {
+    if (!event?.id || !event?.reference) return;
+
+    try {
+      const zapElement = this.getElementByEventId(event.id);
+      if (!zapElement) return;
+
+      DialogComponents.addReferenceToElement(zapElement, event.reference);
+      cacheManager.setReference(event.id, event.reference);
+    } catch (error) {
+      console.error("Failed to update zap reference:", error);
+    }
+  }
+
+  // 4. プロフィール関連メソッド
+  #initializeProfileUpdates() {
+    this.profileUpdateUnsubscribe = cacheManager.subscribeToProfileUpdates(
+      this.#handleProfileUpdate.bind(this)
+    );
+  }
+
+  async #handleProfileUpdate(pubkey, profile) {
+    const elements = this.shadowRoot.querySelectorAll(`[data-pubkey="${pubkey}"]`);
+    await Promise.allSettled(
+      Array.from(elements).map(element => 
+        this.profileUI.updateProfileElement(element, profile)
+      )
+    );
+  }
+
+  async #updateProfiles(profileUpdates) {
+    const PROFILE_BATCH_SIZE = 10;
+    for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
+      const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);
+      await Promise.all(
+        batch.map(({ pubkey, element }) => 
+          this.#updateProfileIfNeeded(pubkey, element)
+        )
+      );
+      // UIの更新を待つ
+      await new Promise(resolve => requestAnimationFrame(resolve));
+    }
+  }
+
+  async #updateProfileIfNeeded(pubkey, element) {
+    if (pubkey) {
+      await this.#loadProfileAndUpdate(pubkey, element);
+    }
+  }
+
+  async #loadProfileAndUpdate(pubkey, element) {
+    if (!pubkey || !element) return;
+  
+    try {
+      // 即座にプロフィールを読み込んで表示
+      await this.profileUI.loadAndUpdate(pubkey, element);
+      // 更新は購読で処理されるため、ここでは初期表示のみ
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+    }
+  }
+
+  // 5. ヘルパーメソッド
+  #getUniqueEvents(events) {
+    return [...new Map(events.map(e => [e.id, e])).values()]
+      .sort((a, b) => b.created_at - a.created_at);
+  }
+
+  #handleCachedReference(eventId, element) {
+    const cachedReference = cacheManager.getReference(eventId);
+    if (cachedReference) {
+      DialogComponents.addReferenceToElement(element, cachedReference);
+    }
+  }
+
+  #isValidPlaceholder(element) {
+    return element && element.classList.contains('placeholder');
+  }
+
+  #updatePlaceholderContent(placeholder, zapInfo, eventId) {
+    const colorClass = this.itemBuilder.getAmountColorClass(zapInfo.satsAmount);
+    
+    placeholder.className = `zap-list-item ${colorClass}${zapInfo.comment ? " with-comment" : ""}`;
+    placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
+    placeholder.setAttribute("data-event-id", eventId);
+    placeholder.innerHTML = DialogComponents.createZapItemHTML(zapInfo, colorClass, this.viewId);
+    placeholder.removeAttribute('data-index');
+  }
 }
