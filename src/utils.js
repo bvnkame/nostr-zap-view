@@ -145,18 +145,7 @@ const ZapUtils = {
     if (!descriptionTag) return { pubkey: null, content: "" };
 
     try {
-      // より強固なJSON文字列のサニタイズ
-      const sanitizedDescription = descriptionTag
-        // 制御文字の除去
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-        // バックスラッシュのエスケープを修正
-        .replace(/\\\\/g, '\\')
-        // 不正なエスケープシーケンスの修正
-        .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
-        // 重複したエスケープの修正
-        .replace(/\\+(["\\/bfnrt])/g, '\\$1')
-        // Unicode エスケープシーケンスの修正
-        .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
+      const sanitizedDescription = sanitizeJsonString(descriptionTag);
 
       let parsed;
       try {
@@ -401,18 +390,7 @@ function parseDescriptionTag(event) {
   if (!descriptionTag) return { pubkey: null, content: "" };
 
   try {
-    // より強固なJSON文字列のサニタイズ
-    const sanitizedDescription = descriptionTag
-      // 制御文字の除去
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
-      // バックスラッシュのエスケープを修正
-      .replace(/\\\\/g, '\\')
-      // 不正なエスケープシーケンスの修正
-      .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
-      // 重複したエスケープの修正
-      .replace(/\\+(["\\/bfnrt])/g, '\\$1')
-      // Unicode エスケープシーケンスの修正
-      .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
+    const sanitizedDescription = sanitizeJsonString(descriptionTag);
 
     let parsed;
     try {
@@ -482,6 +460,21 @@ function safeNip19Decode(identifier) {
   }
 }
 
+// Sanitize utilities
+function sanitizeJsonString(jsonStr) {
+  return jsonStr
+    // 制御文字の除去
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    // バックスラッシュのエスケープを修正
+    .replace(/\\\\/g, '\\')
+    // 不正なエスケープシーケンスの修正
+    .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
+    // 重複したエスケープの修正
+    .replace(/\\+(["\\/bfnrt])/g, '\\$1')
+    // Unicode エスケープシーケンスの修正
+    .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
+}
+
 // --- Remove 'export' from individual function declarations ---
 
 // Consolidate all exports into a single export statement to remove duplicates
@@ -517,5 +510,6 @@ export {
   getProfileDisplayName,
   verifyNip05,
   sanitizeImageUrl,
-  isValidCount
+  isValidCount,
+  sanitizeJsonString
 };
