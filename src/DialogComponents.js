@@ -199,7 +199,7 @@ export class DialogComponents {
   static getDialogTemplate() {
     return `
       <dialog class="dialog">
-        <h2 class="dialog-title"></h2>
+        <h2 class="dialog-title"><a href="#" target="_blank"></a></h2>
         <button class="close-dialog-button">X</button>
         <div class="zap-stats"></div>
         <ul class="dialog-zap-list"></ul>

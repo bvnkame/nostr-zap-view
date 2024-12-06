@@ -182,17 +182,21 @@ class NostrZapViewDialog extends HTMLElement {
     );
     if (!fetchButton) return;
 
-    const title = this.#getElement(".dialog-title");
-    if (!title) return;
+    const titleContainer = this.#getElement(".dialog-title");
+    const title = this.#getElement(".dialog-title a");
+    if (!title || !titleContainer) return;
 
     const customTitle = fetchButton.getAttribute("data-title");
+    const identifier = fetchButton.getAttribute("data-nzv-id");
+    
+    title.href = identifier ? `https://njump.me/${identifier}` : '#';
+    
     if (customTitle?.trim()) {
       title.textContent = customTitle;
-      title.classList.add("custom-title");
+      titleContainer.classList.add("custom-title");
     } else {
-      const identifier = fetchButton.getAttribute("data-nzv-id");
       title.textContent = DIALOG_CONFIG.DEFAULT_TITLE + formatIdentifier(identifier);
-      title.classList.remove("custom-title");
+      titleContainer.classList.remove("custom-title");
     }
   }
 
@@ -223,7 +227,7 @@ class NostrZapViewDialog extends HTMLElement {
     return operations;
   }
 
-  // 初期化の完了を待機するメソッドを追加
+  // ��期化の完了を待機するメソッドを追加
   async waitForInitialization() {
     return this.#initializationPromise;
   }

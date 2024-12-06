@@ -97,14 +97,28 @@ button {
   height: 42px;
   margin: 0;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dialog-title a {
   font-size: 0.9rem;
   font-weight: normal;
   color: var(--pubkey-text);
-  text-align: center;
-  line-height: 42px;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
 }
 
-.dialog-title.custom-title {
+.dialog-title a:hover {
+  text-decoration: underline;
+}
+
+.dialog-title.custom-title a {
   color: var(--tite-text);
   font-weight: 600;
   font-size: 1rem;
