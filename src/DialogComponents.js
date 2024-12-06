@@ -158,8 +158,6 @@ export class DialogComponents {
     if (!reference) return '';
 
     const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
-    console.log('tagKey:', tagKey);
-    console.log('reference:', reference);
 
     if (tagKey) {
       const tag = reference.tags.find(t => Array.isArray(t) && t[0] === tagKey);

@@ -300,7 +300,6 @@ export class ATagReferenceProcessor extends BatchProcessor {
 
     // 単一のフィルターオブジェクトにマージ
     const filter = [filterConditions];
-    console.log('ATag filter:', filter);
 
     const eventHandler = (event, processedItems) => {
       const aTagValue = validItems.find(item => {

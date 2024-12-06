@@ -11,11 +11,11 @@ export const APP_CONFIG = {
     theme: "light",
     colorMode: true,
   },
-  INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
+  INITIAL_LOAD_COUNT: 20, // 追加：初期ロード件数のデフォルト値
+  ADDITIONAL_LOAD_COUNT: 30, // 一度に読み込む件数を減らす
   LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '500px', // スクロール検知の余裕を調整
+    ROOT_MARGIN: '700px', // スクロール検知の余裕を調整
     THRESHOLD: 0.1,
     DEBOUNCE_TIME: 500 // デバウンス時間を増やす
   }

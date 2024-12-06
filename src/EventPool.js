@@ -52,11 +52,6 @@ export class EventPool {
   }
 
   #createSubscription(viewId, config, decoded, handlers) {
-    console.log('Sending Zap subscription request:', {
-      viewId,
-      relayUrls: config.relayUrls,
-      filter: decoded.req
-    });
     
     this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
       config.relayUrls,
@@ -146,7 +141,6 @@ export class EventPool {
       const tagValue = type === 'e' ? tag[1] : `${tag[1]}`;
 
       try {
-        console.log(`Fetching ${type}-tag reference:`, { eventId: event.id, tagValue });
         const reference = await processor.getOrCreateFetchPromise(tagValue);
         
         if (reference) {

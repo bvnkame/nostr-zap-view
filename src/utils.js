@@ -58,7 +58,6 @@ const Decoder = {
     req.limit = since ? APP_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.INITIAL_LOAD_COUNT;
     if (since) req.until = since;
 
-    console.log("Created request:", req);
     return { req };
   }
 };
