@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools/pool";
-import { BATCH_CONFIG, REQUEST_CONFIG } from "./AppSettings.js";
+import { BATCH_CONFIG } from "./AppSettings.js";
 import {
   ETagReferenceProcessor,
   ATagReferenceProcessor,
@@ -69,67 +69,12 @@ export class EventPool {
     return event && event.id && Array.isArray(event.tags);
   }
 
-  #createReferenceFilter(type, tag) {
-    if (type === 'a') {
-      const [kind, pubkey, identifier] = tag[1].split(':');
-      return {
-        kinds: [parseInt(kind)],
-        authors: [pubkey],
-        '#d': [identifier]
-      };
-    } else if (type === 'e' && /^[0-9a-f]{64}$/.test(tag[1].toLowerCase())) {
-      return { ids: [tag[1].toLowerCase()] };
-    }
-    return null;
-  }
-
-  async #handleReferenceFetch(eventId, relayUrls, filter) {
-    const promise = this.#fetchEventWithFilter(relayUrls, filter)
-      .then(result => {
-        if (result) {
-          cacheManager.setReference(eventId, result);
-        }
-        this.#referenceFetching.delete(eventId);
-        return result;
-      });
-
-    this.#referenceFetching.set(eventId, promise);
-    return promise;
-  }
-
   #handleReferenceError(eventId, error) {
     console.error('Reference fetch error:', error);
     if (eventId) {
       this.#referenceFetching.delete(eventId);
     }
     return null;
-  }
-
-  async #fetchEventWithFilter(relayUrls, filter) {
-    if (!Array.isArray(relayUrls) || relayUrls.length === 0) {
-      console.warn('No relay URLs provided for event fetch');
-      return null;
-    }
-
-    try {
-      console.log('Sending reference event request:', {
-        relayUrls,
-        filter
-      });
-
-      const events = await this.#zapPool.querySync(
-        relayUrls,
-        filter,
-        { timeout: REQUEST_CONFIG.METADATA_TIMEOUT }
-      );
-
-      return events && events.length > 0
-        ? events.sort((a, b) => b.created_at - a.created_at)[0]
-        : null;
-    } catch (error) {
-      console.error('Event fetch error:', { error, filter, relayUrls });
-      return null;
-    }
   }
 
   // Connection management
@@ -184,7 +129,7 @@ export class EventPool {
   }
 
   // Reference handling
-  async fetchReference(relayUrls, event, type) {
+  async fetchReference(_relayUrls, event, type) {
     try {
       if (!this.#validateEvent(event)) return null;
 
@@ -197,10 +142,20 @@ export class EventPool {
       const pending = this.#referenceFetching.get(event.id);
       if (pending) return pending;
 
-      const filter = this.#createReferenceFilter(type, tag);
-      if (!filter) return null;
+      const processor = type === 'e' ? this.#etagProcessor : this.#aTagProcessor;
+      const tagValue = type === 'e' ? tag[1] : `${tag[1]}`;
 
-      return this.#handleReferenceFetch(event.id, relayUrls, filter);
+      try {
+        console.log(`Fetching ${type}-tag reference:`, { eventId: event.id, tagValue });
+        const reference = await processor.getOrCreateFetchPromise(tagValue);
+        
+        if (reference) {
+          cacheManager.setReference(event.id, reference);
+        }
+        return reference;
+      } finally {
+        this.#referenceFetching.delete(event.id);
+      }
     } catch (error) {
       return this.#handleReferenceError(event?.id, error);
     }

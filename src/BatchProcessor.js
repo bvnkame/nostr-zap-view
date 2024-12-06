@@ -134,27 +134,43 @@ export class BatchProcessor {
 
     return new Promise((resolve) => {
       const processedItems = new Set();
+      const timeoutDuration = 5000;
       let timeoutId;
 
-      const pool = this._getSubscriptionPool();
-      const sub = pool.subscribeMany(
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (sub) sub.close();
+        items.forEach(item => {
+          if (!processedItems.has(item)) {
+            this.resolveItem(item, null);
+          }
+        });
+        resolve();
+      };
+
+      const sub = this.pool.subscribeMany(
         relayUrls,
         filter,
         {
           onevent: (event) => {
-            eventHandler(event, processedItems);
+            try {
+              eventHandler(event, processedItems);
+              // すべてのアイテムが処理されたら早期終了
+              if (processedItems.size === items.length) {
+                cleanup();
+              }
+            } catch (error) {
+              console.error('Event handler error:', error);
+            }
           },
-          oneose: () => {
-            this._cleanup(timeoutId, sub, items, processedItems);
-            resolve();
+          oneose: cleanup,
+          onerror: (error) => {
+            console.error('Subscription error:', error);
           }
         }
       );
 
-      timeoutId = setTimeout(() => {
-        this._cleanup(timeoutId, sub, items, processedItems);
-        resolve();
-      }, 5000);
+      timeoutId = setTimeout(cleanup, timeoutDuration);
     });
   }
 
@@ -220,17 +236,25 @@ export class ETagReferenceProcessor extends BatchProcessor {
   }
 
   async onBatchProcess(items) {
+    if (!items?.length) return;
+
     const filter = [{
       kinds: [1, 30023, 30030, 30009, 40, 42, 31990],
-      ids: items
+      ids: items.slice(0, this.batchSize)
     }];
 
     const eventHandler = (event, processedItems) => {
-      this.resolveItem(event.id, event);
-      processedItems.add(event.id);
+      if (items.includes(event.id)) {
+        const cachedEvent = this.getCachedItem(event.id);
+        if (!cachedEvent || event.created_at > cachedEvent.created_at) {
+          this.setCachedItem(event.id, event);
+          this.resolveItem(event.id, event);
+          processedItems.add(event.id);
+        }
+      }
     };
 
-    return this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
+    await this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
   }
 }
 
@@ -251,25 +275,29 @@ export class ATagReferenceProcessor extends BatchProcessor {
   }
 
   async onBatchProcess(items) {
-    // aタグの値を解析してフィルターを作成
-    const filters = items.map(aTagValue => {
+    if (!items?.length) return;
+
+    const filters = [];
+    const validItems = [];
+
+    items.slice(0, this.batchSize).forEach(aTagValue => {
       const parsed = this._parseAtagValue(aTagValue);
-      if (!parsed) return null;
+      if (parsed) {
+        filters.push({
+          kinds: [parsed.kind],
+          authors: [parsed.pubkey],
+          '#d': [parsed.identifier]
+        });
+        validItems.push(aTagValue);
+      } else {
+        this.resolveItem(aTagValue, null);
+      }
+    });
 
-      return {
-        kinds: [parsed.kind],
-        authors: [parsed.pubkey],
-        '#d': [parsed.identifier]
-      };
-    }).filter(Boolean);
-
-    if (filters.length === 0) {
-      items.forEach(item => this.resolveItem(item, null));
-      return;
-    }
+    if (filters.length === 0) return;
 
     const eventHandler = (event, processedItems) => {
-      const aTagValue = items.find(item => {
+      const aTagValue = validItems.find(item => {
         const parsed = this._parseAtagValue(item);
         return parsed && 
                event.kind === parsed.kind && 
@@ -278,12 +306,16 @@ export class ATagReferenceProcessor extends BatchProcessor {
       });
 
       if (aTagValue) {
-        this.resolveItem(aTagValue, event);
-        processedItems.add(aTagValue);
+        const cachedEvent = this.getCachedItem(aTagValue);
+        if (!cachedEvent || event.created_at > cachedEvent.created_at) {
+          this.setCachedItem(aTagValue, event);
+          this.resolveItem(aTagValue, event);
+          processedItems.add(aTagValue);
+        }
       }
     };
 
-    return this._createSubscriptionPromise(items, this.relayUrls, filters, eventHandler);
+    await this._createSubscriptionPromise(validItems, this.relayUrls, filters, eventHandler);
   }
 }
 
