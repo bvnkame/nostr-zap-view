@@ -282,17 +282,70 @@ class ZapInfoCache extends BaseCache {
   }
 }
 
-class ImageCache extends BaseCache {
+class ImageCache extends ProfileCache {
   setImage(url, img) {
-    this.set(url, img);
+    if (!url || !img) return;
+    this.set(url, {
+      image: img,
+      timestamp: Date.now()
+    });
   }
 
   getImage(url) {
-    return this.get(url);
+    const cached = this.get(url);
+    return cached?.image;
   }
 
   hasImage(url) {
     return this.has(url);
+  }
+
+  clearExpired(maxAge = 3600000) { // 1時間
+    const now = Date.now();
+    for (const [url, data] of this.cache.entries()) {
+      if (now - data.timestamp > maxAge) {
+        this.delete(url);
+      }
+    }
+  }
+}
+
+class Nip05Cache extends ProfileCache {
+  #pendingVerifications = new Map();
+
+  setNip05(pubkey, value) {
+    if (!pubkey) return;
+    this.set(pubkey, {
+      value,
+      timestamp: Date.now(),
+      verified: true
+    });
+  }
+
+  getNip05(pubkey) {
+    const cached = this.get(pubkey);
+    return cached?.value;
+  }
+
+  setPendingVerification(pubkey, promise) {
+    this.#pendingVerifications.set(pubkey, promise);
+  }
+
+  getPendingVerification(pubkey) {
+    return this.#pendingVerifications.get(pubkey);
+  }
+
+  deletePendingVerification(pubkey) {
+    this.#pendingVerifications.delete(pubkey);
+  }
+
+  clearPendingVerifications() {
+    this.#pendingVerifications.clear();
+  }
+
+  clear() {
+    super.clear();
+    this.clearPendingVerifications();
   }
 }
 
@@ -312,9 +365,9 @@ export class CacheManager {
     this.decodedCache = new DecodedCache(); // 追加
     this.loadStateCache = new LoadStateCache(); // 追加
     this.zapInfoCache = new ZapInfoCache(); // 追加
-    this.imageCache = new ImageCache(); // 追加
-    this.nip05Cache = new BaseCache(); // Add this line
-    this.nip05PendingCache = new BaseCache(); // Add this line
+    this.imageCache = new ImageCache(); // 更新
+    this.nip05Cache = new Nip05Cache(); // 更新
+    this.nip05PendingCache = new BaseCache(); // 追加：NIP-05保留中フェッチ用キャッシュ
 
     // 汎用キャッシュの初期化
     const CACHE_NAMES = [
@@ -410,26 +463,25 @@ export class CacheManager {
   getImageCache(url) { return this.imageCache.getImage(url); }
   hasImageCache(url) { return this.imageCache.hasImage(url); }
 
-  // Add these new methods
+  // NIP-05関連のメソッドを更新
   setNip05(pubkey, value) {
-    this.nip05Cache.set(pubkey, value);
+    return this.nip05Cache.setNip05(pubkey, value);
   }
 
   getNip05(pubkey) {
-    return this.nip05Cache.get(pubkey);
+    return this.nip05Cache.getNip05(pubkey);
   }
 
-  // Add these NIP-05 pending fetch methods
   setNip05PendingFetch(pubkey, promise) {
-    this.nip05PendingCache.set(pubkey, promise);
+    this.nip05Cache.setPendingVerification(pubkey, promise);
   }
 
   getNip05PendingFetch(pubkey) {
-    return this.nip05PendingCache.get(pubkey);
+    return this.nip05Cache.getPendingVerification(pubkey);
   }
 
   deleteNip05PendingFetch(pubkey) {
-    this.nip05PendingCache.delete(pubkey);
+    this.nip05Cache.deletePendingVerification(pubkey);
   }
 
   // View状態管理の委譲メソッド（統合版）
@@ -479,7 +531,7 @@ export class CacheManager {
     this.zapInfoCache.clear();
     this.imageCache.clear();
     this.nip05Cache.clear(); // Add this line
-    this.nip05PendingCache.clear(); // Add this line
+    this.nip05Cache.clearPendingVerifications(); // Add this line
     Object.values(this.#caches).forEach(cache => cache.clear());
     this.viewStats.clear();
     this.viewStates.clear();
