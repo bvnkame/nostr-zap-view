@@ -212,33 +212,31 @@ export class EventPool {
         filter: decoded.req
       });
 
+      // サブスクリプション開始時刻を記録
+      const subscriptionStartTime = Math.floor(Date.now() / 1000);
+
+      const wrappedHandlers = {
+        ...handlers,
+        onevent: (event) => {
+          // イベント作成時刻がサブスクリプション開始時刻以降ならリアルタイム
+          event.isRealTimeEvent = event.created_at >= subscriptionStartTime;
+          handlers.onevent(event);
+        },
+        oneose: () => {
+          handlers.oneose();
+        }
+      };
+
       this.#subscriptions.get(viewId).zap = this.#zapPool.subscribeMany(
         config.relayUrls,
         [decoded.req],
-        {
-          ...handlers,
-          oneose: () => {
-            handlers.oneose();
-          },
-        }
+        wrappedHandlers
       );
     } catch (error) {
       console.error("Subscription creation failed:", error);
       throw error;
     }
   }
-
-
-  async #processReference(relayUrls, value, processor) {
-    try {
-      processor.setRelayUrls(relayUrls);
-      return await processor.getOrCreateFetchPromise(value);
-    } catch (error) {
-      this.#handleError("Reference processing error", error);
-      return null;
-    }
-  }
-
 
   #handleError(message, error) {
     console.error(message + ":", error);

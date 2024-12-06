@@ -344,6 +344,12 @@ class ZapSubscriptionManager {
         }
       });
 
+      // リアルタイムZapイベントの場合のみ統計情報を更新、設定を渡す
+      if (event.isRealTimeEvent) {
+        const config = this.getViewConfig(viewId);
+        statsManager.handleZapEvent(event, viewId, config?.identifier);
+      }
+
       if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
         if (this.zapListUI) {
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
@@ -362,9 +368,10 @@ class ZapSubscriptionManager {
     events.sort((a, b) => b.created_at - a.created_at);
     events.forEach(event => cacheManager.addZapEvent(viewId, event));
 
+    // リアルタイムイベントでない場合は統計処理をスキップ
     await Promise.all([
-      profilePool.processEventProfiles(events),
-      ...events.map(event => statsManager.handleZapEvent(event, viewId))
+      profilePool.processEventProfiles(events)
+      // statsManager.handleZapEventの呼び出しを削除
     ]);
 
     await this._updateUI(events, viewId);

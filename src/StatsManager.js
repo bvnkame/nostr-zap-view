@@ -123,48 +123,48 @@ export class StatsManager {
     return this.#currentStats.get(viewId);
   }
 
-  async handleZapEvent(event, viewId) {
-    console.debug("StatsManager: Processing Zap event:", {
-      eventId: event.id,
-      viewId,
-      isRealTime: event.isRealTimeEvent,
-      timestamp: event.created_at
-    });
+  async handleZapEvent(event, viewId, identifier) {
+    // リアルタイムイベントでない場合は早期リターン
+    if (!event?.isRealTimeEvent) {
+      return;
+    }
 
     try {
-      const currentStats = cacheManager.getViewStats(viewId);
       const amountMsats = this.extractAmountFromBolt11(
         event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
       );
 
       if (amountMsats <= 0) return;
 
-      if (event.isRealTimeEvent) {
-        const newStats = currentStats?.error ? {
-          count: 0,
-          msats: 0,
-          maxMsats: 0
-        } : currentStats || await this.getZapStats(
-          cacheManager.getViewIdentifier(viewId),
-          viewId
-        ) || {
-          count: 0,
-          msats: 0,
-          maxMsats: 0
-        };
+      // キャッシュされた統計情報を取得
+      const currentStats = cacheManager.getViewStats(viewId);
+      
+      // 現在の統計情報がない場合は初期値を使用
+      const baseStats = {
+        count: currentStats?.count || 0,
+        msats: currentStats?.msats || 0,
+        maxMsats: currentStats?.maxMsats || 0
+      };
 
-        const updatedStats = {
-          count: newStats.count + 1,
-          msats: newStats.msats + amountMsats,
-          maxMsats: Math.max(newStats.maxMsats, amountMsats)
-        };
+      // 新しい統計情報を計算
+      const updatedStats = {
+        count: baseStats.count + 1,
+        msats: baseStats.msats + amountMsats,
+        maxMsats: Math.max(baseStats.maxMsats, amountMsats)
+      };
 
-        cacheManager.updateStatsCache(viewId, cacheManager.getViewIdentifier(viewId), updatedStats);
-        this.displayStats(updatedStats, viewId);
+      // キャッシュを更新
+      if (identifier) {
+        cacheManager.updateStatsCache(viewId, identifier, updatedStats);
       }
+      
+      // UIを更新
+      this.displayStats(updatedStats, viewId);
 
+      // イベントにメタデータを追加
       event.isStatsCalculated = true;
       event.amountMsats = amountMsats;
+
     } catch (error) {
       console.error("Failed to handle zap event stats:", error);
     }
