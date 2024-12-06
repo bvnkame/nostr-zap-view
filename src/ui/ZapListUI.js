@@ -1,6 +1,5 @@
 import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
-import { createNoZapsMessage } from "../utils.js";
 import { DIALOG_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
@@ -152,31 +151,29 @@ export class ZapListUI {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
-    const delay = this.config.noZapsDelay || 3000;
-    await this.#delayAndCheckCache(delay);
+    // キャッシュを遅延チェック
+    const hasZaps = await this.#checkCacheWithDelay();
+    if (hasZaps) return;
 
-    // キャッシュを再確認
-    const zapEvents = cacheManager.getZapEvents(this.viewId);
-    if (zapEvents?.length) {
-      await this.renderZapListFromCache(zapEvents);
-      return;
-    }
-
-    // カスタマイズ可能なNoZapsメッセージを表示
+    // NoZapsメッセージを表示
     this.#displayNoZapsMessage(list);
   }
 
-  async #delayAndCheckCache(delay) {
+  async #checkCacheWithDelay() {
+    const delay = this.config.noZapsDelay || DIALOG_CONFIG.DEFAULT_NO_ZAPS_DELAY;
     await new Promise(resolve => setTimeout(resolve, delay));
+
+    const zapEvents = cacheManager.getZapEvents(this.viewId);
+    if (zapEvents?.length) {
+      await this.renderZapListFromCache(zapEvents);
+      return true;
+    }
+    return false;
   }
 
   #displayNoZapsMessage(list) {
-    const customMessage = this.config.noZapsMessage || DIALOG_CONFIG.NO_ZAPS_MESSAGE;
-    list.innerHTML = `
-      <div class="no-zaps-container">
-        ${createNoZapsMessage({ NO_ZAPS_MESSAGE: customMessage })}
-      </div>
-    `;
+    const message = this.config.noZapsMessage || DIALOG_CONFIG.NO_ZAPS_MESSAGE;
+    list.innerHTML = DialogComponents.createNoZapsMessageHTML(message);
     list.style.minHeight = '100px';
   }
 

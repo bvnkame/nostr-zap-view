@@ -225,4 +225,12 @@ export class DialogComponents {
       </div>
     `;
   }
+
+  static createNoZapsMessageHTML(message) {
+    return `
+      <div class="no-zaps-container">
+        <div class="no-zaps-message">${message}</div>
+      </div>
+    `;
+  }
 }

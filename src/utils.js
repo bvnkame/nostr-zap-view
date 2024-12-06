@@ -434,11 +434,6 @@ function safeNip19Decode(identifier) {
   }
 }
 
-// Define createNoZapsMessage
-function createNoZapsMessage(config) {
-  return `<div class="no-zaps-message">${config.NO_ZAPS_MESSAGE}</div>`;
-}
-
 // --- Remove 'export' from individual function declarations ---
 
 // Consolidate all exports into a single export statement to remove duplicates
@@ -469,7 +464,6 @@ export {
   safeNip19Decode,
 
   // Standalone functions
-  createNoZapsMessage,
   isWithin24Hours,
   decodeIdentifier,
   getProfileDisplayName,

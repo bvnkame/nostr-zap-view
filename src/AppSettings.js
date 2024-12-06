@@ -51,6 +51,7 @@ export const ZAP_AMOUNT_CONFIG = {
 export const DIALOG_CONFIG = {
   DEFAULT_TITLE: "To ",
   NO_ZAPS_MESSAGE: "No Zaps yet!<br>Send the first Zap!",
+  DEFAULT_NO_ZAPS_DELAY: 1500,
 };
 
 // Timeout settings for metadata requests
