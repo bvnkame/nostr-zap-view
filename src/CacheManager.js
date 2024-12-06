@@ -178,31 +178,37 @@ class ReferenceCache extends BaseCache {
   }
 }
 
-class ViewStatsCache extends BaseCache {
-  constructor() {
-    super();
-    this.viewCache = new Map();
-  }
+class StatsCache extends BaseCache {
+  #viewStats = new Map();
 
-  getCachedStats(viewId, identifier) {
-    if (!this.viewCache.has(viewId)) {
-      this.viewCache.set(viewId, new Map());
-    }
-    return this.viewCache.get(viewId).get(identifier);
-  }
-
-  updateStatsCache(viewId, identifier, stats) {
-    if (!this.viewCache.has(viewId)) {
-      this.viewCache.set(viewId, new Map());
-    }
-    this.viewCache.get(viewId).set(identifier, { 
-      stats, 
-      timestamp: Date.now() 
+  setCached(viewId, identifier, stats) {
+    const key = `${viewId}:${identifier}`;
+    this.set(key, {
+      stats,
+      timestamp: Date.now()
     });
   }
 
-  clearStats(viewId) {
-    this.viewCache.delete(viewId);
+  getCached(viewId, identifier) {
+    const key = `${viewId}:${identifier}`;
+    return this.get(key);
+  }
+
+  updateViewStats(viewId, stats) {
+    this.#viewStats.set(viewId, stats);
+  }
+
+  getViewStats(viewId) {
+    return this.#viewStats.get(viewId);
+  }
+
+  clearViewStats(viewId) {
+    this.#viewStats.delete(viewId);
+  }
+
+  clear() {
+    super.clear();
+    this.#viewStats.clear();
   }
 }
 
@@ -302,7 +308,7 @@ export class CacheManager {
     this.profileCache = new ProfileCache();
     this.zapEventCache = new ZapEventCache();
     this.referenceCache = new ReferenceCache();
-    this.statsCache = new ViewStatsCache();
+    this.statsCache = new StatsCache(); // ViewStatsCacheをStatsCacheに置き換え
     this.decodedCache = new DecodedCache(); // 追加
     this.loadStateCache = new LoadStateCache(); // 追加
     this.zapInfoCache = new ZapInfoCache(); // 追加
@@ -347,13 +353,18 @@ export class CacheManager {
   getReferenceComponent(eventId) { return this.referenceCache.getComponent(eventId); }
   setReferenceComponent(eventId, html) { return this.referenceCache.setComponent(eventId, html); }
 
-  // Stats関連のメソッドを追加
+  // Stats関連のメソッドを更新
   getCachedStats(viewId, identifier) {
-    return this.statsCache.getCachedStats(viewId, identifier);
+    return this.statsCache.getCached(viewId, identifier);
   }
 
   updateStatsCache(viewId, identifier, stats) {
-    return this.statsCache.updateStatsCache(viewId, identifier, stats);
+    this.statsCache.setCached(viewId, identifier, stats);
+    this.statsCache.updateViewStats(viewId, stats);
+  }
+
+  getViewStats(viewId) {
+    return this.statsCache.getViewStats(viewId);
   }
 
   // キャッシュデータ処理メソッドを追加
