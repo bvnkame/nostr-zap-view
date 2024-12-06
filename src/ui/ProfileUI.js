@@ -53,7 +53,13 @@ export class ProfileUI {
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
     if (skeleton && iconContainer) {
       const updateIcon = (src) => {
+        // 既存の画像要素とリンクを削除
         skeleton.remove();
+        const existingImage = iconContainer.querySelector('img');
+        const existingLink = iconContainer.querySelector('a');
+        if (existingImage) existingImage.remove();
+        if (existingLink) existingLink.remove();
+
         const img = Object.assign(document.createElement("img"), {
           src,
           alt: `${escapeHTML(senderName)}'s icon`,
