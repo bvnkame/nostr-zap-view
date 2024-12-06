@@ -58,30 +58,6 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  async #initialize() {
-    if (!this.viewId) {
-      console.error("Cannot initialize dialog without viewId");
-      return;
-    }
-
-    const config = subscriptionManager.getViewConfig(this.viewId);
-    if (!config) {
-      throw new Error("Config is required for initialization");
-    }
-
-    // 基本UIの初期化を同期的に実行
-    await this.#initializeBasicDOM();
-    this.#state.isBasicInitialized = true;
-
-    // フルUIの初期化を実行
-    await this.#initializeFullUI(config);
-    this.#state.isInitialized = true;
-
-    const identifier = this.getAttribute("data-nzv-id");
-    if (identifier) {
-      await this.#initializeStats(identifier);
-    }
-  }
 
   async #initializeBasicDOM() {
     return new Promise(resolve => {
@@ -132,11 +108,6 @@ class NostrZapViewDialog extends HTMLElement {
     }
   }
 
-  #getConfig() {
-    if (!this.viewId) return null;
-    const config = subscriptionManager.getViewConfig(this.viewId);
-    return config;
-  }
 
   static get observedAttributes() {
     return ["data-theme"];
