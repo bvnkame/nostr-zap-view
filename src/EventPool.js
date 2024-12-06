@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools/pool";
-import { BATCH_CONFIG } from "./AppSettings.js";
+import { BATCH_CONFIG, REQUEST_CONFIG } from "./AppSettings.js";
 import {
   ETagReferenceProcessor,
   ATagReferenceProcessor,

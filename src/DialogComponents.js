@@ -155,25 +155,31 @@ export class DialogComponents {
   }
 
   static #getReferenceContent(reference) {
-    if (!reference?.tags || !reference?.content) return '';
+    if (!reference) return '';
 
     const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
-    if (!tagKey) return reference.content;
+    console.log('tagKey:', tagKey);
+    console.log('reference:', reference);
 
+    if (tagKey) {
+      const tag = reference.tags.find(t => Array.isArray(t) && t[0] === tagKey);
+      if (tag && tag[1]) {
+        return tag[1];
+      }
+    }
+
+    // kind 40 の特別な処理
     if (reference.kind === 40) {
       try {
         const contentObj = JSON.parse(reference.content);
         return contentObj.name || reference.content;
       } catch {
-        return reference.content;
+        // JSON パースに失敗した場合はそのまま content を返す
       }
     }
 
-    if (tagKey === 'content') return reference.content;
-
-    const tag = Array.isArray(reference.tags) ?
-      reference.tags.find(t => Array.isArray(t) && t[0] === tagKey) : null;
-    return tag?.[1] || reference.content;
+    // タグから取得できなかった場合、content を返す
+    return reference.content || '';
   }
 
   static #buildReferenceHTML(url, content) {
