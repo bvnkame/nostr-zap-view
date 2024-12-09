@@ -108,7 +108,6 @@ class ZapSubscriptionManager {
   // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
     try {
-      console.debug("Initializing subscription:", { config, viewId });
 
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
@@ -120,8 +119,6 @@ class ZapSubscriptionManager {
         console.warn("Failed to decode identifier:", config.identifier);
         throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
       }
-
-      console.debug("Decoded identifier:", decoded);
 
       this._initializeLoadState(viewId);
       
@@ -148,10 +145,8 @@ class ZapSubscriptionManager {
     if (cachedEvents.length === 0) {
       if (this.zapListUI) {
         await this.zapListUI.showNoZapsMessage();
-        console.debug("No cached events found:", { viewId });
       }
     } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-      console.debug("Cached events found:", { count: cachedEvents.length, viewId });
       this.setupInfiniteScroll(viewId);
     }
   }
@@ -209,19 +204,10 @@ class ZapSubscriptionManager {
   }
 
   async _handleIntersection(entry, viewId) {
-    console.debug('Intersection detected:', { 
-      isIntersecting: entry.isIntersecting, 
-      viewId 
-    });
 
     if (!entry.isIntersecting) return;
 
     const state = cacheManager.getLoadState(viewId);
-    console.debug('Load state:', { 
-      isLoading: state.isLoading, 
-      lastEventTime: state.lastEventTime, 
-      viewId 
-    });
 
     if (state.isLoading) {
       console.debug('Already loading, will retry later:', { viewId });
@@ -235,7 +221,6 @@ class ZapSubscriptionManager {
     }
 
     this.loadMoreZaps(viewId).then(count => {
-      console.debug('Load more completed:', { count, viewId });
       if (count === 0) {
         console.debug('No more zaps to load, cleaning up:', { viewId });
         this._cleanupInfiniteScroll(viewId);
@@ -266,13 +251,6 @@ class ZapSubscriptionManager {
     const state = cacheManager.getLoadState(viewId);
     const config = this.getViewConfig(viewId);
 
-    console.debug('Loading more zaps:', { 
-      viewId, 
-      lastEventTime: state.lastEventTime,
-      isLoading: state.isLoading,
-      hasConfig: !!config 
-    });
-
     if (!this._canLoadMore(state, config)) {
       console.warn('Cannot load more:', { 
         state: { 
@@ -287,7 +265,6 @@ class ZapSubscriptionManager {
     state.isLoading = true;
     try {
       const loadedCount = await this._executeLoadMore(viewId, state, config);
-      console.debug('Loaded more zaps:', { loadedCount, viewId });
       
       if (loadedCount > 0) {
         const events = cacheManager.getZapEvents(viewId).slice(-loadedCount);
@@ -310,12 +287,6 @@ class ZapSubscriptionManager {
       return 0;
     }
 
-    console.debug('Executing load more:', { 
-      viewId, 
-      lastEventTime: state.lastEventTime,
-      decodedIdentifier: decoded 
-    });
-
     const batchEvents = [];
     const loadTimeout = setTimeout(() => {
       console.warn('Load timeout reached:', { 
@@ -329,10 +300,6 @@ class ZapSubscriptionManager {
 
     try {
       await this._collectEvents(viewId, config, decoded, batchEvents, APP_CONFIG.ADDITIONAL_LOAD_COUNT, state);
-      console.debug('Collected events:', { 
-        count: batchEvents.length, 
-        viewId 
-      });
 
       if (batchEvents.length > 0) {
         await this._processBatchEvents(batchEvents, viewId);
@@ -465,12 +432,6 @@ class ZapSubscriptionManager {
 
   _canLoadMore(state, config) {
     const canLoad = config && !state.isLoading && state.lastEventTime;
-    console.debug('Can load more check:', { 
-      hasConfig: !!config, 
-      isLoading: state?.isLoading, 
-      lastEventTime: state?.lastEventTime,
-      canLoad 
-    });
     return canLoad;
   }
 }
