@@ -6,32 +6,29 @@ export class StatusUI {
   }
 
   displayStats(stats) {
-    console.time('[StatusUI] Total stats display');
-    const statsDiv = this.root.querySelector(".zap-stats");
+    const statsDiv = this.root?.querySelector(".zap-stats");
     if (!statsDiv) {
-      console.timeEnd('[StatusUI] Total stats display');
+      console.warn('[StatusUI] Stats container not found');
       return;
     }
 
-    // スケルトン表示の場合
-    if (stats?.skeleton) {
-      console.debug('[StatusUI] Showing skeleton');
-      statsDiv.innerHTML = this.#createSkeletonStats();
-      console.timeEnd('[StatusUI] Total stats display');
-      return;
+    try {
+      let html;
+      if (!stats) {
+        html = this.createTimeoutStats();
+      } else if (stats.skeleton) {
+        html = this.#createSkeletonStats();
+      } else if (stats.error) {
+        html = this.createTimeoutStats();
+      } else {
+        html = this.createNormalStats(stats);
+      }
+
+      statsDiv.innerHTML = html;
+    } catch (error) {
+      console.error('[StatusUI] Error displaying stats:', error);
+      statsDiv.innerHTML = this.createTimeoutStats();
     }
-
-    console.time('[StatusUI] HTML generation');
-    const isTimeout = !stats || stats.error;
-    const html = isTimeout
-      ? this.createTimeoutStats()
-      : this.createNormalStats(stats);
-    console.timeEnd('[StatusUI] HTML generation');
-
-    console.time('[StatusUI] DOM update');
-    statsDiv.innerHTML = html;
-    console.timeEnd('[StatusUI] DOM update');
-    console.timeEnd('[StatusUI] Total stats display');
   }
 
   #createSkeletonStats() {
