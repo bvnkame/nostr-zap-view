@@ -224,7 +224,13 @@ class ZapSubscriptionManager {
     });
 
     if (state.isLoading) {
-      console.debug('Already loading, skipping:', { viewId });
+      console.debug('Already loading, will retry later:', { viewId });
+      // ロード中の場合は1秒後に再試行
+      setTimeout(() => {
+        if (entry.isIntersecting) {
+          this._handleIntersection(entry, viewId);
+        }
+      }, 1000);
       return;
     }
 
