@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools/pool";
-import { BATCH_CONFIG, REQUEST_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import {
   ETagReferenceProcessor,
   ATagReferenceProcessor,
@@ -34,8 +34,8 @@ export class EventPool {
   #initializeProcessors() {
     const processorConfig = {
       pool: this.#zapPool,
-      batchSize: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
-      batchDelay: BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
+      batchSize: APP_CONFIG.BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
+      batchDelay: APP_CONFIG.BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
     };
     this.#etagProcessor = new ETagReferenceProcessor(processorConfig);
     this.#aTagProcessor = new ATagReferenceProcessor(processorConfig);

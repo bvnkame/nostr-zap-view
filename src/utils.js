@@ -1,4 +1,4 @@
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import { cacheManager } from "./CacheManager.js";
 
 // Core constants
@@ -230,7 +230,7 @@ function decodeIdentifier(identifier, since = null) {
   const cacheKey = `${identifier}:${since}`;
   if (cacheManager.hasDecoded(cacheKey)) return cacheManager.getDecoded(cacheKey);
   
-  if (!Validator.isValidIdentifier(identifier)) throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+  if (!Validator.isValidIdentifier(identifier)) throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
   
   const decoded = Decoder.safeNip19Decode(identifier);
   if (!decoded) return null;

@@ -1,5 +1,5 @@
 import { getProfileDisplayName, verifyNip05, escapeHTML } from "./utils.js";
-import { PROFILE_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import { ProfileProcessor } from "./BatchProcessor.js";
 import { cacheManager } from "./CacheManager.js";
 import { SimplePool } from "nostr-tools/pool";
@@ -28,7 +28,7 @@ export class ProfilePool {
   }
 
   #initializePool() {
-    this.#config = PROFILE_CONFIG;
+    this.#config = APP_CONFIG.PROFILE_CONFIG;
     this.#simplePool = new SimplePool();
 
     if (!this.#simplePool?.ensureRelay) {

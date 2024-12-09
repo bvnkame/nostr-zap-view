@@ -1,5 +1,5 @@
 import { decodeIdentifier, isEventIdentifier } from "./utils.js";
-import { ZAP_CONFIG as CONFIG, APP_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import { statsManager } from "./StatsManager.js";
 import { eventPool } from "./EventPool.js";
 import { cacheManager } from "./CacheManager.js";
@@ -118,7 +118,7 @@ class ZapSubscriptionManager {
       const decoded = decodeIdentifier(config.identifier);
       if (!decoded) {
         console.warn("Failed to decode identifier:", config.identifier);
-        throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+        throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
       }
 
       console.debug("Decoded identifier:", decoded);
@@ -225,12 +225,12 @@ class ZapSubscriptionManager {
 
     if (state.isLoading) {
       console.debug('Already loading, will retry later:', { viewId });
-      // ロード中の場合は1秒後に再試行
+      // ロード中の場合は設定値に基づいて再試行
       setTimeout(() => {
         if (entry.isIntersecting) {
           this._handleIntersection(entry, viewId);
         }
-      }, 1000);
+      }, APP_CONFIG.INFINITE_SCROLL.RETRY_DELAY); // 以前は1000ms
       return;
     }
 
@@ -460,7 +460,7 @@ class ZapSubscriptionManager {
             .catch(console.error);
         }
       }
-    }, 500);
+    }, APP_CONFIG.BUFFER_INTERVAL); // 以前は500ms
   }
 
   _canLoadMore(state, config) {

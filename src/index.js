@@ -1,6 +1,5 @@
 import { 
   APP_CONFIG, 
-  ZAP_CONFIG, 
   ViewerConfig 
 } from "./AppSettings.js";
 import {
@@ -66,7 +65,7 @@ async function handleButtonClick(button, viewId) {
     const dialog = await createDialog(viewId, config);
     
     if (!dialog) {
-      throw new Error(ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
+      throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
     }
 
     await showDialog(viewId);
@@ -104,7 +103,7 @@ function initializeApp() {
     button.setAttribute("data-zap-view-id", viewId);
 
     if (!button.hasAttribute("data-zap-color-mode")) {
-      button.setAttribute("data-zap-color-mode", ZAP_CONFIG.DEFAULT_COLOR_MODE.toString());
+      button.setAttribute("data-zap-color-mode", APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE.toString());
     }
 
     button.addEventListener("click", () => handleButtonClick(button, viewId));
@@ -113,4 +112,4 @@ function initializeApp() {
 
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-export { ZAP_CONFIG as CONFIG, profilePool, eventPool, APP_CONFIG };
+export { profilePool, eventPool, APP_CONFIG };

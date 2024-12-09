@@ -1,6 +1,6 @@
 import { ZapInfo } from "../ZapInfo.js";
 import { DialogComponents } from "../DialogComponents.js";
-import { DIALOG_CONFIG } from "../AppSettings.js";
+import { APP_CONFIG } from "../AppSettings.js";
 import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
@@ -160,7 +160,7 @@ export class ZapListUI {
   }
 
   async #checkCacheWithDelay() {
-    const delay = this.config.noZapsDelay || DIALOG_CONFIG.DEFAULT_NO_ZAPS_DELAY;
+    const delay = this.config.noZapsDelay || APP_CONFIG.DIALOG_CONFIG.DEFAULT_NO_ZAPS_DELAY;
     await new Promise(resolve => setTimeout(resolve, delay));
 
     const zapEvents = cacheManager.getZapEvents(this.viewId);
@@ -172,7 +172,7 @@ export class ZapListUI {
   }
 
   #displayNoZapsMessage(list) {
-    const message = this.config.noZapsMessage || DIALOG_CONFIG.NO_ZAPS_MESSAGE;
+    const message = this.config.noZapsMessage || APP_CONFIG.DIALOG_CONFIG.NO_ZAPS_MESSAGE;
     list.innerHTML = DialogComponents.createNoZapsMessageHTML(message);
     list.style.minHeight = '100px';
   }

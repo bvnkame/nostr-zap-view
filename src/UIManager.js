@@ -2,7 +2,7 @@ import { StatusUI } from "./ui/StatusUI.js";
 import { ProfileUI } from "./ui/ProfileUI.js";
 import { ZapListUI } from "./ui/ZapListUI.js";
 import { DialogComponents } from "./DialogComponents.js";
-import { APP_CONFIG, DIALOG_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
 import { formatIdentifier } from "./utils.js";  // isValidCountを削除
 import { cacheManager } from "./CacheManager.js";
@@ -195,7 +195,7 @@ class NostrZapViewDialog extends HTMLElement {
       title.textContent = customTitle;
       titleContainer.classList.add("custom-title");
     } else {
-      title.textContent = DIALOG_CONFIG.DEFAULT_TITLE + formatIdentifier(identifier);
+      title.textContent = APP_CONFIG.DIALOG_CONFIG.DEFAULT_TITLE + formatIdentifier(identifier);
       titleContainer.classList.remove("custom-title");
     }
   }

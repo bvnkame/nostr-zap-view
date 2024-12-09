@@ -1,6 +1,6 @@
 import { formatIdentifier, parseZapEvent, encodeNpub, createDefaultZapInfo } from "./utils.js";
 import { cacheManager } from "./CacheManager.js";
-import { ZAP_AMOUNT_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 
 export class ZapInfo {
   constructor(event, defaultIcon) {
@@ -16,16 +16,16 @@ export class ZapInfo {
   static getAmountColorClass(amount, isColorModeEnabled) {
     // 明示的にbooleanに変換
     const colorMode = isColorModeEnabled === undefined ? 
-      ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+    APP_CONFIG.ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
       !!isColorModeEnabled;
 
 
-    if (!colorMode) return ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
+    if (!colorMode) return APP_CONFIG.ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
     return this.#calculateAmountColorClass(amount);
   }
 
   static #calculateAmountColorClass(amount) {
-    const { THRESHOLDS, DEFAULT_CLASS } = ZAP_AMOUNT_CONFIG;
+    const { THRESHOLDS, DEFAULT_CLASS } = APP_CONFIG.ZAP_AMOUNT_CONFIG;
     return THRESHOLDS.find(t => amount >= t.value)?.className || DEFAULT_CLASS;
   }
 

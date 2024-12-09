@@ -1,4 +1,4 @@
-import { API_CONFIG } from "./AppSettings.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import { displayZapStats } from "./UIManager.js";
 import { safeNip19Decode } from "./utils.js";
 import { cacheManager } from "./CacheManager.js"; // Add import
@@ -58,7 +58,7 @@ export class StatsManager {
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      API_CONFIG.REQUEST_TIMEOUT
+      APP_CONFIG.REQUEST_CONFIG.REQUEST_TIMEOUT
     );
 
     try {
@@ -124,7 +124,7 @@ export class StatsManager {
     const cached = cacheManager.getCachedStats(viewId, identifier);
     const now = Date.now();
 
-    if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
+    if (cached && now - cached.timestamp < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION) {
       return cached.stats;
     }
 
