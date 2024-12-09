@@ -1,4 +1,4 @@
-import { StatusUI } from "./ui/StatsUI.js";
+import { statsUI } from "./ui/StatsUI.js";
 import { ProfileUI } from "./ui/ProfileUI.js";
 import { ZapListUI } from "./ui/ZapListUI.js";
 import { DialogComponents } from "./DialogComponents.js";
@@ -49,7 +49,7 @@ class NostrZapViewDialog extends HTMLElement {
       if (identifier) {
         const stats = await statsManager.getCurrentStats(this.viewId);
         if (stats) {
-          this.statusUI.displayStats(stats);
+          this.statsUI.displayStats(stats);
         }
       }
       
@@ -84,7 +84,7 @@ class NostrZapViewDialog extends HTMLElement {
     this.shadowRoot.appendChild(styleSheet);
 
     // UIコンポーネントの初期化
-    this.statusUI = new StatusUI(this.shadowRoot);
+    this.statsUI = new statsUI(this.shadowRoot);
     this.profileUI = new ProfileUI();
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
     subscriptionManager.setZapListUI(this.zapListUI);
@@ -166,7 +166,7 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   displayZapStats(stats) {
-    this.statusUI.displayStats(stats);
+    this.statsUI.displayStats(stats);
   }
 
   // ... その他の必要なメソッド ...
@@ -219,7 +219,7 @@ class NostrZapViewDialog extends HTMLElement {
         replacePlaceholderWithZap: (event, index) => this.zapListUI?.replacePlaceholder(event, index),
         renderZapListFromCache: (cache) => this.zapListUI?.renderZapListFromCache(cache),
         prependZap: (event) => this.zapListUI?.prependZap(event),
-        displayZapStats: (stats) => this.statusUI?.displayStats(stats),
+        displayZapStats: (stats) => this.statsUI?.displayStats(stats),
         showNoZapsMessage: () => this.zapListUI?.showNoZapsMessage()
       });
     }

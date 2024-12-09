@@ -1,6 +1,6 @@
 import { formatNumber } from "../utils.js";
 
-export class StatusUI {
+export class statsUI {
   constructor(rootElement) {
     this.root = rootElement;
   }
@@ -8,7 +8,7 @@ export class StatusUI {
   displayStats(stats) {
     const statsDiv = this.root?.querySelector(".zap-stats");
     if (!statsDiv) {
-      console.warn('[StatusUI] Stats container not found');
+      console.warn('[statsUI] Stats container not found');
       return;
     }
 
@@ -26,7 +26,7 @@ export class StatusUI {
 
       statsDiv.innerHTML = html;
     } catch (error) {
-      console.error('[StatusUI] Error displaying stats:', error);
+      console.error('[statsUI] Error displaying stats:', error);
       statsDiv.innerHTML = this.createTimeoutStats();
     }
   }
@@ -60,7 +60,7 @@ export class StatusUI {
   }
 
   createNormalStats(stats) {
-    console.debug('[StatusUI] Creating normal stats:', stats);
+    console.debug('[statsUI] Creating normal stats:', stats);
     return `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number">${formatNumber(
