@@ -34,13 +34,6 @@ export class StatusUI {
     console.timeEnd('[StatusUI] Total stats display');
   }
 
-  showNoZaps() {
-    const list = this.root.querySelector(".dialog-zap-list");
-    if (list) {
-      list.innerHTML = this.#createNoZapsMessage();
-    }
-  }
-
   #createSkeletonStats() {
     return `
       <div class="stats-item">Total Count</div>
@@ -87,14 +80,6 @@ export class StatusUI {
         Math.floor(stats.maxMsats / 1000)
       )}</span></div>
       <div class="stats-item">sats</div>
-    `;
-  }
-
-  #createNoZapsMessage() {
-    return `
-      <div class="no-zaps-message">
-        No Zaps yet!<br>Send the first Zap!
-      </div>
     `;
   }
 }
