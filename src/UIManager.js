@@ -1,4 +1,4 @@
-import { StatusUI } from "./ui/StatusUI.js";
+import { StatusUI } from "./ui/StatsUI.js";
 import { ProfileUI } from "./ui/ProfileUI.js";
 import { ZapListUI } from "./ui/ZapListUI.js";
 import { DialogComponents } from "./DialogComponents.js";
