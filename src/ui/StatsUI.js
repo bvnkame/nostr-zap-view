@@ -6,29 +6,31 @@ export class statsUI {
   }
 
   displayStats(stats) {
-    const statsDiv = this.root?.querySelector(".zap-stats");
-    if (!statsDiv) {
-      console.warn('[statsUI] Stats container not found');
-      return;
-    }
-
-    try {
-      let html;
-      if (!stats) {
-        html = this.createTimeoutStats();
-      } else if (stats.skeleton) {
-        html = this.#createSkeletonStats();
-      } else if (stats.error) {
-        html = this.createTimeoutStats();
-      } else {
-        html = this.createNormalStats(stats);
+    requestAnimationFrame(() => {
+      const statsDiv = this.root?.querySelector(".zap-stats");
+      if (!statsDiv) {
+        console.warn('[statsUI] Stats container not found');
+        return;
       }
 
-      statsDiv.innerHTML = html;
-    } catch (error) {
-      console.error('[statsUI] Error displaying stats:', error);
-      statsDiv.innerHTML = this.createTimeoutStats();
-    }
+      try {
+        let html;
+        if (!stats) {
+          html = this.createTimeoutStats();
+        } else if (stats.skeleton) {
+          html = this.#createSkeletonStats();
+        } else if (stats.error) {
+          html = this.createTimeoutStats();
+        } else {
+          html = this.createNormalStats(stats);
+        }
+
+        statsDiv.innerHTML = html;
+      } catch (error) {
+        console.error('[statsUI] Error displaying stats:', error);
+        statsDiv.innerHTML = this.createTimeoutStats();
+      }
+    });
   }
 
   #createSkeletonStats() {

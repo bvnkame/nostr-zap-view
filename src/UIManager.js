@@ -78,24 +78,42 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #initializeFullUI(config) {
+    console.time("initializeFullUI");
+
     // スタイルシートの追加
     const styleSheet = document.createElement("style");
     styleSheet.textContent = styles;
     this.shadowRoot.appendChild(styleSheet);
 
     // UIコンポーネントの初期化
+    console.time("statsUI Initialization");
     this.statsUI = new statsUI(this.shadowRoot);
+    console.timeEnd("statsUI Initialization");
+
+    console.time("profileUI Initialization");
     this.profileUI = new ProfileUI();
+    console.timeEnd("profileUI Initialization");
+
+    console.time("zapListUI Initialization");
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
+    console.timeEnd("zapListUI Initialization");
+
     subscriptionManager.setZapListUI(this.zapListUI);
 
     // UIコンポーネントの初期化の後に
+    console.time("getZapEvents");
     const zapEvents = cacheManager.getZapEvents(this.viewId);
+    console.timeEnd("getZapEvents");
+
     if (!zapEvents?.length) {
       this.zapListUI.showNoZapsMessage();
     } else {
+      console.time("renderZapListFromCache");
       await this.zapListUI.renderZapListFromCache(zapEvents);
+      console.timeEnd("renderZapListFromCache");
     }
+
+    console.timeEnd("initializeFullUI");
   }
 
   static get observedAttributes() {

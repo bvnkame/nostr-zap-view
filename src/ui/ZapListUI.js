@@ -104,21 +104,65 @@ export class ZapListUI {
     }
 
     await this.#updateListContent(async (list) => {
-      const fragment = document.createDocumentFragment();
+      // イベントの前処理を非同期で実行
       const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
-      const profileUpdates = [];
+      const listFragment = document.createDocumentFragment();
+      const profileUpdatesQueue = [];
 
-      for (const event of uniqueEvents) {
+      // 最初のバッチを即座に処理
+      const INITIAL_BATCH = 30;
+      const initialEvents = uniqueEvents.slice(0, INITIAL_BATCH);
+      const remainingEvents = uniqueEvents.slice(INITIAL_BATCH);
+
+      // 最初のバッチを同期的に処理
+      for (const event of initialEvents) {
         const { li, zapInfo } = await this.itemBuilder.createListItem(event);
         this.#handleCachedReference(event.id, li);
-        fragment.appendChild(li);
+        listFragment.appendChild(li);
         if (zapInfo.pubkey) {
-          profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+          profileUpdatesQueue.push({ pubkey: zapInfo.pubkey, element: li });
         }
       }
 
-      this.#updateList(list, fragment);
-      await this.#updateProfiles(profileUpdates);
+      // 最初のバッチをDOMに追加
+      this.#updateList(list, listFragment);
+
+      // 残りのイベントを非同期で処理
+      if (remainingEvents.length > 0) {
+        requestIdleCallback(async () => {
+          const batchSize = 20;
+          for (let i = 0; i < remainingEvents.length; i += batchSize) {
+            const batch = remainingEvents.slice(i, i + batchSize);
+            const batchFragment = document.createDocumentFragment();
+
+            await Promise.all(batch.map(async (event) => {
+              const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+              this.#handleCachedReference(event.id, li);
+              batchFragment.appendChild(li);
+              if (zapInfo.pubkey) {
+                profileUpdatesQueue.push({ pubkey: zapInfo.pubkey, element: li });
+              }
+            }));
+
+            // バッチをDOMに追加
+            const existingTrigger = list.querySelector('.load-more-trigger');
+            if (existingTrigger) {
+              list.insertBefore(batchFragment, existingTrigger);
+            } else {
+              list.appendChild(batchFragment);
+            }
+
+            // UIの更新を待つ
+            await new Promise(resolve => requestAnimationFrame(resolve));
+          }
+
+          // プロフィール更新を開始
+          this.#updateProfiles(profileUpdatesQueue);
+        });
+      } else {
+        // 初期バッチのプロフィール更新を実行
+        this.#updateProfiles(profileUpdatesQueue);
+      }
     });
   }
 
