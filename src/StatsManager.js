@@ -112,7 +112,7 @@ export class StatsManager {
 
     if (showSkeleton) {
       // スケルトン表示を即座に行う
-      await this.displayStats({ skeleton: true }, viewId);
+      this.displayStats({ skeleton: true }, viewId);
     }
 
     if (this.#initializationStatus.has(viewId)) {
