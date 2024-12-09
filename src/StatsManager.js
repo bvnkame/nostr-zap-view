@@ -110,6 +110,11 @@ export class StatsManager {
     console.group(`[Stats] Initializing stats for ${viewId}`);
     console.debug('[Stats] Initialization request:', { identifier, viewId, showSkeleton });
 
+    if (showSkeleton) {
+      // スケルトン表示を即座に行う
+      await this.displayStats({ skeleton: true }, viewId);
+    }
+
     if (this.#initializationStatus.has(viewId)) {
       console.debug('[Stats] Already initializing, returning existing promise');
       console.groupEnd();

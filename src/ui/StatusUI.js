@@ -16,7 +16,7 @@ export class StatusUI {
     // スケルトン表示の場合
     if (stats?.skeleton) {
       console.debug('[StatusUI] Showing skeleton');
-      this.showSkeletonStats(statsDiv);
+      statsDiv.innerHTML = this.#createSkeletonStats();
       console.timeEnd('[StatusUI] Total stats display');
       return;
     }
@@ -41,16 +41,16 @@ export class StatusUI {
     }
   }
 
-  showSkeletonStats(statsDiv) {
-    statsDiv.innerHTML = `
+  #createSkeletonStats() {
+    return `
       <div class="stats-item">Total Count</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item"><span class="number skeleton">...</span></div>
       <div class="stats-item">times</div>
       <div class="stats-item">Total Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item"><span class="number skeleton">...</span></div>
       <div class="stats-item">sats</div>
       <div class="stats-item">Max Amount</div>
-      <div class="stats-item"><span class="number skeleton stats-skeleton"></span></div>
+      <div class="stats-item"><span class="number skeleton">...</span></div>
       <div class="stats-item">sats</div>
     `;
   }
