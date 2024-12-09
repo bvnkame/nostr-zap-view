@@ -281,6 +281,7 @@ const dialogManager = {
 // 公開APIも非同期に変更
 export async function createDialog(viewId) {
   try {
+    console.group(`[Dialog] Creating dialog for ${viewId}`);
     const config = subscriptionManager.getViewConfig(viewId);
     if (!config) {
       throw new Error(`View configuration not found for viewId: ${viewId}`);
@@ -290,9 +291,16 @@ export async function createDialog(viewId) {
     subscriptionManager.setViewConfig(viewId, config);
 
     const dialog = await dialogManager.create(viewId, config);
+    console.debug('[Dialog] Created with cached stats status:', {
+      hasCurrentStats: !!statsManager.getCurrentStats(viewId),
+      hasCachedStats: !!cacheManager.getCachedStats(viewId, config.identifier)
+    });
+
+    console.groupEnd();
     return dialog;
   } catch (error) {
-    console.error('Failed to create dialog:', error);
+    console.error('[Dialog] Creation failed:', error);
+    console.groupEnd();
     return null;
   }
 }

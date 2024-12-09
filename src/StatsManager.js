@@ -12,21 +12,29 @@ export class StatsManager {
   }
 
   async getZapStats(identifier, viewId) {
+    console.time(`[Stats] Total getZapStats for ${viewId}`);
+    console.debug('[Stats] Getting zap stats:', { identifier, viewId });
     const cached = await this.#checkCachedStats(viewId, identifier);
     if (cached) {
+      console.debug('[Stats] Using cached stats:', cached);
+      console.timeEnd(`[Stats] Total getZapStats for ${viewId}`);
       return cached;
     }
 
+    console.debug('[Stats] Cache miss - fetching fresh stats');
     const stats = await this.fetchStats(identifier);
     if (stats) {
+      console.debug('[Stats] Updating stats cache:', stats);
       cacheManager.updateStatsCache(viewId, identifier, stats);
     }
+    console.timeEnd(`[Stats] Total getZapStats for ${viewId}`);
     return stats;
   }
 
   async fetchStats(identifier) {
     try {
       const response = await this._fetchFromApi(identifier);
+      console.debug('[Stats] Fetched stats:', response);
       const stats = this._formatStats(response);
       return stats || this.createTimeoutError();
     } catch (error) {
@@ -47,6 +55,7 @@ export class StatsManager {
   }
 
   async _fetchFromApi(identifier) {
+    console.time(`[Stats] API fetch for ${identifier}`);
     const decoded = safeNip19Decode(identifier);
     if (!decoded) return null;
 
@@ -62,9 +71,14 @@ export class StatsManager {
     );
 
     try {
+      console.time('[Stats] Fetch request');
       const response = await fetch(endpoint, { signal: controller.signal });
-      return response.json();
+      const data = await response.json();
+      console.timeEnd('[Stats] Fetch request');
+      console.timeEnd(`[Stats] API fetch for ${identifier}`);
+      return data;
     } catch (error) {
+      console.timeEnd(`[Stats] API fetch for ${identifier}`);
       if (error.name === "AbortError") {
         throw new Error("STATS_TIMEOUT");
       }
@@ -93,42 +107,63 @@ export class StatsManager {
   }
 
   async initializeStats(identifier, viewId, showSkeleton = false) {
-    // 既に初期化中または完了している場合は進行中のPromiseを返す
+    console.group(`[Stats] Initializing stats for ${viewId}`);
+    console.debug('[Stats] Initialization request:', { identifier, viewId, showSkeleton });
+
     if (this.#initializationStatus.has(viewId)) {
+      console.debug('[Stats] Already initializing, returning existing promise');
+      console.groupEnd();
       return this.#initializationStatus.get(viewId);
     }
+
+    // キャッシュされた現在の統計情報をチェック
+    const currentStats = this.getCurrentStats(viewId);
+    console.debug('[Stats] Current stats in memory:', currentStats);
 
     const initPromise = (async () => {
       try {
         const stats = await this.getZapStats(identifier, viewId);
+        console.debug('[Stats] Fetched/Retrieved stats:', stats);
+        
         if (stats) {
           this.displayStats(stats, viewId);
           this.#currentStats.set(viewId, stats);
         }
         return stats;
       } catch (error) {
-        console.error("Stats initialization failed:", error);
+        console.error("[Stats] Initialization failed:", error);
         return null;
       } finally {
-        // 初期化完了後にステータスをクリア
         this.#initializationStatus.delete(viewId);
+        console.groupEnd();
       }
     })();
 
-    // 進行中の初期化を追跡
     this.#initializationStatus.set(viewId, initPromise);
     return initPromise;
   }
 
   async #checkCachedStats(viewId, identifier) {
+    console.time('[Stats] Cache check');
     const cached = cacheManager.getCachedStats(viewId, identifier);
     const now = Date.now();
 
-    if (cached && now - cached.timestamp < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION) {
-      return cached.stats;
+    if (cached) {
+      const age = now - cached.timestamp;
+      console.debug('[Stats] Cache details:', {
+        age,
+        isFresh: age < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION,
+        stats: cached.stats,
+        timestamp: new Date(cached.timestamp).toISOString()
+      });
     }
 
-    return null;
+    const result = cached && now - cached.timestamp < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION
+      ? cached.stats
+      : null;
+
+    console.timeEnd('[Stats] Cache check');
+    return result;
   }
 
   getCurrentStats(viewId) {
@@ -138,47 +173,70 @@ export class StatsManager {
   async handleZapEvent(event, viewId, identifier) {
     // リアルタイムイベントでない場合は早期リターン
     if (!event?.isRealTimeEvent) {
+      console.debug('[Stats] Ignoring non-realtime event:', { eventId: event?.id });
       return;
     }
 
+    console.time(`[Stats] Process zap event ${event.id}`);
     try {
-      const amountMsats = this.extractAmountFromBolt11(
-        event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
-      );
+      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+      console.debug('[Stats] Processing zap event:', { 
+        eventId: event.id,
+        bolt11: bolt11Tag?.substring(0, 20) + '...'
+      });
 
-      if (amountMsats <= 0) return;
+      const amountMsats = this.extractAmountFromBolt11(bolt11Tag);
+      console.debug('[Stats] Extracted amount:', { amountMsats });
 
-      // キャッシュされた統計情報を取得
+      if (amountMsats <= 0) {
+        console.debug('[Stats] Invalid amount, skipping');
+        return;
+      }
+
+      console.time('[Stats] Stats calculation');
       const currentStats = cacheManager.getViewStats(viewId);
-      
-      // 現在の統計情報がない場合は初期値を使用
+      console.debug('[Stats] Current stats:', currentStats);
+
       const baseStats = {
         count: currentStats?.count || 0,
         msats: currentStats?.msats || 0,
         maxMsats: currentStats?.maxMsats || 0
       };
 
-      // 新しい統計情報を計算
       const updatedStats = {
         count: baseStats.count + 1,
         msats: baseStats.msats + amountMsats,
         maxMsats: Math.max(baseStats.maxMsats, amountMsats)
       };
+      console.timeEnd('[Stats] Stats calculation');
 
+      console.debug('[Stats] Updated stats:', { 
+        previous: baseStats, 
+        new: updatedStats 
+      });
+
+      console.time('[Stats] Cache update');
       // キャッシュを更新
       if (identifier) {
         cacheManager.updateStatsCache(viewId, identifier, updatedStats);
       }
+      console.timeEnd('[Stats] Cache update');
       
       // UIを更新
-      this.displayStats(updatedStats, viewId);
+      await this.displayStats(updatedStats, viewId);
 
       // イベントにメタデータを追加
       event.isStatsCalculated = true;
       event.amountMsats = amountMsats;
 
     } catch (error) {
-      console.error("Failed to handle zap event stats:", error);
+      console.error('[Stats] Error handling zap event:', error, {
+        eventId: event?.id,
+        viewId,
+        identifier
+      });
+    } finally {
+      console.timeEnd(`[Stats] Process zap event ${event.id}`);
     }
   }
 
@@ -195,8 +253,19 @@ export class StatsManager {
     }
   }
 
-  displayStats(stats, viewId) {
-    displayZapStats(stats, viewId);
+  async displayStats(stats, viewId) {
+    console.group(`[Stats] Display update for ${viewId}`);
+    console.time('Total display time');
+    try {
+      console.time('DisplayZapStats call');
+      await displayZapStats(stats, viewId);
+      console.timeEnd('DisplayZapStats call');
+    } catch (error) {
+      console.error('[Stats] Display error:', error);
+    } finally {
+      console.timeEnd('Total display time');
+      console.groupEnd();
+    }
   }
 }
 

@@ -190,8 +190,24 @@ class StatsCache extends BaseCache {
   }
 
   getCached(viewId, identifier) {
+    console.group('[StatsCache] Getting cached stats');
+    console.time('[StatsCache] Cache lookup');
+    
     const key = `${viewId}:${identifier}`;
-    return this.get(key);
+    const result = this.get(key);
+    const now = Date.now();
+    
+    console.debug('[StatsCache] Cache details:', {
+      key,
+      found: !!result,
+      age: result ? now - result.timestamp : null,
+      cacheTimeout: APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION,
+      isFresh: result ? (now - result.timestamp) < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION : false
+    });
+
+    console.timeEnd('[StatsCache] Cache lookup');
+    console.groupEnd();
+    return result;
   }
 
   updateViewStats(viewId, stats) {
@@ -209,6 +225,16 @@ class StatsCache extends BaseCache {
   clear() {
     super.clear();
     this.#viewStats.clear();
+  }
+
+  setCached(viewId, identifier, stats) {
+    console.debug('[StatsCache] Setting cache:', {
+      viewId,
+      identifier,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+    // ...existing code...
   }
 }
 

@@ -6,25 +6,38 @@ export class StatusUI {
   }
 
   displayStats(stats) {
+    console.time('[StatusUI] Total stats display');
     const statsDiv = this.root.querySelector(".zap-stats");
-    if (!statsDiv) return;
-
-    // スケルトン表示の場合
-    if (stats?.skeleton) {
-      this.showSkeletonStats(statsDiv);
+    if (!statsDiv) {
+      console.timeEnd('[StatusUI] Total stats display');
       return;
     }
 
+    // スケルトン表示の場合
+    if (stats?.skeleton) {
+      console.debug('[StatusUI] Showing skeleton');
+      this.showSkeletonStats(statsDiv);
+      console.timeEnd('[StatusUI] Total stats display');
+      return;
+    }
+
+    console.time('[StatusUI] HTML generation');
     const isTimeout = !stats || stats.error;
-    statsDiv.innerHTML = isTimeout
+    const html = isTimeout
       ? this.createTimeoutStats()
       : this.createNormalStats(stats);
+    console.timeEnd('[StatusUI] HTML generation');
+
+    console.time('[StatusUI] DOM update');
+    statsDiv.innerHTML = html;
+    console.timeEnd('[StatusUI] DOM update');
+    console.timeEnd('[StatusUI] Total stats display');
   }
 
   showNoZaps() {
     const list = this.root.querySelector(".dialog-zap-list");
     if (list) {
-      list.innerHTML = this.createNoZapsMessage();
+      list.innerHTML = this.#createNoZapsMessage();
     }
   }
 
@@ -57,6 +70,7 @@ export class StatusUI {
   }
 
   createNormalStats(stats) {
+    console.debug('[StatusUI] Creating normal stats:', stats);
     return `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number">${formatNumber(
