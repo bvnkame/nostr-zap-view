@@ -15,7 +15,7 @@
   --border: #edf2f7;
   --skeleton: #fdfdfd;
   --skeleton2: #e2e5ec;
-  --zap-stats-skeleton-bg: #dde4eb;
+  --zap-stats-skeleton-bg: #bbc5cf;
   --new-mark: #22c55e;
 
   /* Zap Amount Colors */
@@ -140,6 +140,22 @@ button {
   height: 23px;
   color: var(--stats-item-text);
   font-size: 0.9rem;
+
+  .number {
+    font-size: 1.1rem;
+    font-weight: 500;
+  }
+
+  .number.skeleton {
+    width: 100%;
+    background: linear-gradient(
+      90deg,
+      var(--skeleton) 0%,
+      var(--zap-stats-skeleton-bg) 50%,
+      var(--skeleton) 100%
+    );
+    background-size: 200% 100%;
+  }
 }
 
 .stats-item:nth-child(3n + 1) {
@@ -149,11 +165,6 @@ button {
 .stats-item:nth-child(3n + 2),
 .stats-item:nth-child(3n + 3) {
   justify-content: flex-end;
-}
-
-.stats-item .number {
-  font-size: 1.1rem;
-  font-weight: 500;
 }
 
 .dialog-zap-list {
@@ -357,12 +368,6 @@ button {
   padding-left: 6px;
   text-decoration: none;
   border-left: 1px solid var(--border);
-}
-
-.stats-skeleton {
-  background-color: var(--zap-stats-skeleton-bg);
-  height: 23px;
-  width: 110px;
 }
 
 .zap-placeholder-name {
