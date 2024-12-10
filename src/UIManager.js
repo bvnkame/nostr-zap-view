@@ -113,6 +113,20 @@ class NostrZapViewDialog extends HTMLElement {
       console.timeEnd("renderZapListFromCache");
     }
 
+    // 統計情報の初期化 - キャッシュされたデータを優先的に使用
+    const identifier = this.getAttribute("data-nzv-id");
+    if (identifier) {
+      const cachedStats = await cacheManager.getCachedStats(this.viewId, identifier);
+      if (cachedStats?.stats) {
+        this.statsUI.displayStats(cachedStats.stats);
+      } else {
+        const currentStats = await statsManager.getCurrentStats(this.viewId);
+        if (currentStats) {
+          this.statsUI.displayStats(currentStats);
+        }
+      }
+    }
+
     console.timeEnd("initializeFullUI");
   }
 

@@ -182,11 +182,21 @@ class StatsCache extends BaseCache {
   #viewStats = new Map();
 
   setCached(viewId, identifier, stats) {
+    console.debug('[StatsCache] Setting cache:', {
+      viewId,
+      identifier,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+    
     const key = `${viewId}:${identifier}`;
     this.set(key, {
       stats,
       timestamp: Date.now()
     });
+    
+    // view状態も同時に更新
+    this.updateViewStats(viewId, stats);
   }
 
   getCached(viewId, identifier) {
@@ -211,11 +221,28 @@ class StatsCache extends BaseCache {
   }
 
   updateViewStats(viewId, stats) {
-    this.#viewStats.set(viewId, stats);
+    console.debug('[StatsCache] Updating view stats:', {
+      viewId,
+      stats,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (!stats) return;
+    
+    this.#viewStats.set(viewId, {
+      ...stats,
+      lastUpdate: Date.now()
+    });
   }
 
   getViewStats(viewId) {
-    return this.#viewStats.get(viewId);
+    const stats = this.#viewStats.get(viewId);
+    console.debug('[StatsCache] Retrieved view stats:', {
+      viewId,
+      stats,
+      lastUpdate: stats ? new Date(stats.lastUpdate).toISOString() : null
+    });
+    return stats;
   }
 
   clearViewStats(viewId) {
@@ -225,16 +252,6 @@ class StatsCache extends BaseCache {
   clear() {
     super.clear();
     this.#viewStats.clear();
-  }
-
-  setCached(viewId, identifier, stats) {
-    console.debug('[StatsCache] Setting cache:', {
-      viewId,
-      identifier,
-      stats,
-      timestamp: new Date().toISOString()
-    });
-    // ...existing code...
   }
 }
 

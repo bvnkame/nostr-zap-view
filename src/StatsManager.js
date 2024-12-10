@@ -215,17 +215,9 @@ export class StatsManager {
       };
       console.timeEnd('[Stats] Stats calculation');
 
-      console.debug('[Stats] Updated stats:', { 
-        previous: baseStats, 
-        new: updatedStats 
-      });
-
-      console.time('[Stats] Cache update');
-      // キャッシュを更新
-      if (identifier) {
-        cacheManager.updateStatsCache(viewId, identifier, updatedStats);
-      }
-      console.timeEnd('[Stats] Cache update');
+      // キャッシュの更新処理を修正
+      cacheManager.updateStatsCache(viewId, identifier, updatedStats);
+      this.#currentStats.set(viewId, updatedStats);
       
       // UIを更新
       await this.displayStats(updatedStats, viewId);
