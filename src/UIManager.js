@@ -127,6 +127,13 @@ class NostrZapViewDialog extends HTMLElement {
     dialog.addEventListener("click", (e) => {
       if (e.target === dialog) this.closeDialog();
     });
+
+    // エスケープキーでダイアログを閉じるイベントリスナーを追加
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && dialog?.open) {
+        this.closeDialog();
+      }
+    });
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
