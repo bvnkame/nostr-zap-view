@@ -100,22 +100,22 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-}
 
-.dialog-title a {
-  font-size: 0.9rem;
-  font-weight: normal;
-  color: var(--pubkey-text);
-  text-decoration: none;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-}
+  & a {
+    font-size: 0.9rem;
+    font-weight: normal;
+    color: var(--pubkey-text);
+    text-decoration: none;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+  }
 
-.dialog-title a:hover {
-  text-decoration: underline;
+  & a:hover {
+    text-decoration: underline;
+  }
 }
 
 .dialog-title.custom-title a {
@@ -134,27 +134,27 @@ button {
   grid-template-rows: repeat(3, 1fr);
   gap: 4px;
   margin: 0 8px;
-}
 
-.stats-item {
-  height: 23px;
-  color: var(--stats-item-text);
-  font-size: 0.9rem;
-
-  .number {
-    font-size: 1.1rem;
-    font-weight: 500;
-  }
-
-  .number.skeleton {
-    width: 100%;
-    background: linear-gradient(
-      90deg,
-      var(--skeleton) 0%,
-      var(--zap-stats-skeleton-bg) 50%,
-      var(--skeleton) 100%
-    );
-    background-size: 200% 100%;
+  .stats-item {
+    height: 23px;
+    color: var(--stats-item-text);
+    font-size: 0.9rem;
+  
+    .number {
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+  
+    .number.skeleton {
+      width: 100%;
+      background: linear-gradient(
+        90deg,
+        var(--skeleton) 0%,
+        var(--zap-stats-skeleton-bg) 50%,
+        var(--skeleton) 100%
+      );
+      background-size: 200% 100%;
+    }
   }
 }
 
@@ -165,6 +165,11 @@ button {
 .stats-item:nth-child(3n + 2),
 .stats-item:nth-child(3n + 3) {
   justify-content: flex-end;
+}
+
+.text-muted {
+  margin-right: 16px;
+  opacity: 0.4;
 }
 
 .dialog-zap-list {
@@ -228,14 +233,14 @@ button {
 
 .sender-icon {
   flex-shrink: 0;
-}
 
-.sender-icon img {
-  width: 100%;
-  height: 100%;
-  border-radius: 4px;
-  object-fit: cover;
-  object-position: center;
+  & img {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    object-fit: cover;
+    object-position: center;
+  }
 }
 
 .sender-icon.is-new::before {
@@ -267,21 +272,6 @@ button {
   min-width: 0;
 }
 
-.sender-icon-wrapper {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.sender-icon-wrapper img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
 .sender-name {
   font-size: 0.9375rem;
   font-weight: bold;
@@ -298,12 +288,12 @@ button {
   font-size: 0.8rem;
   white-space: nowrap;
   flex-shrink: 0;
-}
 
-.zap-amount .number {
-  font-size: 1.4rem;
-  font-weight: 500;
-  text-align: right;
+  .number {
+    font-size: 1.4rem;
+    font-weight: 500;
+    text-align: right;
+  }
 }
 
 .zap-details {
@@ -333,11 +323,6 @@ button {
   color: var(--pubkey-text);
   font-size: 1.8rem;
   font-weight: 700;
-}
-
-.text-muted {
-  margin-right: 16px;
-  opacity: 0.4;
 }
 
 .zap-reference {
@@ -375,6 +360,12 @@ button {
   width: 140px;
 }
 
+.zap-placeholder-name.skeleton {
+  width: 120px;
+  height: 19px;
+  margin: 2px 0;
+}
+
 .skeleton {
   color: transparent;
   border-radius: 2px;
@@ -396,16 +387,6 @@ button {
   100% {
     background-position: -200% 0;
   }
-}
-
-.zap-placeholder-name {
-  border-radius: 2px;
-}
-
-.zap-placeholder-name.skeleton {
-  width: 120px;
-  height: 19px;
-  margin: 2px 0;
 }
 
 /* 共通のテキストオーバーフロー処理 */
