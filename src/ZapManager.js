@@ -107,8 +107,8 @@ class ZapSubscriptionManager {
 
   // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
+    console.log('Initializing subscriptions:', { config, viewId });
     try {
-
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
         throw new Error("無効なフィルター設定");
@@ -121,6 +121,13 @@ class ZapSubscriptionManager {
       }
 
       this._initializeLoadState(viewId);
+      
+      // 初期ローディングスピナーを表示
+      const list = this._getListElement(viewId);
+      if (list) {
+        const trigger = this._createLoadTrigger();
+        list.appendChild(trigger);
+      }
       
       const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
       
@@ -136,6 +143,7 @@ class ZapSubscriptionManager {
   }
 
   async finalizeInitialization(viewId, lastEventTime) {
+    console.log('Finalizing initialization:', { viewId, lastEventTime });
     cacheManager.updateLoadState(viewId, {
       isInitialFetchComplete: true,
       lastEventTime
@@ -146,7 +154,14 @@ class ZapSubscriptionManager {
       if (this.zapListUI) {
         await this.zapListUI.showNoZapsMessage();
       }
-    } else if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+    }
+
+    // 一旦ローディングスピナーを削除
+    const list = this._getListElement(viewId);
+    list?.querySelector('.load-more-trigger')?.remove();
+
+    // イベントが十分にある場合のみ、実際のInfinite Scrollを設定
+    if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
       this.setupInfiniteScroll(viewId);
     }
   }
@@ -169,6 +184,7 @@ class ZapSubscriptionManager {
 
   // 無限スクロール関連メソッド
   setupInfiniteScroll(viewId) {
+    console.debug('Setting up infinite scroll:', { viewId });
     try {
       this._cleanupInfiniteScroll(viewId);
       const list = this._getListElement(viewId);
