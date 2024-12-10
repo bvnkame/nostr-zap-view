@@ -79,7 +79,6 @@ export class ZapListUI {
   }
 
   #updateList(list, fragment) {
-    console.log("Updating list content");
     const existingTrigger = list.querySelector('.load-more-trigger');
     list.innerHTML = '';
     list.appendChild(fragment);
@@ -148,7 +147,6 @@ export class ZapListUI {
             }));
 
             // バッチをDOMに追加
-            console.log("Adding batch to list");
             const existingTrigger = list.querySelector('.load-more-trigger');
             if (existingTrigger) {
               list.insertBefore(batchFragment, existingTrigger);
@@ -227,12 +225,10 @@ export class ZapListUI {
 
   // バッチ更新関連
   async batchUpdate(events, options = {}) {
-    console.log("Batch update:", events.length);
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
     try {
-      console.log("Batch update started");
       const existingTrigger = list.querySelector('.load-more-trigger');
       const existingItems = new Map(
         Array.from(list.querySelectorAll('.zap-list-item'))

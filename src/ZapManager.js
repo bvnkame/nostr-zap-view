@@ -107,7 +107,6 @@ class ZapSubscriptionManager {
 
   // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
-    console.log('Initializing subscriptions:', { config, viewId });
     try {
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
@@ -125,7 +124,6 @@ class ZapSubscriptionManager {
       // 初期ローディングスピナーを表示
       const list = this._getListElement(viewId);
       if (list) {
-        console.log('Adding initial load trigger:', { viewId });
         const trigger = this._createLoadTrigger();
         list.appendChild(trigger);
       }
@@ -144,7 +142,6 @@ class ZapSubscriptionManager {
   }
 
   async finalizeInitialization(viewId, lastEventTime) {
-    console.log('Finalizing initialization:', { viewId, lastEventTime });
     cacheManager.updateLoadState(viewId, {
       isInitialFetchComplete: true,
       lastEventTime
@@ -159,7 +156,6 @@ class ZapSubscriptionManager {
 
     // 一旦ローディングスピナーを削除
     const list = this._getListElement(viewId);
-    console.log('Removing initial load trigger:', { viewId });
     list?.querySelector('.load-more-trigger')?.remove();
 
     // イベントが十分にある場合のみ、実際のInfinite Scrollを設定
@@ -186,7 +182,6 @@ class ZapSubscriptionManager {
 
   // 無限スクロール関連メソッド
   setupInfiniteScroll(viewId) {
-    console.debug('Setting up infinite scroll:', { viewId });
     try {
       this._cleanupInfiniteScroll(viewId);
       const list = this._getListElement(viewId);
@@ -201,12 +196,9 @@ class ZapSubscriptionManager {
   }
 
   _createLoadTrigger() {
-    console.debug('Creating load trigger element');
     const trigger = document.createElement('div');
-    console.debug('Creating trigger element');
     trigger.className = 'load-more-trigger';
     const spinner = document.createElement('div');
-    console.debug('Creating spinner element');
     spinner.className = 'loading-spinner';
     trigger.appendChild(spinner);
     return trigger;
@@ -233,7 +225,6 @@ class ZapSubscriptionManager {
     const state = cacheManager.getLoadState(viewId);
 
     if (state.isLoading) {
-      console.debug('Already loading, will retry later:', { viewId });
       // ロード中の場合は設定値に基づいて再試行
       setTimeout(() => {
         if (entry.isIntersecting) {
@@ -245,7 +236,6 @@ class ZapSubscriptionManager {
 
     this.loadMoreZaps(viewId).then(count => {
       if (count === 0) {
-        console.debug('No more zaps to load, cleaning up:', { viewId });
         this._cleanupInfiniteScroll(viewId);
       }
     }).catch(error => {
@@ -260,7 +250,6 @@ class ZapSubscriptionManager {
 
     observer.disconnect();
     const list = this._getListElement(viewId);
-    console.debug('Cleaning up infinite scroll:', { viewId });
     list?.querySelector('.load-more-trigger')?.remove();
     this.observers.delete(viewId);
   }
@@ -367,7 +356,6 @@ class ZapSubscriptionManager {
     let lastEventTime = null;
     
     return new Promise((resolve) => {
-      console.debug('Collecting initial events:', { viewId });
       const bufferInterval = this._setupBufferInterval(batchEvents, viewId);
       
       eventPool.subscribeToZaps(viewId, config, decoded, {
@@ -386,11 +374,9 @@ class ZapSubscriptionManager {
   }
 
   _handleInitialEvent(event, batchEvents, lastEventTime, viewId) {
-    console.debug('Handling initial event:', { viewId, eventId: event.id });
     const currentLastTime = Math.min(lastEventTime || event.created_at, event.created_at);
     
     if (cacheManager.addZapEvent(viewId, event)) {
-      console.debug('Event added to cache:', { viewId, eventId: event.id });
       batchEvents.push(event);
       
       this.updateEventReference(event, viewId).then(hasReference => {
@@ -411,9 +397,7 @@ class ZapSubscriptionManager {
       }
 
       if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
-        console.debug('Initial batch update:', { viewId });
         if (this.zapListUI) {
-          console.debug('Initial batch update:', { viewId });
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
             .catch(console.error);
         }
@@ -444,7 +428,6 @@ class ZapSubscriptionManager {
 
   async _updateUI(events, viewId) {
     if (!this.zapListUI) return;
-    console.debug('Updating UI:', { viewId });
     await this.zapListUI.batchUpdate(events, { isFullUpdate: true });
   }
 
@@ -458,7 +441,6 @@ class ZapSubscriptionManager {
       const now = Date.now();
       if (batchEvents.length > 0 && (now - lastUpdate) >= minInterval) {
         if (this.zapListUI) {
-          console.debug('Buffer interval update:', { viewId });
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId), { isBufferUpdate: true })
             .catch(console.error);
           lastUpdate = now;
