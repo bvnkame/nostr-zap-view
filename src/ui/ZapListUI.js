@@ -110,7 +110,7 @@ export class ZapListUI {
       const profileUpdatesQueue = [];
 
       // 最初のバッチを即座に処理
-      const INITIAL_BATCH = 30;
+      const INITIAL_BATCH = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.INITIAL_BATCH;
       const initialEvents = uniqueEvents.slice(0, INITIAL_BATCH);
       const remainingEvents = uniqueEvents.slice(INITIAL_BATCH);
 
@@ -130,7 +130,7 @@ export class ZapListUI {
       // 残りのイベントを非同期で処理
       if (remainingEvents.length > 0) {
         requestIdleCallback(async () => {
-          const batchSize = 20;
+          const batchSize = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.REMAINING_BATCH;
           for (let i = 0; i < remainingEvents.length; i += batchSize) {
             const batch = remainingEvents.slice(i, i + batchSize);
             const batchFragment = document.createDocumentFragment();
@@ -218,7 +218,7 @@ export class ZapListUI {
   #displayNoZapsMessage(list) {
     const message = this.config.noZapsMessage || APP_CONFIG.DIALOG_CONFIG.NO_ZAPS_MESSAGE;
     list.innerHTML = DialogComponents.createNoZapsMessageHTML(message);
-    list.style.minHeight = '100px';
+    list.style.minHeight = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.MIN_HEIGHT;
   }
 
   // バッチ更新関連
@@ -318,7 +318,7 @@ export class ZapListUI {
   }
 
   async #updateProfiles(profileUpdates) {
-    const PROFILE_BATCH_SIZE = 10;
+    const PROFILE_BATCH_SIZE = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.PROFILE_BATCH;
     for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
       const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);
       await Promise.all(

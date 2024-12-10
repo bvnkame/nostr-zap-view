@@ -47,6 +47,12 @@ export const APP_CONFIG = {
     DEFAULT_TITLE: "To ",
     NO_ZAPS_MESSAGE: "No Zaps yet!<br>Send the first Zap!",
     DEFAULT_NO_ZAPS_DELAY: 1500,
+    ZAP_LIST: {
+      INITIAL_BATCH: 30,
+      REMAINING_BATCH: 30,
+      PROFILE_BATCH: 30,
+      MIN_HEIGHT: '100px',
+    }
   },
   REQUEST_CONFIG: {
     METADATA_TIMEOUT: 20000,
