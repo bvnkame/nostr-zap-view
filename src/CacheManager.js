@@ -133,24 +133,24 @@ class ReferenceCache extends BaseCache {
   #pendingFetches = new Map();
   #components = new Map();  // コンポーネントキャッシュを追加
 
-  async getOrFetch(eventId, fetchFn) {
-    const cached = this.get(eventId);
+  async getOrFetch(tagValue, fetchFn) {
+    const cached = this.get(tagValue);
     if (cached) return cached;
 
-    const fetching = this.#pendingFetches.get(eventId);
+    const fetching = this.#pendingFetches.get(tagValue);
     if (fetching) return fetching;
 
     const promise = fetchFn().then(reference => {
-      if (reference) this.set(eventId, reference);
-      this.#pendingFetches.delete(eventId);
+      if (reference) this.set(tagValue, reference);
+      this.#pendingFetches.delete(tagValue);
       return reference;
     }).catch(error => {
       console.error("Reference fetch failed:", error);
-      this.#pendingFetches.delete(eventId);
+      this.#pendingFetches.delete(tagValue);
       return null;
     });
 
-    this.#pendingFetches.set(eventId, promise);
+    this.#pendingFetches.set(tagValue, promise);
     return promise;
   }
 
@@ -159,12 +159,12 @@ class ReferenceCache extends BaseCache {
   }
 
   // コンポーネント関連のメソッドを追加
-  setComponent(eventId, html) {
-    this.#components.set(eventId, html);
+  setComponent(tagValue, html) {
+    this.#components.set(tagValue, html);
   }
 
-  getComponent(eventId) {
-    return this.#components.get(eventId);
+  getComponent(tagValue) {
+    return this.#components.get(tagValue);
   }
 
   clearComponents() {
