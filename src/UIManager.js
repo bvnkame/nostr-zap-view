@@ -78,7 +78,6 @@ class NostrZapViewDialog extends HTMLElement {
   }
 
   async #initializeFullUI(config) {
-    console.time("initializeFullUI");
 
     // スタイルシートの追加
     const styleSheet = document.createElement("style");
@@ -86,31 +85,19 @@ class NostrZapViewDialog extends HTMLElement {
     this.shadowRoot.appendChild(styleSheet);
 
     // UIコンポーネントの初期化
-    console.time("statsUI Initialization");
     this.statsUI = new statsUI(this.shadowRoot);
-    console.timeEnd("statsUI Initialization");
-
-    console.time("profileUI Initialization");
     this.profileUI = new ProfileUI();
-    console.timeEnd("profileUI Initialization");
-
-    console.time("zapListUI Initialization");
     this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
-    console.timeEnd("zapListUI Initialization");
 
     subscriptionManager.setZapListUI(this.zapListUI);
 
     // UIコンポーネントの初期化の後に
-    console.time("getZapEvents");
     const zapEvents = cacheManager.getZapEvents(this.viewId);
-    console.timeEnd("getZapEvents");
 
     if (!zapEvents?.length) {
       this.zapListUI.showNoZapsMessage();
     } else {
-      console.time("renderZapListFromCache");
       await this.zapListUI.renderZapListFromCache(zapEvents);
-      console.timeEnd("renderZapListFromCache");
     }
 
     // 統計情報の初期化 - キャッシュされたデータを優先的に使用
@@ -126,8 +113,6 @@ class NostrZapViewDialog extends HTMLElement {
         }
       }
     }
-
-    console.timeEnd("initializeFullUI");
   }
 
   static get observedAttributes() {
@@ -313,7 +298,6 @@ const dialogManager = {
 // 公開APIも非同期に変更
 export async function createDialog(viewId) {
   try {
-    console.group(`[Dialog] Creating dialog for ${viewId}`);
     const config = subscriptionManager.getViewConfig(viewId);
     if (!config) {
       throw new Error(`View configuration not found for viewId: ${viewId}`);
@@ -323,16 +307,10 @@ export async function createDialog(viewId) {
     subscriptionManager.setViewConfig(viewId, config);
 
     const dialog = await dialogManager.create(viewId, config);
-    console.debug('[Dialog] Created with cached stats status:', {
-      hasCurrentStats: !!statsManager.getCurrentStats(viewId),
-      hasCachedStats: !!cacheManager.getCachedStats(viewId, config.identifier)
-    });
 
-    console.groupEnd();
     return dialog;
   } catch (error) {
     console.error('[Dialog] Creation failed:', error);
-    console.groupEnd();
     return null;
   }
 }

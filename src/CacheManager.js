@@ -182,13 +182,6 @@ class StatsCache extends BaseCache {
   #viewStats = new Map();
 
   setCached(viewId, identifier, stats) {
-    console.debug('[StatsCache] Setting cache:', {
-      viewId,
-      identifier,
-      stats,
-      timestamp: new Date().toISOString()
-    });
-    
     const key = `${viewId}:${identifier}`;
     this.set(key, {
       stats,
@@ -200,33 +193,12 @@ class StatsCache extends BaseCache {
   }
 
   getCached(viewId, identifier) {
-    console.group('[StatsCache] Getting cached stats');
-    console.time('[StatsCache] Cache lookup');
-    
     const key = `${viewId}:${identifier}`;
     const result = this.get(key);
-    const now = Date.now();
-    
-    console.debug('[StatsCache] Cache details:', {
-      key,
-      found: !!result,
-      age: result ? now - result.timestamp : null,
-      cacheTimeout: APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION,
-      isFresh: result ? (now - result.timestamp) < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION : false
-    });
-
-    console.timeEnd('[StatsCache] Cache lookup');
-    console.groupEnd();
     return result;
   }
 
   updateViewStats(viewId, stats) {
-    console.debug('[StatsCache] Updating view stats:', {
-      viewId,
-      stats,
-      timestamp: new Date().toISOString()
-    });
-    
     if (!stats) return;
     
     this.#viewStats.set(viewId, {
@@ -237,11 +209,6 @@ class StatsCache extends BaseCache {
 
   getViewStats(viewId) {
     const stats = this.#viewStats.get(viewId);
-    console.debug('[StatsCache] Retrieved view stats:', {
-      viewId,
-      stats,
-      lastUpdate: stats ? new Date(stats.lastUpdate).toISOString() : null
-    });
     return stats;
   }
 
@@ -271,7 +238,6 @@ class DecodedCache extends BaseCache {
 }
 
 class LoadStateCache extends BaseCache {
-  #states = new Map();
 
   initializeLoadState(viewId) {
     const initialState = {

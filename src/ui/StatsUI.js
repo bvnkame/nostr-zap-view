@@ -62,7 +62,6 @@ export class statsUI {
   }
 
   createNormalStats(stats) {
-    console.debug('[statsUI] Creating normal stats:', stats);
     return `
       <div class="stats-item">Total Count</div>
       <div class="stats-item"><span class="number">${formatNumber(
