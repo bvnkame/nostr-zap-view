@@ -11,7 +11,7 @@ export const APP_CONFIG = {
     theme: "light",
     colorMode: true,
   },
-  INITIAL_LOAD_COUNT: 10, // 追加：初期ロード件数のデフォルト値
+  INITIAL_LOAD_COUNT: 8, // 追加：初期ロード件数のデフォルト値
   ADDITIONAL_LOAD_COUNT: 30, // 一度に読み込む件数を減らす
   LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   BUFFER_INTERVAL: 500, // バッファ間隔（ms）
@@ -19,7 +19,7 @@ export const APP_CONFIG = {
     ROOT_MARGIN: '700px', // スクロール検知の余裕を調整
     THRESHOLD: 0.1,
     DEBOUNCE_TIME: 500, // デバウンス時間を増やす
-    RETRY_DELAY: 1000 // リトライ遅延時間（ms）
+    RETRY_DELAY: 500 // リトライ遅延時間（ms）
   },
   ZAP_CONFIG: {
     DEFAULT_LIMIT: 1,
