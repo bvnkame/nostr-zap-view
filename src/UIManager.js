@@ -128,10 +128,18 @@ class NostrZapViewDialog extends HTMLElement {
       if (e.target === dialog) this.closeDialog();
     });
 
-    // エスケープキーでダイアログを閉じるイベントリスナーを追加
+    // スペースキーでのスクロール制御を追加
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && dialog?.open) {
-        this.closeDialog();
+      if (dialog?.open) {
+        if (e.key === "Escape") {
+          this.closeDialog();
+        } else if (e.key === " ") {
+          e.preventDefault();
+          const zapList = this.#getElement(".dialog-zap-list");
+          if (zapList) {
+            zapList.scrollTop += zapList.clientHeight * 0.8;
+          }
+        }
       }
     });
   }
@@ -342,7 +350,7 @@ export async function showDialog(viewId) {
   }
 }
 
-// 以下のエクスポート関数を修正
+// 以下の���クスポート関数を修正
 export const closeDialog = (viewId) => dialogManager.execute(viewId, 'closeDialog');
 export const displayZapStats = (stats, viewId) => dialogManager.execute(viewId, 'displayZapStats', stats);
 export const replacePlaceholderWithZap = (event, index, viewId) => 
