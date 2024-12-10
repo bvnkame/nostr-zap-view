@@ -185,7 +185,9 @@ class ZapSubscriptionManager {
   _createLoadTrigger() {
     const trigger = document.createElement('div');
     trigger.className = 'load-more-trigger';
-    trigger.style.cssText = 'height: 10px; margin-top: 20px;';
+    const spinner = document.createElement('div');
+    spinner.className = 'loading-spinner';
+    trigger.appendChild(spinner);
     return trigger;
   }
 
