@@ -89,24 +89,10 @@ export class EventPool {
     return Promise.all(processors.map(p => p.connectToRelays()));
   }
 
-  // Subscription management
-  closeSubscription(viewId) {
-    const subscription = this.#subscriptions.get(viewId);
-    const state = this.#state.get(viewId);
-
-    if (!subscription?.zap || !state) return;
-
-    if (!state.isZapClosed) {
-      subscription.zap.close();
-      state.isZapClosed = true;
-    }
-  }
-
   subscribeToZaps(viewId, config, decoded, handlers) {
     try {
       this.#validateSubscription(decoded);
       this.#initializeSubscriptionState(viewId);
-      this.closeSubscription(viewId);
       
       const state = this.#state.get(viewId);
       state.isZapClosed = false;
