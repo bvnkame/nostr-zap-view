@@ -12,7 +12,7 @@ export const APP_CONFIG = {
     colorMode: true,
   },
   INITIAL_LOAD_COUNT: 8, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 30, // 一度に読み込む件数を減らす
+  ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
   LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   BUFFER_INTERVAL: 500, // バッファ間隔（ms）
   INFINITE_SCROLL: {
