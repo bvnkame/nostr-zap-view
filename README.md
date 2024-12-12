@@ -19,14 +19,14 @@ To configure a button for displaying zap information, use the following attribut
   data-title=""
   data-nzv-id="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
   data-zap-color-mode="true"
-  data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">
+  data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me">
   View zaps 👀
 </button>
 ```
 
 Add this script tag right before the bottom closing body tag.
 ```js
-<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.1.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.2.0"></script>
 ```
 
 ## Related repository
