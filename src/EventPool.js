@@ -79,7 +79,7 @@ export class EventPool {
       await this.#setupProcessors(zapRelayUrls);
       this.#isConnected = true;
     } catch (error) {
-      this.#handleError("リレー接続エラー", error);
+      this.#handleError("Relay connection error", error);
     }
   }
 
@@ -99,13 +99,13 @@ export class EventPool {
       
       this.#createSubscription(viewId, config, decoded, this.#wrapHandlers(handlers));
     } catch (error) {
-      this.#handleError("サブスクリプションエラー", error);
+      this.#handleError("Subscription error", error);
     }
   }
 
   #validateSubscription(decoded) {
     if (!decoded?.req?.kinds || !Array.isArray(decoded.req.kinds)) {
-      throw new Error("無効なサブスクリプション設定");
+      throw new Error("Invalid subscription settings");
     }
   }
 

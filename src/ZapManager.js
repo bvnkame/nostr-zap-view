@@ -110,7 +110,7 @@ class ZapSubscriptionManager {
     try {
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
-        throw new Error("無効なフィルター設定");
+        throw new Error("Invalid filter settings");
       }
 
       const decoded = decodeIdentifier(config.identifier);
@@ -136,7 +136,7 @@ class ZapSubscriptionManager {
       
       await this.finalizeInitialization(viewId, lastEventTime);
     } catch (error) {
-      console.error("サブスクリプション初期化エラー:", error);
+      console.error("Subscription initialization error:", error);
       throw error;
     }
   }
