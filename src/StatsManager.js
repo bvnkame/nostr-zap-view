@@ -1,41 +1,27 @@
-import { API_CONFIG } from "./ZapConfig.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import { displayZapStats } from "./UIManager.js";
-import { safeNip19Decode } from "./utils.js"; // Add import
+import { safeNip19Decode } from "./utils.js";
+import { cacheManager } from "./CacheManager.js"; // Add import
 
 export class StatsManager {
-  constructor() {
-    this.viewStatsCache = new Map();
-  }
+  #currentStats = new Map();
+  #initializationStatus = new Map();  // 追加: 初期化状態を追跡
 
-  getOrCreateViewCache(viewId) {
-    if (!this.viewStatsCache.has(viewId)) {
-      this.viewStatsCache.set(viewId, new Map());
-    }
-    return this.viewStatsCache.get(viewId);
+  constructor() {
+    // キャッシュ関連のプロパティを削除
   }
 
   async getZapStats(identifier, viewId) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    const cached = viewCache.get(identifier);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < API_CONFIG.CACHE_DURATION) {
-      return cached.stats;
+    const cached = await this.#checkCachedStats(viewId, identifier);
+    if (cached) {
+      return cached;
     }
 
     const stats = await this.fetchStats(identifier);
     if (stats) {
-      this.updateCache(viewId, identifier, stats);
+      cacheManager.updateStatsCache(viewId, identifier, stats);
     }
     return stats;
-  }
-
-  updateCache(viewId, identifier, stats) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    viewCache.set(identifier, {
-      stats,
-      timestamp: Date.now(),
-    });
   }
 
   async fetchStats(identifier) {
@@ -63,21 +49,22 @@ export class StatsManager {
   async _fetchFromApi(identifier) {
     const decoded = safeNip19Decode(identifier);
     if (!decoded) return null;
-    
+
     const isProfile = decoded.type === "npub" || decoded.type === "nprofile";
     const endpoint = `https://api.nostr.band/v0/stats/${
       isProfile ? "profile" : "event"
     }/${identifier}`;
-    
+
     const controller = new AbortController();
     const timeoutId = setTimeout(
       () => controller.abort(),
-      API_CONFIG.REQUEST_TIMEOUT
+      APP_CONFIG.REQUEST_CONFIG.REQUEST_TIMEOUT
     );
 
     try {
       const response = await fetch(endpoint, { signal: controller.signal });
-      return response.json();
+      const data = await response.json();
+      return data;
     } catch (error) {
       if (error.name === "AbortError") {
         throw new Error("STATS_TIMEOUT");
@@ -106,86 +93,111 @@ export class StatsManager {
     return formattedStats;
   }
 
-  async handleCachedZaps(viewId, config) {
-    const viewState = this.getOrCreateViewState(viewId);
-    try {
-      if (!viewState.currentStats) {
-        const stats = await this.getZapStats(config.identifier, viewId);
-        // 初期データはそのまま使用
-        viewState.currentStats = stats?.error ? { timeout: stats.timeout } : stats;
-      }
+  async initializeStats(identifier, viewId, showSkeleton = false) {
 
-      displayZapStats(viewState.currentStats, viewId);
-      await renderZapListFromCache(
-        viewState.zapEventsCache,
-        config.maxCount,
-        viewId
-      );
-    } catch (error) {
-      console.error("Failed to handle cached zaps:", error);
-      displayZapStats({ timeout: true }, viewId);
+    if (showSkeleton) {
+      // スケルトン表示を即座に行う
+      this.displayStats({ skeleton: true }, viewId);
     }
+
+    if (this.#initializationStatus.has(viewId)) {
+      return this.#initializationStatus.get(viewId);
+    }
+
+    // キャッシュされた現在の統計情報をチェック
+
+    const initPromise = (async () => {
+      try {
+        const stats = await this.getZapStats(identifier, viewId);
+        
+        if (stats) {
+          this.displayStats(stats, viewId);
+          this.#currentStats.set(viewId, stats);
+        }
+        return stats;
+      } catch (error) {
+        console.error("[Stats] Initialization failed:", error);
+        return null;
+      } finally {
+        this.#initializationStatus.delete(viewId);
+      }
+    })();
+
+    this.#initializationStatus.set(viewId, initPromise);
+    return initPromise;
   }
 
-  async initializeStats(identifier, viewId) {
-    try {
-      const stats = await this.getZapStats(identifier, viewId);
-      const initialStats = stats?.error ? { timeout: true } : stats;
-      this.displayStats(initialStats, viewId);
-      return initialStats;
-    } catch (error) {
-      console.error("Failed to fetch initial stats:", error);
-      this.displayStats({ timeout: true }, viewId);
-      return { error: true, timeout: true };
+  async #checkCachedStats(viewId, identifier) {
+    const cached = cacheManager.getCachedStats(viewId, identifier);
+    const now = Date.now();
+
+    if (cached) {
     }
+
+    const result = cached && now - cached.timestamp < APP_CONFIG.REQUEST_CONFIG.CACHE_DURATION
+      ? cached.stats
+      : null;
+
+    return result;
   }
 
-  async handleZapEvent(event, state, viewId) {
-    const amountMsats = this.extractAmountFromBolt11(
-      event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1]
-    );
+  getCurrentStats(viewId) {
+    return this.#currentStats.get(viewId);
+  }
 
-    if (amountMsats <= 0) return;
+  async handleZapEvent(event, viewId, identifier) {
+    // リアルタイムイベントでない場合は早期リターン
+    if (!event?.isRealTimeEvent) {
+      return;
+    }
 
-    // リアルタイムイベントの場合のみ現在の統計情報に加算
-    if (event.isRealTimeEvent) {
-      // 統計情報が未初期化の場合は初期化
-      if (!state.currentStats || state.currentStats.error) {
-        state.currentStats = await this.getZapStats(this.getViewIdentifier(viewId), viewId) || {
-          count: 0,
-          msats: 0,
-          maxMsats: 0
-        };
+    try {
+      const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
+      const amountMsats = this.extractAmountFromBolt11(bolt11Tag);
+
+      if (amountMsats <= 0) {
+        return;
       }
 
-      // 現在の統計情報に加算
-      state.currentStats = {
-        count: state.currentStats.count + 1,
-        msats: state.currentStats.msats + amountMsats,
-        maxMsats: Math.max(state.currentStats.maxMsats, amountMsats)
+      const currentStats = cacheManager.getViewStats(viewId);
+
+      const baseStats = {
+        count: currentStats?.count || 0,
+        msats: currentStats?.msats || 0,
+        maxMsats: currentStats?.maxMsats || 0
       };
 
-      // キャッシュとUIを更新
-      this.updateCache(viewId, this.getViewIdentifier(viewId), state.currentStats);
-      this.displayStats(state.currentStats, viewId);
+      const updatedStats = {
+        count: baseStats.count + 1,
+        msats: baseStats.msats + amountMsats,
+        maxMsats: Math.max(baseStats.maxMsats, amountMsats)
+      };
+
+      // キャッシュの更新処理を修正
+      cacheManager.updateStatsCache(viewId, identifier, updatedStats);
+      this.#currentStats.set(viewId, updatedStats);
+      
+      // UIを更新
+      await this.displayStats(updatedStats, viewId);
+
+      // イベントにメタデータを追加
+      event.isStatsCalculated = true;
+      event.amountMsats = amountMsats;
+
+    } catch (error) {
+      console.error('[Stats] Error handling zap event:', error, {
+        eventId: event?.id,
+        viewId,
+        identifier
+      });
     }
-
-    event.isStatsCalculated = true;
-    event.amountMsats = amountMsats;
-  }
-
-  // 新しくビューの識別子を取得するメソッドを追加
-  getViewIdentifier(viewId) {
-    const viewCache = this.getOrCreateViewCache(viewId);
-    return Array.from(viewCache.keys())[0];
   }
 
   extractAmountFromBolt11(bolt11) {
     try {
       const decoded = window.decodeBolt11(bolt11);
       return parseInt(
-        decoded.sections.find((section) => section.name === "amount")?.value ??
-          "0",
+        decoded.sections.find((section) => section.name === "amount")?.value ?? "0",
         10
       );
     } catch (error) {
@@ -194,8 +206,12 @@ export class StatsManager {
     }
   }
 
-  displayStats(stats, viewId) {
-    displayZapStats(stats, viewId);
+  async displayStats(stats, viewId) {
+    try {
+      await displayZapStats(stats, viewId);
+    } catch (error) {
+      console.error('[Stats] Display error:', error);
+    }
   }
 }
 

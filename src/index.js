@@ -1,66 +1,115 @@
-import { APP_CONFIG, ZAP_CONFIG } from "./ZapConfig.js";
-import { ZapConfig } from "./ZapConfig.js";
-import { createDialog } from "./UIManager.js";
+import { 
+  APP_CONFIG, 
+  ViewerConfig 
+} from "./AppSettings.js";
+import {
+  createDialog,
+  showDialog,
+  renderZapListFromCache,
+} from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
-import { profileManager } from "./ProfileManager.js";
-import { zapPool, poolManager } from "./ZapPool.js";  // poolManagerを追加
+import { profilePool } from "./ProfilePool.js";
+import { eventPool } from "./EventPool.js";
+import { cacheManager } from "./CacheManager.js";
+import { ZapInfo } from "./ZapInfo.js";
 
-/**
- * ボタンクリック時の初期化とデータ取得を行う
- * @param {HTMLElement} button - 初期化対象のボタン要素 
- * @param {string} viewId - ビューの識別子
- */
+// ヘルパー関数
+async function updateCachedZapsColorMode(events, config) {
+  try {
+    events.forEach(event => {
+      const zapInfo = cacheManager.getZapInfo(event.id);
+      if (!zapInfo?.satsAmount) return;
+      
+      zapInfo.colorClass = ZapInfo.getAmountColorClass(
+        zapInfo.satsAmount,
+        config.isColorModeEnabled
+      );
+      cacheManager.setZapInfo(event.id, zapInfo);
+    });
+  } catch (error) {
+    console.error('Failed to update color mode:', error);
+  }
+}
+
+// 初期化関連の処理をまとめる
+async function initializeViewer(viewId, config) {
+  const cachedEvents = cacheManager.getZapEvents(viewId);
+  if (cachedEvents.length > 0) {
+    await updateCachedZapsColorMode(cachedEvents, config);
+    const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
+    profilePool.fetchProfiles(pubkeys);
+  }
+
+  const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
+    viewId,
+    config,
+    renderZapListFromCache
+  );
+
+  if (hasEnoughCachedEvents) {
+    subscriptionManager.setupInfiniteScroll(viewId);
+  }
+
+  return hasEnoughCachedEvents;
+}
+
 async function handleButtonClick(button, viewId) {
   try {
-    const config = ZapConfig.fromButton(button);
-
-    // 1. 即座にダイアログとスケルトンを表示
-    subscriptionManager.setViewConfig(viewId, config);
-    createDialog(viewId);
-    subscriptionManager.handleViewClick(viewId);
-
-    // 2. バックグラウンドでリレー接続とデータ取得を実行
-    if (!button.hasAttribute('data-initialized')) {
-      Promise.all([
-        poolManager.connectToRelays(config.relayUrls),
-        statsManager.initializeStats(config.identifier, viewId),
-        subscriptionManager.initializeSubscriptions(config, viewId)
-      ]).catch(error => {
-        console.error("Failed to initialize:", error);
-      });
-
-      button.setAttribute('data-initialized', 'true');
+    const config = ViewerConfig.fromButton(button);
+    if (!config) {
+      throw new Error('Failed to create config from button');
     }
+
+    subscriptionManager.setViewConfig(viewId, config);
+    const dialog = await createDialog(viewId, config);
+    
+    if (!dialog) {
+      throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DIALOG_NOT_FOUND);
+    }
+
+    await showDialog(viewId);
+
+    // 非同期処理を実行
+    setTimeout(async () => {
+      await initializeViewer(viewId, config);
+
+      if (!button.hasAttribute("data-initialized")) {
+        const identifier = button.getAttribute("data-nzv-id");
+        await Promise.all([
+          eventPool.connectToRelays(config.relayUrls),
+          subscriptionManager.initializeSubscriptions(config, viewId),
+          !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
+          // 統計情報の初期化を一度だけ行う
+          identifier ? statsManager.initializeStats(identifier, viewId, true) : Promise.resolve()
+        ]);
+        button.setAttribute("data-initialized", "true");
+      }
+    }, 0);
   } catch (error) {
     console.error(`Failed to handle click for viewId ${viewId}:`, error);
   }
 }
 
 function initializeApp() {
-  // Set global libraries
   Object.entries(APP_CONFIG.LIBRARIES).forEach(([key, value]) => {
     window[key] = value;
   });
 
-  // 単一ボタンの初期化
-  const fetchButton = document.querySelector("button[data-nzv-id]");
-  if (fetchButton) {
-    const viewId = "nostr-zap-view-0";
-    fetchButton.setAttribute("data-zap-view-id", viewId);
-    fetchButton.addEventListener("click", () => handleButtonClick(fetchButton, viewId));
-  }
-
-  // 複数ボタンの初期化
   document.querySelectorAll("button[data-nzv-id]").forEach((button, index) => {
+    if (button.hasAttribute("data-zap-view-id")) return;
+    
     const viewId = `nostr-zap-view-${index}`;
     button.setAttribute("data-zap-view-id", viewId);
+
+    if (!button.hasAttribute("data-zap-color-mode")) {
+      button.setAttribute("data-zap-color-mode", APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE.toString());
+    }
+
     button.addEventListener("click", () => handleButtonClick(button, viewId));
   });
 }
 
-// Run the application
 document.addEventListener("DOMContentLoaded", initializeApp);
 
-// Public API
-export { ZAP_CONFIG as CONFIG, profileManager, zapPool, APP_CONFIG };
+export { profilePool, eventPool, APP_CONFIG };

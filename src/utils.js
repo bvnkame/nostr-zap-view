@@ -1,38 +1,12 @@
-import { ZAP_CONFIG as CONFIG } from "./ZapConfig.js";
+import { APP_CONFIG } from "./AppSettings.js";
+import { cacheManager } from "./CacheManager.js";
 
-// Define constants
+// Core constants
 const CONSTANTS = {
-  CACHE_MAX_SIZE: 1000,
   DEFAULT_ERROR_MESSAGE: "Processing failed",
   SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent"],
+  PROTOCOLS: ["http:", "https:"],
 };
-
-// Cache manager
-class CacheManager {
-  constructor(maxSize = CONSTANTS.CACHE_MAX_SIZE) {
-    this.cache = new Map();
-    this.maxSize = maxSize;
-  }
-
-  get(key) {
-    return this.cache.get(key);
-  }
-
-  set(key, value) {
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-    }
-    this.cache.set(key, value);
-  }
-
-  has(key) {
-    return this.cache.has(key);
-  }
-}
-
-// Shared cache instances
-const decodedCache = new CacheManager();
 
 // Validation utilities
 const Validator = {
@@ -40,172 +14,238 @@ const Validator = {
   isValidCount: (count) => typeof count === "number" && count > 0,
   isValidUrl: (url) => {
     try {
-      const parsed = new URL(url);
-      return ["http:", "https:"].includes(parsed.protocol);
+      return CONSTANTS.PROTOCOLS.includes(new URL(url).protocol);
     } catch {
       return false;
     }
   },
-  isValidTimestamp: (timestamp) => {
-    return typeof timestamp === "number" && timestamp > 0;
+  isValidTimestamp: (timestamp) => typeof timestamp === "number" && timestamp > 0,
+  isProfileIdentifier: (identifier) => {
+    if (!identifier || typeof identifier !== "string") return false;
+    return identifier.startsWith("npub1") || identifier.startsWith("nprofile1");
   },
+  isEventIdentifier: (identifier) => {
+    if (!identifier || typeof identifier !== "string") return false;
+    return identifier.startsWith("note1") || identifier.startsWith("nevent1");
+  }
 };
 
-// Decoding related functions
-export function decodeIdentifier(identifier, maxCount) {
-  const cacheKey = `${identifier}:${maxCount}`;
+// Decoder utilities
+const Decoder = {
+  safeNip19Decode: (identifier) => {
+    try {
+      return window.NostrTools.nip19.decode(identifier);
+    } catch (error) {
+      console.debug("Failed to decode identifier:", error);
+      return null;
+    }
+  },
+  createReqFromType: (type, data, since) => {
+    const baseReq = {
+      npub: () => ({ kinds: [9735], "#p": [data] }),
+      note: () => ({ kinds: [9735], "#e": [data] }),
+      nprofile: () => ({ kinds: [9735], "#p": [data.pubkey] }),
+      nevent: () => ({ kinds: [9735], "#e": [data.id] })
+    };
 
-  if (decodedCache.has(cacheKey)) {
-    return decodedCache.get(cacheKey);
+    const reqCreator = baseReq[type];
+    if (!reqCreator) {
+      console.error("Unsupported identifier type:", type);
+      return null;
+    }
+
+    const req = reqCreator();
+    req.limit = since ? APP_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.INITIAL_LOAD_COUNT;
+    if (since) req.until = since;
+
+    return { req };
   }
+};
 
-  if (!Validator.isValidIdentifier(identifier) || !Validator.isValidCount(maxCount)) {
-    throw new Error(CONFIG.ERRORS.DECODE_FAILED);
+// Encoder utilities
+const Encoder = {
+  encodeNpub: (pubkey) => {
+    try {
+      return window.NostrTools.nip19.npubEncode(pubkey);
+    } catch (error) {
+      console.debug("Failed to encode npub:", error);
+      return null;
+    }
+  },
+  encodeNprofile: (pubkey, relays = []) => {
+    try {
+      return window.NostrTools.nip19.nprofileEncode({
+        pubkey,
+        relays,
+      });
+    } catch (error) {
+      console.debug("Failed to encode nprofile:", error);
+      return null;
+    }
+  },
+  encodeNevent: (id, kind, pubkey, relays = []) => {
+    try {
+      return window.NostrTools.nip19.neventEncode({
+        id,
+        kind,
+        pubkey,
+        relays,
+      });
+    } catch (error) {
+      console.debug("Failed to encode nevent:", error);
+      return null;
+    }
+  },
+  encodeNaddr: (kind, pubkey, identifier, relays = []) => {
+    try {
+      return window.NostrTools.nip19.naddrEncode({
+        kind,
+        pubkey,
+        identifier,
+        relays,
+      });
+    } catch (error) {
+      console.debug("Failed to encode naddr:", error);
+      return null;
+    }
   }
+};
 
-  const decoded = safeNip19Decode(identifier);
-  if (!decoded) return null;
-
-  const result = createReqFromType(decoded.type, decoded.data, maxCount);
-  if (result) {
-    decodedCache.set(cacheKey, result);
+// Formatter utilities
+const Formatter = {
+  formatNumber: (num) => new Intl.NumberFormat().format(num),
+  formatIdentifier: (identifier) => {
+    if (!identifier || typeof identifier !== "string") return "unknown";
+    try {
+      const decoded = window.NostrTools.nip19.decode(identifier);
+      return `${decoded.type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
+    } catch (error) {
+      console.debug("Failed to format identifier:", error);
+      return "unknown";
+    }
+  },
+  escapeHTML: (str) => {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
   }
+};
 
-  return result;
-}
+// Zap utilities
+const ZapUtils = {
+  parseZapEvent: async (event) => {
+    const { pubkey, content } = ZapUtils.parseDescriptionTag(event);
+    const satsText = await ZapUtils.parseBolt11(event);
+    return { pubkey, content, satsText };
+  },
+  parseDescriptionTag: (event) => {
+    const descriptionTag = event.tags.find(
+      (tag) => tag[0] === "description"
+    )?.[1];
+    if (!descriptionTag) return { pubkey: null, content: "" };
 
-// Change from function to export function
-export function safeNip19Decode(identifier) {
-  try {
-    return window.NostrTools.nip19.decode(identifier);
-  } catch (error) {
-    console.debug('Failed to decode identifier:', error);
-    return null;
+    try {
+      const sanitizedDescription = sanitizeJsonString(descriptionTag);
+
+      let parsed;
+      try {
+        parsed = JSON.parse(sanitizedDescription);
+      } catch {
+        // 最後の手段としてJSONを再構築
+        const match = sanitizedDescription.match(/"pubkey"\s*:\s*"([^"]+)"|"content"\s*:\s*"([^"]+)"/g);
+        if (!match) throw new Error('Invalid JSON structure');
+
+        parsed = {};
+        match.forEach(item => {
+          const [key, value] = item.split(':').map(s => s.trim().replace(/"/g, ''));
+          parsed[key] = value;
+        });
+      }
+
+      // pubkeyの型チェックと正規化
+      let pubkey = null;
+      if (parsed.pubkey) {
+        pubkey = typeof parsed.pubkey === "string" 
+          ? parsed.pubkey 
+          : String(parsed.pubkey);
+      }
+
+      // contentの型チェックと正規化
+      const content = typeof parsed.content === "string" 
+        ? parsed.content.trim() 
+        : "";
+
+      return { pubkey, content };
+    } catch (error) {
+      console.warn("Description tag parse warning:", error, {
+        tag: descriptionTag,
+        sanitized: sanitizedDescription
+      });
+      return { pubkey: null, content: "" };
+    }
+  },
+  parseBolt11: async (event) => {
+    const bolt11Tag = event.tags.find(
+      (tag) => tag[0].toLowerCase() === "bolt11"
+    )?.[1];
+    if (!bolt11Tag) return "Amount: Unknown";
+
+    try {
+      const decoded = window.decodeBolt11(bolt11Tag);
+      const amountMsat = decoded.sections.find(
+        (section) => section.name === "amount"
+      )?.value;
+      return amountMsat
+        ? `${Formatter.formatNumber(Math.floor(amountMsat / 1000))} sats`
+        : "Amount: Unknown";
+    } catch (error) {
+      console.error("BOLT11 decode error:", error);
+      return "Amount: Unknown";
+    }
+  },
+  createDefaultZapInfo: (event, defaultIcon) => {
+    return {
+      satsText: "Amount: Unknown",
+      satsAmount: 0,
+      comment: "",
+      pubkey: "",
+      created_at: event.created_at,
+      displayIdentifier: "anonymous",
+      senderName: "anonymous",
+      senderIcon: defaultIcon,
+      reference: null,
+    };
   }
-}
+};
 
-function createReqFromType(type, data, maxCount) {
-  const reqMap = {
-    npub: () => ({ kinds: [9735], "#p": [data], limit: maxCount }),
-    note: () => ({ kinds: [9735], "#e": [data], limit: maxCount }),
-    nprofile: () => ({ kinds: [9735], "#p": [data.pubkey], limit: maxCount }),
-    nevent: () => ({ kinds: [9735], "#e": [data.id], limit: maxCount }),
-  };
-
-  const reqCreator = reqMap[type];
-  if (!reqCreator) {
-    console.error("Unsupported identifier type:", type);
-    return null;
-  }
-
-  return { req: reqCreator() };
-}
-
-// Add helper function for number formatting
-export function formatNumber(num) {
-  return new Intl.NumberFormat().format(num);
-}
-
-// Add function to check if within 24 hours
-export function isWithin24Hours(timestamp) {
+// Time-related utilities
+function isWithin24Hours(timestamp) {
   const now = Math.floor(Date.now() / 1000);
   const hours24 = 24 * 60 * 60;
   return now - timestamp < hours24;
 }
 
-// Change formatNpub function to a generic function
-export function formatIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') {
-    return 'unknown';
-  }
-
-  try {
-    const decoded = window.NostrTools.nip19.decode(identifier);
-    const { type } = decoded;
-    return `${type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
-  } catch (error) {
-    console.debug('Failed to format identifier:', error);
-    return 'unknown';
-  }
+// Keep existing decodeIdentifier as main export
+function decodeIdentifier(identifier, since = null) {
+  const cacheKey = `${identifier}:${since}`;
+  if (cacheManager.hasDecoded(cacheKey)) return cacheManager.getDecoded(cacheKey);
+  
+  if (!Validator.isValidIdentifier(identifier)) throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
+  
+  const decoded = Decoder.safeNip19Decode(identifier);
+  if (!decoded) return null;
+  
+  const result = Decoder.createReqFromType(decoded.type, decoded.data, since);
+  if (result) cacheManager.setDecoded(cacheKey, result);
+  
+  return result;
 }
 
-// Add function to check identifier type
-export function isProfileIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') return false;
-  return identifier.startsWith('npub1') || identifier.startsWith('nprofile1');
-}
-
-export function isEventIdentifier(identifier) {
-  if (!identifier || typeof identifier !== 'string') return false;
-  return identifier.startsWith('note1') || identifier.startsWith('nevent1');
-}
-
-export function getProfileDisplayName(profile) {
+function getProfileDisplayName(profile) {
   return profile?.display_name || profile?.name || "nameless";
 }
 
-export async function parseZapEvent(event) {
-  const { pubkey, content } = parseDescriptionTag(event);
-  const satsText = await parseBolt11(event);
-
-  return {
-    pubkey,
-    content,
-    satsText,
-  };
-}
-
-export function parseDescriptionTag(event) {
-  const descriptionTag = event.tags.find((tag) => tag[0] === "description")?.[1];
-  if (!descriptionTag) return { pubkey: null, content: "" };
-
-  try {
-    // 制御文字の除去と不正なエスケープシーケンスの修正
-    const sanitizedDescription = descriptionTag
-      .replace(/[\u0000-\u001F\u007F]/g, "") // 制御文字の除去
-      .replace(/\\([^"\\\/bfnrtu])/g, '$1'); // 不正なエスケープシーケンスの修正
-
-    const parsed = JSON.parse(sanitizedDescription);
-    
-    // pubkeyの型チェックと正規化
-    const pubkey = typeof parsed.pubkey === 'string' 
-      ? parsed.pubkey 
-      : typeof parsed.pubkey === 'object' && parsed.pubkey !== null
-        ? parsed.pubkey.toString()
-        : null;
-
-    return { 
-      pubkey: pubkey,
-      content: typeof parsed.content === 'string' ? parsed.content : "" 
-    };
-  } catch (error) {
-    console.warn("Description tag parse warning:", error, { tag: descriptionTag });
-    return { pubkey: null, content: "" };
-  }
-}
-
-export async function parseBolt11(event) {
-  const bolt11Tag = event.tags.find((tag) => tag[0].toLowerCase() === "bolt11")?.[1];
-  if (!bolt11Tag) return "Amount: Unknown";
-
-  try {
-    const decoded = window.decodeBolt11(bolt11Tag);
-    const amountMsat = decoded.sections.find((section) => section.name === "amount")?.value;
-    return amountMsat ? `${formatNumber(Math.floor(amountMsat / 1000))} sats` : "Amount: Unknown";
-  } catch (error) {
-    console.error("BOLT11 decode error:", error);
-    return "Amount: Unknown";
-  }
-}
-
-export function escapeHTML(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-// Add NIP-05 verification function
-export async function verifyNip05(nip05, pubkey) {
+async function verifyNip05(nip05, pubkey) {
   if (!nip05 || !pubkey) return null;
 
   try {
@@ -217,14 +257,13 @@ export async function verifyNip05(nip05, pubkey) {
   }
 }
 
-// Add secure URL sanitization function
-export function sanitizeImageUrl(url) {
-  if (!url || typeof url !== 'string') return null;
-  
+function sanitizeImageUrl(url) {
+  if (!url || typeof url !== "string") return null;
+
   try {
     const parsed = new URL(url);
     // Allow only http and https protocols
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
+    if (!["http:", "https:"].includes(parsed.protocol)) {
       return null;
     }
     // パラメータとハッシュは保持するように変更
@@ -234,38 +273,243 @@ export function sanitizeImageUrl(url) {
   }
 }
 
-// Add NIP-19 encoding utilities
-export function encodeNpub(pubkey) {
+const isValidCount = (count) => Number.isInteger(count) && count > 0;
+
+// --- Move individual functions out of Formatter ---
+function formatNumber(num) {
+  return new Intl.NumberFormat().format(num);
+}
+
+function formatIdentifier(identifier) {
+  if (!identifier || typeof identifier !== "string") return "unknown";
+  try {
+    const decoded = window.NostrTools.nip19.decode(identifier);
+    return `${decoded.type.toLowerCase()}1${identifier.slice(5, 11)}...${identifier.slice(-4)}`;
+  } catch (error) {
+    console.debug("Failed to format identifier:", error);
+    return "unknown";
+  }
+}
+
+function escapeHTML(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// --- Move individual functions out of Encoder ---
+function encodeNpub(pubkey) {
   try {
     return window.NostrTools.nip19.npubEncode(pubkey);
   } catch (error) {
-    console.debug('Failed to encode npub:', error);
+    console.debug("Failed to encode npub:", error);
     return null;
   }
 }
 
-export function encodeNprofile(pubkey, relays = []) {
+function encodeNprofile(pubkey, relays = []) {
   try {
     return window.NostrTools.nip19.nprofileEncode({
       pubkey,
-      relays
+      relays,
     });
   } catch (error) {
-    console.debug('Failed to encode nprofile:', error);
+    console.debug("Failed to encode nprofile:", error);
     return null;
   }
 }
 
-export function encodeNevent(id, kind, pubkey, relays = []) {
+function encodeNevent(id, kind, pubkey, relays = []) {
   try {
     return window.NostrTools.nip19.neventEncode({
       id,
       kind,
       pubkey,
-      relays
+      relays,
     });
   } catch (error) {
-    console.debug('Failed to encode nevent:', error);
+    console.debug("Failed to encode nevent:", error);
     return null;
   }
 }
+
+function encodeNaddr(kind, pubkey, identifier, relays = []) {
+  try {
+    return window.NostrTools.nip19.naddrEncode({
+      kind,
+      pubkey,
+      identifier,
+      relays,
+    });
+  } catch (error) {
+    console.debug("Failed to encode naddr:", error);
+    return null;
+  }
+}
+
+// --- Move individual functions out of Validator ---
+function isEventIdentifier(identifier) {
+  if (!identifier || typeof identifier !== "string") return false;
+  return identifier.startsWith("note1") || identifier.startsWith("nevent1");
+}
+
+function isProfileIdentifier(identifier) {
+  if (!identifier || typeof identifier !== "string") return false;
+  return identifier.startsWith("npub1") || identifier.startsWith("nprofile1");
+}
+
+function isValidIdentifier(identifier) {
+  return typeof identifier === "string" && identifier.length > 0;
+}
+
+// --- Move individual functions out of ZapUtils ---
+async function parseZapEvent(event) {
+  const { pubkey, content } = parseDescriptionTag(event);
+  const satsText = await parseBolt11(event);
+  return { pubkey, content, satsText };
+}
+
+function createDefaultZapInfo(event, defaultIcon) {
+  return {
+    satsText: "Amount: Unknown",
+    satsAmount: 0,
+    comment: "",
+    pubkey: "",
+    created_at: event.created_at,
+    displayIdentifier: "anonymous",
+    senderName: "anonymous",
+    senderIcon: defaultIcon,
+    reference: null,
+  };
+}
+
+function parseDescriptionTag(event) {
+  const descriptionTag = event.tags.find(
+    (tag) => tag[0] === "description"
+  )?.[1];
+  if (!descriptionTag) return { pubkey: null, content: "" };
+
+  try {
+    const sanitizedDescription = sanitizeJsonString(descriptionTag);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(sanitizedDescription);
+    } catch {
+      // 最後の手段としてJSONを再構築
+      const match = sanitizedDescription.match(/"pubkey"\s*:\s*"([^"]+)"|"content"\s*:\s*"([^"]+)"/g);
+      if (!match) throw new Error('Invalid JSON structure');
+
+      parsed = {};
+      match.forEach(item => {
+        const [key, value] = item.split(':').map(s => s.trim().replace(/"/g, ''));
+        parsed[key] = value;
+      });
+    }
+
+    // pubkeyの型チェックと正規化
+    let pubkey = null;
+    if (parsed.pubkey) {
+      pubkey = typeof parsed.pubkey === "string" 
+        ? parsed.pubkey 
+        : String(parsed.pubkey);
+    }
+
+    // contentの型チェックと正規化
+    const content = typeof parsed.content === "string" 
+      ? parsed.content.trim() 
+      : "";
+
+    return { pubkey, content };
+  } catch (error) {
+    console.warn("Description tag parse warning:", error, {
+      tag: descriptionTag,
+      sanitized: sanitizedDescription
+    });
+    return { pubkey: null, content: "" };
+  }
+}
+
+async function parseBolt11(event) {
+  const bolt11Tag = event.tags.find(
+    (tag) => tag[0].toLowerCase() === "bolt11"
+  )?.[1];
+  if (!bolt11Tag) return "Amount: Unknown";
+
+  try {
+    const decoded = window.decodeBolt11(bolt11Tag);
+    const amountMsat = decoded.sections.find(
+      (section) => section.name === "amount"
+    )?.value;
+    return amountMsat
+      ? `${formatNumber(Math.floor(amountMsat / 1000))} sats`
+      : "Amount: Unknown";
+  } catch (error) {
+    console.error("BOLT11 decode error:", error);
+    return "Amount: Unknown";
+  }
+}
+
+// --- Move individual function out of Decoder ---
+function safeNip19Decode(identifier) {
+  try {
+    return window.NostrTools.nip19.decode(identifier);
+  } catch (error) {
+    console.debug("Failed to decode identifier:", error);
+    return null;
+  }
+}
+
+// Sanitize utilities
+function sanitizeJsonString(jsonStr) {
+  return jsonStr
+    // 制御文字の除去
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    // バックスラッシュのエスケープを修正
+    .replace(/\\\\/g, '\\')
+    // 不正なエスケープシーケンスの修正
+    .replace(/\\(?!(["\\\/bfnrt]|u[0-9a-fA-F]{4}))/g, '')
+    // 重複したエスケープの修正
+    .replace(/\\+(["\\/bfnrt])/g, '\\$1')
+    // Unicode エスケープシーケンスの修正
+    .replace(/\\u(?![0-9a-fA-F]{4})/g, '');
+}
+
+// --- Remove 'export' from individual function declarations ---
+
+// Consolidate all exports into a single export statement to remove duplicates
+export {
+  // Individual functions from Formatter
+  formatNumber,
+  formatIdentifier,
+  escapeHTML,
+
+  // Individual functions from Encoder
+  encodeNpub,
+  encodeNprofile,
+  encodeNevent,
+  encodeNaddr,
+
+  // Individual functions from Validator
+  isEventIdentifier,
+  isProfileIdentifier,
+  isValidIdentifier,
+
+  // Individual functions from ZapUtils
+  parseZapEvent,
+  createDefaultZapInfo,
+  parseDescriptionTag,
+  parseBolt11,
+
+  // Individual function from Decoder
+  safeNip19Decode,
+
+  // Standalone functions
+  isWithin24Hours,
+  decodeIdentifier,
+  getProfileDisplayName,
+  verifyNip05,
+  sanitizeImageUrl,
+  isValidCount,
+  sanitizeJsonString
+};

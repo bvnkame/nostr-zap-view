@@ -1,11 +1,12 @@
-import { profileManager } from "./ProfileManager.js";
-import defaultIcon from "./assets/nostr-icon.svg";
+import { profilePool } from "../ProfilePool.js";
+import defaultIcon from "../assets/nostr-icon.svg";
 import {
   getProfileDisplayName,
   escapeHTML,
   sanitizeImageUrl,
   encodeNprofile, // Add import
-} from "./utils.js";
+} from "../utils.js";
+import { cacheManager } from "../CacheManager.js";  // 追加
 
 export class ProfileUI {
   async loadAndUpdate(pubkey, element) {
@@ -18,7 +19,7 @@ export class ProfileUI {
       const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
 
-      const [profile] = await profileManager.fetchProfiles([pubkey]);
+      const [profile] = await profilePool.fetchProfiles([pubkey]);
 
       const senderName = profile
         ? getProfileDisplayName(profile) || "nameless"
@@ -52,7 +53,13 @@ export class ProfileUI {
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
     if (skeleton && iconContainer) {
       const updateIcon = (src) => {
+        // 既存の画像要素とリンクを削除
         skeleton.remove();
+        const existingImage = iconContainer.querySelector('img');
+        const existingLink = iconContainer.querySelector('a');
+        if (existingImage) existingImage.remove();
+        if (existingLink) existingLink.remove();
+
         const img = Object.assign(document.createElement("img"), {
           src,
           alt: `${escapeHTML(senderName)}'s icon`,
@@ -78,7 +85,10 @@ export class ProfileUI {
 
       if (senderIcon) {
         const img = new Image();
-        img.onload = () => updateIcon(senderIcon);
+        img.onload = () => {
+          cacheManager.setImageCache(senderIcon, img);
+          updateIcon(senderIcon);
+        };
         img.onerror = () => updateIcon(defaultIcon);
         img.src = senderIcon;
       } else {
@@ -89,12 +99,12 @@ export class ProfileUI {
 
   #updateNip05(pubkeyElement, pubkey) {
     if (pubkeyElement && !pubkeyElement.getAttribute("data-nip05-updated")) {
-      const cachedNip05 = profileManager.getNip05(pubkey);
+      const cachedNip05 = profilePool.getNip05(pubkey);
       if (cachedNip05) {
         pubkeyElement.textContent = cachedNip05;
         pubkeyElement.setAttribute("data-nip05-updated", "true");
       } else {
-        profileManager.verifyNip05Async(pubkey).then((nip05) => {
+        profilePool.verifyNip05Async(pubkey).then((nip05) => {
           if (nip05) {
             pubkeyElement.textContent = nip05;
             pubkeyElement.setAttribute("data-nip05-updated", "true");
@@ -116,6 +126,48 @@ export class ProfileUI {
         className: "profile-icon",
       });
       iconContainer.appendChild(defaultImg);
+    }
+  }
+
+  /**
+   * プロフィール要素を更新
+   * @param {HTMLElement} element 更新対象の要素
+   * @param {Object} profile プロフィール情報
+   */
+  async updateProfileElement(element, profile) {
+    if (!element || !profile) return;
+
+    // アイコン要素の更新
+    const iconElement = element.querySelector('.sender-icon img, .zap-placeholder-icon');
+    if (iconElement) {
+      if (profile.picture) {
+        const img = document.createElement('img');
+        img.src = profile.picture;
+        img.alt = profile.name || 'Profile Picture';
+        img.width = 40;
+        img.height = 40;
+        if (iconElement.parentElement) {
+          iconElement.parentElement.replaceChild(img, iconElement);
+        }
+      }
+    }
+
+    // 名前要素の更新
+    const nameElement = element.querySelector('.sender-name, .zap-placeholder-name');
+    if (nameElement) {
+      nameElement.textContent = profile.display_name || profile.name || 'anonymous';
+      nameElement.className = 'sender-name';
+    }
+
+    // NIP-05の更新
+    if (profile.nip05) {
+      const pubkey = element.getAttribute('data-pubkey');
+      if (pubkey) {
+        const nip05Element = element.querySelector('[data-nip05-target="true"]');
+        if (nip05Element) {
+          await this.updateNip05Display(pubkey, nip05Element);
+        }
+      }
     }
   }
 }

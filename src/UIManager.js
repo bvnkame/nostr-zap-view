@@ -1,106 +1,147 @@
+import { statsUI } from "./ui/StatsUI.js";
+import { ProfileUI } from "./ui/ProfileUI.js";
+import { ZapListUI } from "./ui/ZapListUI.js";
+import { DialogComponents } from "./DialogComponents.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import styles from "./styles/styles.css";
-import defaultIcon from "./assets/nostr-icon.svg";
-import arrowRightIcon from "./assets/arrow_right.svg"; // 追加
-import quickReferenceIcon from "./assets/link.svg"; // 追加
-import {
-  formatIdentifier,
-  parseZapEvent,
-  isWithin24Hours,
-  escapeHTML,
-  isEventIdentifier, // Add import
-  encodeNevent,   // Add import
-  encodeNpub, // Add import
-} from "./utils.js";
-import { APP_CONFIG } from "./index.js";
-import { StatusUI } from "./StatusUI.js";  // updated import
-import { ProfileUI } from "./ProfileUI.js"; // Add import
-
-// Zapイベント情報を扱うクラス
-class ZapInfo {
-  constructor(event, defaultIcon) {
-    this.event = event;
-    this.defaultIcon = defaultIcon;
-  }
-
-  async extractInfo() {
-    try {
-      const { pubkey, content, satsText } = await parseZapEvent(
-        this.event,
-        this.defaultIcon
-      );
-      const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
-      const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
-
-      // referenceの抽出を単純化
-      const reference = this.event.reference || this.#extractReferenceFromTags();
-
-      return {
-        satsText,
-        satsAmount,
-        comment: content || "",
-        pubkey: normalizedPubkey || "",
-        created_at: this.event.created_at,
-        displayIdentifier: normalizedPubkey
-          ? formatIdentifier(encodeNpub(normalizedPubkey))
-          : "anonymous",
-        senderName: null,
-        senderIcon: null,
-        reference,
-      };
-    } catch (error) {
-      console.error("Failed to extract zap info:", error, this.event);
-      return this.#createDefaultInfo();
-    }
-  }
-
-  #extractReferenceFromTags() {
-    if (!this.event.tags) return null;
-    
-    const eTag = this.event.tags.find((tag) => tag[0] === "e");
-    const pTag = this.event.tags.find((tag) => tag[0] === "p");
-    
-    if (!eTag) return null;
-
-    return {
-      id: eTag[1],
-      kind: parseInt(eTag[3], 10) || 1,
-      pubkey: pTag?.[1] || this.event.pubkey || "",
-      content: this.event.content || "",
-      tags: this.event.tags || [],
-    };
-  }
-
-  #createDefaultInfo() {
-    return {
-      satsText: "Amount: Unknown",
-      satsAmount: 0,
-      comment: "",
-      pubkey: "",
-      created_at: this.event.created_at,
-      displayIdentifier: "anonymous",
-      senderName: "anonymous",
-      senderIcon: this.defaultIcon,
-      reference: null,
-    };
-  }
-}
+import { formatIdentifier } from "./utils.js";  // isValidCountを削除
+import { cacheManager } from "./CacheManager.js";
+import { subscriptionManager } from "./ZapManager.js"; // 追加: ZapSubscriptionManager をインポート
+import { statsManager } from "./StatsManager.js"; // 追加: statsManager をインポート
 
 class NostrZapViewDialog extends HTMLElement {
-  static get observedAttributes() {
-    return ["data-theme", "data-max-count"];
-  }
-
-  #state = {
-    isInitialized: false,
-    theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
-    maxCount: APP_CONFIG.DEFAULT_OPTIONS.maxCount,
-  };
+  #state;
+  #initializationPromise;
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.statusUI = null;  // renamed from uiStatus
-    this.profileUI = new ProfileUI();  // Add ProfileUI instance
+    
+    this.#state = {
+      isInitialized: false,
+      theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
+    };
+  }
+
+  async connectedCallback() {
+    this.viewId = this.getAttribute("data-view-id");
+    if (!this.viewId) {
+      console.error("No viewId provided to dialog");
+      return;
+    }
+
+    // 初期化を追跡可能なPromiseとして保持
+    this.#initializationPromise = this.#initializeBasicDOM();
+    
+    try {
+      await this.#initializationPromise;
+      this.#state.isBasicInitialized = true;
+      
+      // フルUIの初期化を実行
+      const config = subscriptionManager.getViewConfig(this.viewId);
+      if (!config) {
+        throw new Error("Config is required for initialization");
+      }
+      await this.#initializeFullUI(config);
+      
+      // 統計情報の初期化 - 既に初期化されている場合は既存のデータを使用
+      const identifier = this.getAttribute("data-nzv-id");
+      if (identifier) {
+        const stats = await statsManager.getCurrentStats(this.viewId);
+        if (stats) {
+          this.statsUI.displayStats(stats);
+        }
+      }
+      
+      this.#state.isInitialized = true;
+      this.dispatchEvent(new CustomEvent('dialog-initialized', { 
+        detail: { viewId: this.viewId }
+      }));
+    } catch (error) {
+      console.error("Dialog initialization failed:", error);
+    }
+  }
+
+
+  async #initializeBasicDOM() {
+    return new Promise(resolve => {
+      // 基本的なダイアログ構造の初期化
+      const template = document.createElement("template");
+      template.innerHTML = DialogComponents.getDialogTemplate();
+      this.shadowRoot.appendChild(template.content.cloneNode(true));
+      
+      this.#setupEventListeners();
+      
+      // マイクロタスクで完了を確認
+      queueMicrotask(() => resolve());
+    });
+  }
+
+  async #initializeFullUI(config) {
+
+    // スタイルシートの追加
+    const styleSheet = document.createElement("style");
+    styleSheet.textContent = styles;
+    this.shadowRoot.appendChild(styleSheet);
+
+    // UIコンポーネントの初期化
+    this.statsUI = new statsUI(this.shadowRoot);
+    this.profileUI = new ProfileUI();
+    this.zapListUI = new ZapListUI(this.shadowRoot, this.profileUI, this.viewId, config);
+
+    subscriptionManager.setZapListUI(this.zapListUI);
+
+    // UIコンポーネントの初期化の後に
+    const zapEvents = cacheManager.getZapEvents(this.viewId);
+
+    if (!zapEvents?.length) {
+      this.zapListUI.showNoZapsMessage();
+    } else {
+      await this.zapListUI.renderZapListFromCache(zapEvents);
+    }
+
+    // 統計情報の初期化 - キャッシュされたデータを優先的に使用
+    const identifier = this.getAttribute("data-nzv-id");
+    if (identifier) {
+      const cachedStats = await cacheManager.getCachedStats(this.viewId, identifier);
+      if (cachedStats?.stats) {
+        this.statsUI.displayStats(cachedStats.stats);
+      } else {
+        const currentStats = await statsManager.getCurrentStats(this.viewId);
+        if (currentStats) {
+          this.statsUI.displayStats(currentStats);
+        }
+      }
+    }
+  }
+
+  static get observedAttributes() {
+    return ["data-theme"];
+  }
+
+  #setupEventListeners() {
+    const dialog = this.#getElement(".dialog");
+    const closeButton = this.#getElement(".close-dialog-button");
+
+    closeButton.addEventListener("click", () => this.closeDialog());
+    dialog.addEventListener("click", (e) => {
+      if (e.target === dialog) this.closeDialog();
+    });
+
+    // スペースキーでのスクロール制御を追加
+    document.addEventListener("keydown", (e) => {
+      if (dialog?.open) {
+        if (e.key === "Escape") {
+          this.closeDialog();
+        } else if (e.key === " ") {
+          e.preventDefault();
+          const zapList = this.#getElement(".dialog-zap-list");
+          if (zapList) {
+            zapList.scrollTop += zapList.clientHeight * 0.8;
+          }
+        }
+      }
+    });
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -110,508 +151,216 @@ class NostrZapViewDialog extends HTMLElement {
       case "data-theme":
         this.#updateTheme(newValue);
         break;
-      case "data-max-count":
-        this.#updateMaxCount(parseInt(newValue, 10));
-        break;
     }
   }
 
   #updateTheme(theme) {
-    this.#state.theme = theme;
-    if (this.#state.isInitialized) {
+    const state = cacheManager.updateThemeState(this.viewId, { theme });
+    if (state.isInitialized) {
       this.#applyTheme();
     }
   }
 
-  #updateMaxCount(count) {
-    if (TypeChecker.isValidCount(count)) {
-      this.#state.maxCount = count;
-    }
-  }
-
   #applyTheme() {
-    // Implement the theme application logic here
-    const themeClass =
-      this.#state.theme === "dark" ? "dark-theme" : "light-theme";
+    const state = cacheManager.getThemeState(this.viewId);
+    const themeClass = state.theme === "dark" ? "dark-theme" : "light-theme";
     this.shadowRoot.host.classList.add(themeClass);
   }
 
-  // Lifecycle methods
-  connectedCallback() {
-    this.#initializeDialog();
-  }
-
-  // Initialization methods
-  #initializeDialog() {
-    this.#setupStyles();
-    this.#setupTemplate();
-    this.#setupEventListeners();
-    this.statusUI = new StatusUI(this.shadowRoot);  // renamed from uiStatus
-  }
-
-  #setupStyles() {
-    const styleSheet = document.createElement("style");
-    styleSheet.textContent = styles;
-    this.shadowRoot.appendChild(styleSheet);
-  }
-
-  #setupTemplate() {
-    const template = document.createElement("template");
-    template.innerHTML = `
-      <dialog class="dialog">
-        <h2 class="dialog-title"></h2>
-        <button class="close-dialog-button">X</button>
-        <div class="zap-stats"></div>
-        <ul class="dialog-zap-list"></ul>
-      </dialog>
-    `;
-    this.shadowRoot.appendChild(template.content.cloneNode(true));
-  }
-
-  #setupEventListeners() {
+  // Public API methods
+  async showDialog() {
+    await this.#initializationPromise; // 基本初期化の完了を待つ
     const dialog = this.#getElement(".dialog");
-    const closeButton = this.#getElement(".close-dialog-button");
+    if (!dialog || dialog.open || !this.#state.isBasicInitialized) {
+      console.warn("Cannot show dialog - not properly initialized");
+      return;
+    }
 
-    closeButton.addEventListener("click", () => this.closeDialog());
-    dialog.addEventListener("click", this.#onDialogClick.bind(this));
+    dialog.showModal();
+    this.#updateDialogTitle();
   }
 
-  #onDialogClick(event) {
-    if (event.target === this.#getElement(".dialog")) {
-      this.closeDialog();
+  closeDialog() {
+    const dialog = this.#getElement(".dialog");
+    if (dialog?.open) {
+      dialog.close();
+      this.remove();
     }
   }
 
-  async #extractZapInfo(event) {
-    const zapInfo = new ZapInfo(event, defaultIcon);
-    const info = await zapInfo.extractInfo();
-    return info; // 修正: referenceを再設定せず、そのまま返す
-  }
-
-  async #loadProfileAndUpdate(pubkey, element) {
-    if (!pubkey) return;
-    await this.profileUI.loadAndUpdate(pubkey, element);
-  }
-
-  async replacePlaceholderWithZap(event, index) {
-    const placeholder = this.#getElement(`[data-index="${index}"]`);
-    if (!placeholder) return;
-
-    try {
-      // 基本情報を即時表示
-      const zapInfo = await this.#extractZapInfo(event);
-      // zapInfo.reference = event.reference; // この行を削除
-
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-
-      placeholder.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
-      placeholder.setAttribute("data-pubkey", zapInfo.pubkey);
-      placeholder.innerHTML = this.#createZapHTML(zapInfo);
-
-      // プロフィール情報を非同期で更新
-      if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, placeholder);
-      }
-    } catch (error) {
-      console.error("Failed to replace placeholder:", error);
+  // Delegate methods to specialized UI classes
+  async renderZapListFromCache(zapEventsCache) {
+    await this.zapListUI.renderZapListFromCache(zapEventsCache);
+    // キャッシュからの表示後に無限スクロールを設定
+    if (zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
+      subscriptionManager.setupInfiniteScroll(this.viewId);
     }
   }
 
-  async renderZapListFromCache(zapEventsCache, maxCount) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    try {
-      const sortedZaps = [...zapEventsCache]
-        .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, maxCount);
-
-      // 基本��報のみで表示を即時更新
-      const fragment = document.createDocumentFragment();
-      const zapInfoPromises = sortedZaps.map(async (event) => {
-        const zapInfo = await this.#extractZapInfo(event);
-        // zapInfo.reference = event.reference; // この行を削除
-
-        const li = document.createElement("li");
-        const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-
-        li.className = `zap-list-item ${colorClass}${
-          zapInfo.comment ? " with-comment" : ""
-        }`;
-        li.setAttribute("data-pubkey", zapInfo.pubkey);
-        li.innerHTML = this.#createZapHTML(zapInfo);
-
-        fragment.appendChild(li);
-        return { li, pubkey: zapInfo.pubkey };
-      });
-
-      // DOMを一括更新
-      const zapElements = await Promise.all(zapInfoPromises);
-      list.innerHTML = "";
-      list.appendChild(fragment);
-
-      // プロフィール情報を非同期で更新
-      zapElements.forEach(({ li, pubkey }) => {
-        if (pubkey) {
-          this.#loadProfileAndUpdate(pubkey, li);
-        }
-      });
-    } catch (error) {
-      console.error("Failed to render zap list:", error);
-    }
+  displayZapStats(stats) {
+    this.statsUI.displayStats(stats);
   }
 
-  async prependZap(event) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    // "No Zaps" メッセージが存在する場合、メッセージのみを削除
-    const noZapsMessage = list.querySelector(".no-zaps-message");
-    if (noZapsMessage) {
-      noZapsMessage.remove();
-    }
-
-    try {
-      const zapInfo = await this.#extractZapInfo(event);
-      // zapInfo.reference = event.reference; // この行を削除
-
-      const colorClass = this.#getAmountColorClass(zapInfo.satsAmount);
-      const li = document.createElement("li");
-      li.className = `zap-list-item ${colorClass}${
-        zapInfo.comment ? " with-comment" : ""
-      }`;
-      li.setAttribute("data-pubkey", zapInfo.pubkey);
-      li.innerHTML = this.#createZapHTML(zapInfo);
-
-      list.prepend(li);
-
-      // プロフィール情報を非同期で更新
-      if (zapInfo.pubkey) {
-        this.#loadProfileAndUpdate(zapInfo.pubkey, li);
-      }
-    } catch (error) {
-      console.error("Failed to prepend zap:", error);
-    }
-  }
-
-  #getAmountColorClass(amount) {
-    if (!this.#isColorModeEnabled()) return "";
-
-    const thresholds = [
-      { value: 10000, className: "zap-amount-10k" },
-      { value: 5000, className: "zap-amount-5k" },
-      { value: 2000, className: "zap-amount-2k" },
-      { value: 1000, className: "zap-amount-1k" },
-      { value: 500, className: "zap-amount-500" },
-      { value: 200, className: "zap-amount-200" },
-      { value: 100, className: "zap-amount-100" },
-    ];
-
-    for (const threshold of thresholds) {
-      if (amount >= threshold.value) return threshold.className;
-    }
-    return "";
-  }
-
-  #isColorModeEnabled() {
-    // Fix: Get the correct button for this dialog using viewId
-    const viewId = this.getAttribute("data-view-id");
-    const button = document.querySelector(
-      `button[data-zap-view-id="${viewId}"]`
-    );
-    const colorModeAttr = button?.getAttribute("data-zap-color-mode");
-    return !colorModeAttr || !["true", "false"].includes(colorModeAttr)
-      ? APP_CONFIG.DEFAULT_OPTIONS.colorMode
-      : colorModeAttr === "true";
-  }
-
-  // UI element creation methods
-  #createUIComponents(zapInfo) {
-    const iconComponent = this.#createIconComponent(zapInfo);
-    const nameComponent = this.#createNameComponent(zapInfo);
-    const pubkeyComponent = this.#createPubkeyComponent(zapInfo);
-
-    // referenceComponentの生成を条件付きに
-    const viewId = this.getAttribute("data-view-id");
-    const identifier =
-      document
-        .querySelector(`button[data-zap-view-id="${viewId}"]`)
-        ?.getAttribute("data-nzv-id") || "";
-    const referenceComponent = !isEventIdentifier(identifier)
-      ? this.#createReferenceComponent(zapInfo)
-      : "";
-
-    return {
-      iconComponent,
-      nameComponent,
-      pubkeyComponent,
-      referenceComponent,
-    };
-  }
-
-  #createIconComponent({ senderIcon, senderName }) {
-    return `<div class="zap-placeholder-icon skeleton"></div>`;
-  }
-
-  #createNameComponent({ senderName }) {
-    return senderName
-      ? `<span class="sender-name">${escapeHTML(senderName)}</span>`
-      : `<div class="zap-placeholder-name skeleton"></div>`;
-  }
-
-  #createPubkeyComponent({ pubkey, displayIdentifier, reference }) {
-    const viewId = this.getAttribute("data-view-id");
-    const identifier =
-      document
-        .querySelector(`button[data-zap-view-id="${viewId}"]`)
-        ?.getAttribute("data-nzv-id") || "";
-    const shouldShowReference = !isEventIdentifier(identifier);
-
-    return reference && shouldShowReference
-      ? `<span class="sender-pubkey" data-pubkey="${pubkey}">${displayIdentifier}</span>`
-      : `<span class="sender-pubkey" data-nip05-target="true" data-pubkey="${pubkey}">${displayIdentifier}</span>`;
-  }
-
-  #createReferenceComponent({ reference }) {
-    if (!reference) return "";
-
-    try {
-      const getLinkUrl = this.#getReferenceUrl(reference);
-      const content = this.#getReferenceContent(reference);
-
-      return `
-        <div class="zap-reference">
-          <div class="reference-icon">
-            <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
-          </div>
-          <div class="reference-content">
-            <div class="reference-text">${escapeHTML(content)}</div>
-            <a href="${getLinkUrl}" target="_blank" class="reference-link">
-              <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
-            </a>
-          </div>
-        </div>
-      `;
-    } catch (error) {
-      console.error("Failed to create reference component:", error);
-      return "";
-    }
-  }
-
-  #getReferenceUrl(reference) {
-    if (reference.kind === 31990) {
-      const rTags = reference.tags.filter((t) => t[0] === "r");
-      const nonSourceTag = rTags.find((t) => !t.includes("source")) || rTags[0];
-      return nonSourceTag?.[1];
-    }
-    return `https://njump.me/${encodeNevent(
-      reference.id,
-      reference.kind,
-      reference.pubkey
-    )}`;
-  }
-
-  #getReferenceContent(reference) {
-    const kindContentMap = {
-      30023: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30030: () => reference.tags.find((t) => t[0] === "title")?.[1] || reference.content,
-      30009: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      40: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      41: () => reference.tags.find((t) => t[0] === "name")?.[1] || reference.content,
-      31990: () => reference.tags.find((t) => t[0] === "alt")?.[1] || reference.content,
-    };
-
-    return kindContentMap[reference.kind]?.() || reference.content;
-  }
-
-  #createZapHTML(zapInfo) {
-    const {
-      iconComponent,
-      nameComponent,
-      pubkeyComponent,
-      referenceComponent,
-    } = this.#createUIComponents(zapInfo);
-    const [amount, unit] = zapInfo.satsText.split(" ");
-    const isNew = isWithin24Hours(zapInfo.created_at);
-
-    return `
-      <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
-        <div class="sender-icon${isNew ? " is-new" : ""}">
-          ${iconComponent}
-        </div>
-        <div class="sender-info">
-          ${nameComponent}
-          ${pubkeyComponent}
-        </div>
-        <div class="zap-amount"><span class="number">${amount}</span> ${unit}</div>
-      </div>
-      ${
-        zapInfo.comment
-          ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(
-              zapInfo.comment
-            )}</span></div>`
-          : ""
-      }
-      ${referenceComponent}
-    `;
-  }
+  // ... その他の必要なメソッド ...
 
   #getElement(selector) {
     return this.shadowRoot.querySelector(selector);
   }
 
-  // Public API
-  showDialog() {
-    const dialog = this.#getElement(".dialog");
-    if (dialog && !dialog.open) {
-      const viewId = this.getAttribute("data-view-id");
-      const fetchButton = document.querySelector(
-        `button[data-zap-view-id="${viewId}"]`
-      );
-      if (fetchButton) {
-        const title = this.#getElement(".dialog-title");
-        const customTitle = fetchButton.getAttribute("data-title");
-        if (customTitle && customTitle.trim()) {
-          title.textContent = customTitle;
-          title.classList.add("custom-title");
-        } else {
-          const identifier = fetchButton.getAttribute("data-nzv-id");
-          title.textContent = "To " + formatIdentifier(identifier);
-          title.classList.remove("custom-title");
-        }
-      }
-      dialog.showModal();
+  #updateDialogTitle() {
+    const viewId = this.getAttribute("data-view-id");
+    const fetchButton = document.querySelector(
+      `button[data-zap-view-id="${viewId}"]`
+    );
+    if (!fetchButton) return;
+
+    const titleContainer = this.#getElement(".dialog-title");
+    const title = this.#getElement(".dialog-title a");
+    if (!title || !titleContainer) return;
+
+    const customTitle = fetchButton.getAttribute("data-title");
+    const identifier = fetchButton.getAttribute("data-nzv-id");
+    
+    title.href = identifier ? `https://njump.me/${identifier}` : '#';
+    
+    if (customTitle?.trim()) {
+      title.textContent = customTitle;
+      titleContainer.classList.add("custom-title");
+    } else {
+      title.textContent = APP_CONFIG.DIALOG_CONFIG.DEFAULT_TITLE + formatIdentifier(identifier);
+      titleContainer.classList.remove("custom-title");
     }
   }
 
-  closeDialog() {
-    const dialog = this.#getElement(".dialog");
-    if (dialog?.open) dialog.close();
-  }
-
-  // Zap display methods
-  initializeZapPlaceholders(maxCount) {
-    const list = this.#getElement(".dialog-zap-list");
-    if (!list) return;
-
-    list.innerHTML = Array(maxCount)
-      .fill(null)
-      .map(
-        (_, i) => `
-        <li class="zap-list-item" data-index="${i}">
-          <div class="zap-sender">
-            <div class="sender-icon">
-              <div class="zap-placeholder-icon skeleton"></div>
-            </div>
-            <div class="sender-info">
-              <div class="zap-placeholder-name skeleton"></div>
-              <div class="sender-pubkey skeleton"></div>
-            </div>
-            <div class="zap-amount skeleton"></div>
-          </div>
-        </li>
-      `
-      )
-      .join("");
-  }
-
-  initializeZapStats() {
-    this.statusUI.initializeStats();  // renamed from uiStatus
-  }
-
-  displayZapStats(stats) {
-    this.statusUI.displayStats(stats);  // renamed from uiStatus
-  }
-
-  showNoZapsMessage() {
-    this.statusUI.showNoZaps();  // renamed from uiStatus
-  }
-
-  #createNoZapsMessage() {
-    return `
-      <div class="no-zaps-message">
-        No Zaps yet!<br>Send the first Zap!
-      </div>
-    `;
-  }
-
-  showNoZapsMessage() {
-    const list = this.#getElement(".dialog-zap-list");
-    if (list) {
-      list.innerHTML = this.#createNoZapsMessage();
+  // UI操作メソッド
+  getOperations() {
+    // 基本初期化チェック
+    if (!this.#state.isBasicInitialized) {
+      console.warn(`Basic initialization not complete for viewId: ${this.viewId}`);
+      return null;
     }
+
+    const operations = {
+      closeDialog: () => this.closeDialog(),
+      showDialog: () => this.showDialog(),
+    };
+
+    // 完全な初期化が完了している場合のみ追加の操作を提供
+    if (this.#state.isInitialized) {
+      Object.assign(operations, {
+        replacePlaceholderWithZap: (event, index) => this.zapListUI?.replacePlaceholder(event, index),
+        renderZapListFromCache: (cache) => this.zapListUI?.renderZapListFromCache(cache),
+        prependZap: (event) => this.zapListUI?.prependZap(event),
+        displayZapStats: (stats) => this.statsUI?.displayStats(stats),
+        showNoZapsMessage: () => this.zapListUI?.showNoZapsMessage()
+      });
+    }
+
+    return operations;
+  }
+
+  // ��期化の完了を待機するメソッドを追加
+  async waitForInitialization() {
+    return this.#initializationPromise;
   }
 }
 
 customElements.define("nzv-dialog", NostrZapViewDialog);
 
-// Simplified external API
-export const createDialog = (viewId) => {
-  if (!document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`)) {
+// ダイアログ操作のヘルパー関数
+const dialogManager = {
+  create: async (viewId, config) => {
+    
+    if (!viewId || !config) {
+      console.error('Invalid viewId or config:', { viewId, config });
+      return Promise.reject(new Error('Invalid viewId or config'));
+    }
+
+    // configを先に設定
+    subscriptionManager.setViewConfig(viewId, config);
+
+    const existingDialog = document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+    if (existingDialog) return existingDialog;
+
     const dialog = document.createElement("nzv-dialog");
     dialog.setAttribute("data-view-id", viewId);
+    dialog.setAttribute("data-config", JSON.stringify(config));
+
+    const button = document.querySelector(`button[data-zap-view-id="${viewId}"]`);
+    if (button?.getAttribute("data-nzv-id")) {
+      dialog.setAttribute("data-nzv-id", button.getAttribute("data-nzv-id"));
+    }
+
     document.body.appendChild(dialog);
+    await dialog.waitForInitialization();
+    
+    return dialog;
+  },
+
+  get: (viewId) => document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`),
+
+  execute: (viewId, operation, ...args) => {
+    const dialog = dialogManager.get(viewId);
+    const operations = dialog?.getOperations();
+    if (!operations) {
+      console.warn(`Dialog operations not available for ${viewId}`);
+      return null;
+    }
+    return operations[operation]?.(...args) ?? null;
   }
 };
 
-export const {
-  closeDialog,
-  showDialog,
-  initializeZapPlaceholders,
-  initializeZapStats,
-  replacePlaceholderWithZap,
-  renderZapListFromCache,
-  prependZap,
-  displayZapStats,
-  showNoZapsMessage, // ここに統合
-} = (() => {
-  const getDialog = (viewId) =>
-    document.querySelector(`nzv-dialog[data-view-id="${viewId}"]`);
+// 公開APIも非同期に変更
+export async function createDialog(viewId) {
+  try {
+    const config = subscriptionManager.getViewConfig(viewId);
+    if (!config) {
+      throw new Error(`View configuration not found for viewId: ${viewId}`);
+    }
 
-  return {
-    closeDialog: (viewId) => getDialog(viewId)?.closeDialog(),
-    showDialog: (viewId) => getDialog(viewId)?.showDialog(),
-    initializeZapPlaceholders: (maxCount, viewId) =>
-      getDialog(viewId)?.initializeZapPlaceholders(maxCount),
-    initializeZapStats: (viewId) => getDialog(viewId)?.initializeZapStats(),
-    replacePlaceholderWithZap: (event, index, viewId) =>
-      getDialog(viewId)?.replacePlaceholderWithZap(event, index),
-    renderZapListFromCache: async (cache, max, viewId) => {
-      const dialog = getDialog(viewId);
-      if (!dialog) return;
+    // configを先に設定
+    subscriptionManager.setViewConfig(viewId, config);
 
-      console.log('[UIManager] キャッシュからの表示開始:', {
-        cacheSize: cache.length,
-        maxDisplay: max,
-        viewId
-      });
+    const dialog = await dialogManager.create(viewId, config);
 
-      const list = dialog.shadowRoot.querySelector(".dialog-zap-list");
-      if (!list) return;
-      list.innerHTML = "";
+    return dialog;
+  } catch (error) {
+    console.error('[Dialog] Creation failed:', error);
+    return null;
+  }
+}
 
-      // キャッシュからデータを即時表示
-      const sortedZaps = [...cache]
-        .sort((a, b) => b.created_at - a.created_at)
-        .slice(0, max);
+export async function showDialog(viewId) {
+  try {
+    const dialog = dialogManager.get(viewId);
+    if (!dialog) {
+      throw new Error('Dialog not found');
+    }
 
-      console.log('[UIManager] 表示するZaps:', {
-        count: sortedZaps.length,
-        ids: sortedZaps.map(zap => zap.id)
-      });
+    // 基本初期化の完了だけを待つ
+    await dialog.waitForInitialization();
+    const operations = dialog.getOperations();
+    if (!operations?.showDialog) {
+      throw new Error('Basic dialog operations not available');
+    }
 
-      if (sortedZaps.length === 0) {
-        dialog.showNoZapsMessage();
-        return;
-      }
+    operations.showDialog();
+  } catch (error) {
+    console.error('Failed to show dialog:', error);
+  }
+}
 
-      await dialog.renderZapListFromCache(sortedZaps, max);
-    },
-    prependZap: (event, viewId) => getDialog(viewId)?.prependZap(event, viewId),
-    displayZapStats: (stats, viewId) =>
-      getDialog(viewId)?.displayZapStats(stats),
-    showNoZapsMessage: (viewId) => getDialog(viewId)?.showNoZapsMessage(),
-  };
-})();
+// 以下の���クスポート関数を修正
+export const closeDialog = (viewId) => dialogManager.execute(viewId, 'closeDialog');
+export const displayZapStats = (stats, viewId) => dialogManager.execute(viewId, 'displayZapStats', stats);
+export const replacePlaceholderWithZap = (event, index, viewId) => 
+  dialogManager.execute(viewId, 'replacePlaceholderWithZap', event, index);
+export const renderZapListFromCache = async (cache, viewId) => 
+  await dialogManager.execute(viewId, 'renderZapListFromCache', cache);
+export const prependZap = (event, viewId) => dialogManager.execute(viewId, 'prependZap', event);
+export const showNoZapsMessage = (viewId) => {
+  const dialog = dialogManager.get(viewId);
+  const operations = dialog?.getOperations();
+  if (!operations?.showNoZapsMessage) return;
+  operations.showNoZapsMessage();
+};

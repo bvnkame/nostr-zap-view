@@ -66,32 +66,42 @@
       <h1>nostr zap view</h1>
       <p>Example page</p>
     </header>
+
     <main>
+      <button
+        data-title=""
+        data-nzv-id="npub1sg6plzptd64u62a878hep2kev88swjh3tw00gjsfl8f237lmu63q0uf63m"
+        data-zap-color-mode="true"
+        data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+      >
+        View Zaps received by Jack Dorsey
+      </button>
+
+      <br />
+
       <h2>Zap any user and view the zap</h2>
       <button
         data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
-        data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+        data-relays="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
       >
         Zap Me ⚡️
       </button>
       <button
         data-title=""
         data-nzv-id="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
-        data-max-count="8"
         data-zap-color-mode="true"
-        data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+        data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
       >
         View zaps 👀
       </button>
 
-      <br />
       <br />
 
       <h2>Zap any note and view the zap</h2>
       <button
         data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
         data-note-id="note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg"
-        data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+        data-relays="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
       >
         Zap nostr-zap-view ⚡️
       </button>
@@ -99,47 +109,12 @@
       <button
         data-title="To nostr-zap-view"
         data-nzv-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv"
-        data-max-count="8"
         data-zap-color-mode="true"
-        data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+        data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
       >
         View zaps 👀
       </button>
 
-      <br />
-      <br />
-
-      <div>note:</div>
-      <div
-        id="nostr-embed-note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg"
-      ></div>
-      <script>
-        !(function () {
-          const n = document.createElement("script");
-          n.type = "text/javascript";
-          n.async = !0;
-          n.src =
-            "https://cdn.jsdelivr.net/gh/nostrband/nostr-embed@0.1.16/dist/nostr-embed.js";
-          const options = {
-            showZaps: true,
-            showCopyAddr: false,
-            hideNostrich: false,
-            showFollowing: true,
-          };
-          n.onload = function () {
-            nostrEmbed.init(
-              "note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg",
-              "#nostr-embed-note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg",
-              "",
-              options
-            );
-          };
-          const a = document.getElementsByTagName("script")[0];
-          a.parentNode.insertBefore(n, a);
-        })();
-      </script>
-
-      <br />
       <br />
 
       <h2>Button design example</h2>
@@ -172,9 +147,8 @@
           "
           onmouseover="this.style.background='#6B7280'"
           onmouseout="this.style.background='#4B5563'"
-          data-npub="npub1a3pvwe2p3v7mnjz6hle63r628wl9w567aw7u23fzqs062v5vqcqqu3sgh3"
-          data-note-id="note10uqd8wydxfw4h06agupr0g68u2dwnx65d806h6ve9s578s8yq03sehafpg"
-          data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+          data-npub="npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
+          data-relays="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
         >
           Zap
         </button>
@@ -198,11 +172,10 @@
           "
           onmouseover="this.style.background='#6B7280'"
           onmouseout="this.style.background='#4B5563'"
-          data-title="To nostr-zap-view"
-          data-nzv-id="nevent1qqs87qxnhzxnyh2mhaw5wq3h5dr79xhfnd2xnhataxvjc20rcrjq8cck4glgv"
-          data-max-count="8"
+          data-title=""
+          data-nzv-id="npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
           data-zap-color-mode="true"
-          data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
+          data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"
         >
           View
         </button>
@@ -232,7 +205,7 @@
     onmouseout="this.style.background='#4B5563'"
     data-npub="npub1..." 
     data-note-id="note1..." 
-    data-relays="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"&gt;
+    data-relays="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"&gt;
     Zap
   &lt;/button&gt;
   &lt;button style="
@@ -255,9 +228,8 @@
     onmouseout="this.style.background='#4B5563'"
     data-title="" 
     data-nzv-id="nevent1..." 
-    data-max-count="8" 
     data-zap-color-mode="true" 
-    data-relay-urls="wss://relay.nostr.band,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"&gt;
+    data-relay-urls="wss://relay.nostr.band,wss://relay.damus.io,wss://nos.lol,wss://nostr.bitcoiner.social,wss://relay.nostr.wirednet.jp,wss://yabu.me"&gt;
     View
   &lt;/button&gt;
 &lt;/div&gt;
@@ -280,7 +252,7 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/nostr-zap@1.1.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.1.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.2.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
     <script>
       hljs.highlightAll();
