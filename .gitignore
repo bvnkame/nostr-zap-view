@@ -1,5 +1,5 @@
 /dist/
-/dist/test.html
+/test/
 /node_modules/
 /.vscode/
 licenses.json
