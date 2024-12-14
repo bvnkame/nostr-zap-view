@@ -199,36 +199,6 @@ export class BatchProcessor {
     this.relayUrls = Array.isArray(urls) ? urls : [];
   }
 
-  async connectToRelays() {
-    if (!this.relayUrls?.length) {
-      throw new Error('No relays configured');
-    }
-
-    const results = await this._connectToRelays();
-    const connectedCount = this._countSuccessfulConnections(results);
-    
-    if (connectedCount === 0) {
-      throw new Error('Failed to connect to any relay');
-    }
-
-    return connectedCount;
-  }
-
-  async _connectToRelays() {
-    console.log(`Connecting to relays: ${this.relayUrls.join(', ')}`);
-    const connectionPromises = this.relayUrls.map(url => 
-      this.pool.ensureRelay(url).catch(error => {
-        console.warn(`Failed to connect to relay ${url}:`, error);
-        return null;
-      })
-    );
-    return Promise.allSettled(connectionPromises);
-  }
-
-  _countSuccessfulConnections(results) {
-    return results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
-  }
-
   // キャッシュ関連メソッドの改善
   getCachedItem(key) {
     const cached = this.eventCache.get(key);

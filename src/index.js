@@ -60,7 +60,6 @@ async function handleButtonClick(button, viewId) {
         await Promise.all([
           eventPool.connectToRelays(config.relayUrls),
           subscriptionManager.initializeSubscriptions(config, viewId),
-          !profilePool.isInitialized ? profilePool.initialize() : Promise.resolve(),
           // 統計情報の初期化を一度だけ行う
           identifier ? statsManager.initializeStats(identifier, viewId, true) : Promise.resolve()
         ]);

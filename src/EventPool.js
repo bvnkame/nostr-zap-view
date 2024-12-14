@@ -75,18 +75,9 @@ export class EventPool {
   // Connection management
   async connectToRelays(zapRelayUrls) {
     if (this.#isConnected) return;
-    try {
-      await this.#setupProcessors(zapRelayUrls);
-      this.#isConnected = true;
-    } catch (error) {
-      this.#handleError("Relay connection error", error);
-    }
-  }
-
-  async #setupProcessors(zapRelayUrls) {
     const processors = [this.#eTagProcessor, this.#aTagProcessor];
     processors.forEach(p => p.setRelayUrls(zapRelayUrls));
-    return Promise.all(processors.map(p => p.connectToRelays()));
+    this.#isConnected = true;
   }
 
   subscribeToZaps(viewId, config, decoded, handlers) {

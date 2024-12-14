@@ -16,7 +16,7 @@ export class ProfilePool {
   static instance = null;
   #config;
   #simplePool;
-  #isInitialized = false;
+  #isInitialized = true; // 初期値をtrueに変更
   #profileProcessor;
 
   constructor() {
@@ -47,18 +47,6 @@ export class ProfilePool {
   // Core Methods
   get isInitialized() {
     return this.#isInitialized;
-  }
-
-  async initialize() {
-    if (this.#isInitialized) return;
-    
-    try {
-      await this.#profileProcessor.connectToRelays();
-      this.#isInitialized = true;
-    } catch (error) {
-      this.#isInitialized = false;
-      throw new Error('ProfilePool initialization error: ' + error.message);
-    }
   }
 
   // Profile Fetching Methods
