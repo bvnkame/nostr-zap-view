@@ -329,7 +329,7 @@ class ZapSubscriptionManager {
   async _collectEvents(viewId, config, decoded, batchEvents, batchSize, state) {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error('Load timeout')), 
-        APP_CONFIG.LOAD_TIMEOUT || 10000);
+        APP_CONFIG.LOAD_TIMEOUT);
 
       eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: (event) => {
@@ -396,7 +396,7 @@ class ZapSubscriptionManager {
         }
       }
 
-      if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE || 5)) {
+      if (batchEvents.length >= (APP_CONFIG.BATCH_SIZE)) {
         if (this.zapListUI) {
           this.zapListUI.batchUpdate(cacheManager.getZapEvents(viewId))
             .catch(console.error);
@@ -435,7 +435,7 @@ class ZapSubscriptionManager {
   _setupBufferInterval(batchEvents, viewId) {
     // バッファー更新の最小間隔を設定
     let lastUpdate = 0;
-    const minInterval = APP_CONFIG.BUFFER_MIN_INTERVAL || 2000; // 最小更新間隔を2秒に
+    const minInterval = APP_CONFIG.BUFFER_MIN_INTERVAL;
 
     return setInterval(() => {
       const now = Date.now();

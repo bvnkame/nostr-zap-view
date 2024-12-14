@@ -11,14 +11,16 @@ export const APP_CONFIG = {
     theme: "light",
     colorMode: true,
   },
-  INITIAL_LOAD_COUNT: 15, // 追加：初期ロード件数のデフォルト値
-  ADDITIONAL_LOAD_COUNT: 20, // 一度に読み込む件数を減らす
-  LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
+  BATCH_SIZE: 5,
+  INITIAL_LOAD_COUNT: 15, // 初期ロード件数
+  ADDITIONAL_LOAD_COUNT: 20, // 追加ロード件数
+  LOAD_TIMEOUT: 10000, // タイムアウト時間（ms）
   BUFFER_INTERVAL: 500, // バッファ間隔（ms）
+  BUFFER_MIN_INTERVAL: 100, // バッファ最小間隔（ms）
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '400px', // スクロール検知の余裕を調整
-    THRESHOLD: 0.1,
-    DEBOUNCE_TIME: 500, // デバウンス時間を増やす
+    ROOT_MARGIN: '400px', // スクロール検知のマージン
+    THRESHOLD: 0.1, // スクロール検知の閾値
+    DEBOUNCE_TIME: 500, // デバウンス時間（ms）
     RETRY_DELAY: 500 // リトライ遅延時間（ms）
   },
   ZAP_CONFIG: {
