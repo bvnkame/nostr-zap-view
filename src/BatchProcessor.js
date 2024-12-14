@@ -215,6 +215,7 @@ export class BatchProcessor {
   }
 
   async _connectToRelays() {
+    console.log(`Connecting to relays: ${this.relayUrls.join(', ')}`);
     const connectionPromises = this.relayUrls.map(url => 
       this.pool.ensureRelay(url).catch(error => {
         console.warn(`Failed to connect to relay ${url}:`, error);

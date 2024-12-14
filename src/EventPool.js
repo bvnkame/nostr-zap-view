@@ -13,7 +13,7 @@ export class EventPool {
   #subscriptions;
   #state;
   #referenceFetching;
-  #etagProcessor;
+  #eTagProcessor;
   #aTagProcessor;
 
   constructor() {
@@ -37,7 +37,7 @@ export class EventPool {
       batchSize: APP_CONFIG.BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_SIZE,
       batchDelay: APP_CONFIG.BATCH_CONFIG.REFERENCE_PROCESSOR.BATCH_DELAY
     };
-    this.#etagProcessor = new ETagReferenceProcessor(processorConfig);
+    this.#eTagProcessor = new ETagReferenceProcessor(processorConfig);
     this.#aTagProcessor = new ATagReferenceProcessor(processorConfig);
   }
 
@@ -84,7 +84,7 @@ export class EventPool {
   }
 
   async #setupProcessors(zapRelayUrls) {
-    const processors = [this.#etagProcessor, this.#aTagProcessor];
+    const processors = [this.#eTagProcessor, this.#aTagProcessor];
     processors.forEach(p => p.setRelayUrls(zapRelayUrls));
     return Promise.all(processors.map(p => p.connectToRelays()));
   }
@@ -125,7 +125,7 @@ export class EventPool {
       const pending = this.#referenceFetching.get(eventId);
       if (pending) return pending;
 
-      const processor = type === 'e' ? this.#etagProcessor : this.#aTagProcessor;
+      const processor = type === 'e' ? this.#eTagProcessor : this.#aTagProcessor;
 
       try {
         const reference = await processor.getOrCreateFetchPromise(eventId);
