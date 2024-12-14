@@ -63,9 +63,12 @@ export class BatchProcessor {
   }
 
   _getBatchItems() {
-    const batchItems = Array.from(this.batchQueue).splice(0, this.batchSize);
-    this.batchQueue = new Set(Array.from(this.batchQueue).filter(key => !batchItems.includes(key)));
-    batchItems.forEach(key => this.processingItems.add(key));
+    const batchItems = Array.from(this.batchQueue).slice(0, this.batchSize);
+    batchItems.forEach(item => {
+      this.batchQueue.delete(item);
+      console.log("delete item", item);
+      this.processingItems.add(item);
+    });
     return batchItems;
   }
 
@@ -186,7 +189,6 @@ export class BatchProcessor {
           }
         }
       );
-      console.log("sub", sub);
 
       timeoutId = setTimeout(() => {
         if (!isCompleted) {
