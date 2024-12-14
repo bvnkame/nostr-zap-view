@@ -12,31 +12,12 @@ import { statsManager } from "./StatsManager.js";
 import { profilePool } from "./ProfilePool.js";
 import { eventPool } from "./EventPool.js";
 import { cacheManager } from "./CacheManager.js";
-import { ZapInfo } from "./ZapInfo.js";
 
-// ヘルパー関数
-async function updateCachedZapsColorMode(events, config) {
-  try {
-    events.forEach(event => {
-      const zapInfo = cacheManager.getZapInfo(event.id);
-      if (!zapInfo?.satsAmount) return;
-      
-      zapInfo.colorClass = ZapInfo.getAmountColorClass(
-        zapInfo.satsAmount,
-        config.isColorModeEnabled
-      );
-      cacheManager.setZapInfo(event.id, zapInfo);
-    });
-  } catch (error) {
-    console.error('Failed to update color mode:', error);
-  }
-}
 
 // 初期化関連の処理をまとめる
 async function initializeViewer(viewId, config) {
   const cachedEvents = cacheManager.getZapEvents(viewId);
   if (cachedEvents.length > 0) {
-    await updateCachedZapsColorMode(cachedEvents, config);
     const pubkeys = [...new Set(cachedEvents.map(event => event.pubkey))];
     profilePool.fetchProfiles(pubkeys);
   }
