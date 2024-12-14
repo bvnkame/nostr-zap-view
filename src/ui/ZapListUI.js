@@ -50,6 +50,12 @@ export class ZapListUI {
       this.profileUpdateUnsubscribe();
       this.profileUpdateUnsubscribe = null;
     }
+
+    // リストをクリア
+    const list = this.#getElement(".dialog-zap-list");
+    if (list) {
+      list.innerHTML = '';
+    }
   }
 
   // 2. リスト操作の基本メソッド
@@ -100,15 +106,15 @@ export class ZapListUI {
   }
 
   async renderZapListFromCache(zapEventsCache) {
-    if (!zapEventsCache?.length) {
-      // キャッシュ状態をリセット
+    // viewId に基づいて正しいイベントを取得
+    const events = cacheManager.getZapEvents(this.viewId);
+    if (!events?.length) {
       cacheManager.setNoZapsState(this.viewId, false);
       return this.showNoZapsMessage();
     }
 
     await this.#updateListContent(async (list) => {
-      // イベントの前処理を非同期で実行
-      const uniqueEvents = this.#getUniqueEvents(zapEventsCache);
+      const uniqueEvents = this.#getUniqueEvents(events); // zapEventsCache から events に変更
       const listFragment = document.createDocumentFragment();
       const profileUpdatesQueue = [];
 

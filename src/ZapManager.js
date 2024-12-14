@@ -10,7 +10,14 @@ class ZapSubscriptionManager {
     this.viewConfigs = new Map();
     this.configStore = new Map();
     this.observers = new Map();
+    // 追加: private フィールドを初期化
+    this.#subscriptions = new Map();
+    this.#state = new Map();
   }
+
+  // Private フィールド宣言を追加
+  #subscriptions;
+  #state;
 
   // 基本設定メソッド
   setZapListUI(zapListUI) {
@@ -370,7 +377,8 @@ class ZapSubscriptionManager {
     return new Promise((resolve) => {
       const bufferInterval = this._setupBufferInterval(batchEvents, viewId);
       
-      eventPool.subscribeToZaps(viewId, config, decoded, {
+      // サブスクリプションを保存
+      const subscription = eventPool.subscribeToZaps(viewId, config, decoded, {
         onevent: (event) => {
           const currentLastTime = this._handleInitialEvent(event, batchEvents, lastEventTime, viewId);
           if (currentLastTime !== null) {
@@ -382,6 +390,9 @@ class ZapSubscriptionManager {
           resolve({ batchEvents: [...batchEvents], lastEventTime });
         }
       });
+
+      // サブスクリプションを保存
+      this.#subscriptions.set(viewId, { zap: subscription });
     });
   }
 
@@ -464,6 +475,27 @@ class ZapSubscriptionManager {
   _canLoadMore(state, config) {
     const canLoad = config && !state.isLoading && state.lastEventTime;
     return canLoad;
+  }
+
+  unsubscribe(viewId) {
+    try {
+      // サブスクリプションの終了
+      const subscription = this.#subscriptions.get(viewId);
+      if (subscription?.zap) {
+        subscription.zap();
+        subscription.zap = null;
+      }
+
+      // 状態のリセット
+      this.#state.set(viewId, { isZapClosed: true });
+
+      // Observer のクリーンアップ
+      this._cleanupInfiniteScroll(viewId);
+      
+      console.log(`Unsubscribed from zaps for viewId: ${viewId}`);
+    } catch (error) {
+      console.error(`Failed to unsubscribe for viewId ${viewId}:`, error);
+    }
   }
 }
 

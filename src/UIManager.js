@@ -92,6 +92,7 @@ class NostrZapViewDialog extends HTMLElement {
     subscriptionManager.setZapListUI(this.zapListUI);
 
     // UIコンポーネントの初期化の後に
+    // viewId に基づいて正しいイベントを取得
     const zapEvents = cacheManager.getZapEvents(this.viewId);
 
     if (!zapEvents?.length) {
@@ -183,6 +184,9 @@ class NostrZapViewDialog extends HTMLElement {
   closeDialog() {
     const dialog = this.#getElement(".dialog");
     if (dialog?.open) {
+      this.zapListUI?.destroy();
+      // UIのクリーンアップのみを行い、キャッシュはそのまま保持
+      subscriptionManager.unsubscribe(this.viewId);
       dialog.close();
       this.remove();
     }
@@ -351,7 +355,13 @@ export async function showDialog(viewId) {
 }
 
 // 以下の���クスポート関数を修正
-export const closeDialog = (viewId) => dialogManager.execute(viewId, 'closeDialog');
+export const closeDialog = (viewId) => {
+  const dialog = dialogManager.get(viewId);
+  if (dialog) {
+    subscriptionManager.unsubscribe(viewId);
+    dialog.closeDialog();
+  }
+};
 export const displayZapStats = (stats, viewId) => dialogManager.execute(viewId, 'displayZapStats', stats);
 export const replacePlaceholderWithZap = (event, index, viewId) => 
   dialogManager.execute(viewId, 'replacePlaceholderWithZap', event, index);
