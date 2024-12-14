@@ -16,7 +16,7 @@ export const APP_CONFIG = {
   LOAD_TIMEOUT: 10000, // タイムアウト時間を延長
   BUFFER_INTERVAL: 500, // バッファ間隔（ms）
   INFINITE_SCROLL: {
-    ROOT_MARGIN: '700px', // スクロール検知の余裕を調整
+    ROOT_MARGIN: '400px', // スクロール検知の余裕を調整
     THRESHOLD: 0.1,
     DEBOUNCE_TIME: 500, // デバウンス時間を増やす
     RETRY_DELAY: 500 // リトライ遅延時間（ms）
