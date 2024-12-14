@@ -6,7 +6,7 @@ import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 
 export class DialogComponents {
-  // クラス内定数定義
+  // 定数定義
   static #REFERENCE_KIND_MAPPING = {
     1: 'content',
     30023: 'title',
@@ -17,20 +17,30 @@ export class DialogComponents {
     31990: 'alt'
   };
 
-  // UI Component Creation Methods
+  static #ERROR_MESSAGES = {
+    UI_COMPONENTS: 'Failed to create UI components:',
+    ZAP_ITEM: 'Failed to create zap item HTML:',
+    REFERENCE: 'Reference component creation failed:'
+  };
+
+  // Core UI Component Methods
   static createUIComponents(zapInfo, _viewId, identifier) {
     try {
       const normalizedReference = this.#getNormalizedReference(zapInfo);
       return {
-        iconComponent: '<div class="zap-placeholder-icon skeleton"></div>',
+        iconComponent: this.#createIconComponent(),
         nameComponent: this.#createNameComponent(zapInfo),
         pubkeyComponent: this.#createPubkeyComponent(zapInfo, identifier),
         referenceComponent: this.#createReferenceComponent(normalizedReference),
       };
     } catch (error) {
-      console.error('Failed to create UI components:', error);
+      console.error(this.#ERROR_MESSAGES.UI_COMPONENTS, error);
       return this.#createDefaultComponents();
     }
+  }
+
+  static #createIconComponent() {
+    return '<div class="zap-placeholder-icon skeleton"></div>';
   }
 
   static #createDefaultComponents() {
@@ -81,7 +91,7 @@ export class DialogComponents {
       const components = this.createUIComponents(zapInfo, viewId, identifier);
       return this.#buildZapItemTemplate(zapInfo, colorClass, components);
     } catch (error) {
-      console.error('Failed to create zap item HTML:', error);
+      console.error(this.#ERROR_MESSAGES.ZAP_ITEM, error);
       return '';
     }
   }
@@ -167,9 +177,7 @@ export class DialogComponents {
   }
 
   static #createReferenceComponent(reference) {
-    if (!reference || !this.#isValidReference(reference)) {
-      return "";
-    }
+    if (!this.#isValidReference(reference)) return "";
 
     const cacheKey = reference.id;
     const cachedComponent = cacheManager.getReferenceComponent(cacheKey);
@@ -183,7 +191,7 @@ export class DialogComponents {
       cacheManager.setReferenceComponent(cacheKey, html);
       return html;
     } catch (error) {
-      console.error("Reference component creation failed:", error);
+      console.error(this.#ERROR_MESSAGES.REFERENCE, error);
       return "";
     }
   }
@@ -265,9 +273,12 @@ export class DialogComponents {
 
   // ZapInfo Integration
   static ZapInfo = class {
+    #event;
+    #defaultIcon;
+
     constructor(event, defaultIcon) {
-      this.event = event;
-      this.defaultIcon = defaultIcon;
+      this.#event = event;
+      this.#defaultIcon = defaultIcon;
     }
 
     static async createFromEvent(event, defaultIcon, config = {}) {
@@ -291,7 +302,7 @@ export class DialogComponents {
     }
 
     async extractInfo(config = {}) {
-      const eventId = this.event.id;
+      const eventId = this.#event.id;
       const cachedInfo = cacheManager.getZapInfo(eventId);
       if (cachedInfo) {
         // ZapInfo の参照を DialogComponents.ZapInfo に変更
@@ -303,18 +314,18 @@ export class DialogComponents {
       }
 
       try {
-        const { pubkey, content, satsText } = await parseZapEvent(this.event);
+        const { pubkey, content, satsText } = await parseZapEvent(this.#event);
         const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
         const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
 
-        const reference = this.event.reference || null;
+        const reference = this.#event.reference || null;
         
         const info = {
           satsText,
           satsAmount,
           comment: content || "",
           pubkey: normalizedPubkey || "",
-          created_at: this.event.created_at,
+          created_at: this.#event.created_at,
           displayIdentifier: normalizedPubkey
             ? formatIdentifier(encodeNpub(normalizedPubkey))
             : "anonymous",
@@ -331,8 +342,8 @@ export class DialogComponents {
         return info;
 
       } catch (error) {
-        console.error("Failed to extract zap info:", error, this.event);
-        const defaultInfo = createDefaultZapInfo(this.event, this.defaultIcon);
+        console.error("Failed to extract zap info:", error, this.#event);
+        const defaultInfo = createDefaultZapInfo(this.#event, this.#defaultIcon);
         cacheManager.setZapInfo(eventId, defaultInfo);
         return defaultInfo;
       }
