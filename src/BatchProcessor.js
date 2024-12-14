@@ -239,7 +239,6 @@ export class ETagReferenceProcessor extends BatchProcessor {
     if (!items?.length) return;
 
     const filter = [{
-      kinds: [1, 30023, 30030, 30009, 40, 42, 31990],
       ids: items.slice(0, this.batchSize)
     }];
 
@@ -255,6 +254,7 @@ export class ETagReferenceProcessor extends BatchProcessor {
     };
 
     await this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
+    console.log(`Processed ${items.length} ETag references`);
   }
 }
 

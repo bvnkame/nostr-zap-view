@@ -1,7 +1,9 @@
-import { escapeHTML, isEventIdentifier, encodeNevent, encodeNaddr, isWithin24Hours } from "./utils.js";
+import { escapeHTML, isEventIdentifier, encodeNevent, encodeNaddr, isWithin24Hours,
+         formatIdentifier, parseZapEvent, encodeNpub, createDefaultZapInfo } from "./utils.js";
+import { cacheManager } from "./CacheManager.js";
+import { APP_CONFIG } from "./AppSettings.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
-import { cacheManager } from "./CacheManager.js";
 
 // 定数定義
 const REFERENCE_KIND_MAPPING = {
@@ -236,5 +238,94 @@ export class DialogComponents {
         <div class="no-zaps-message">${message}</div>
       </div>
     `;
+  }
+
+  // ZapInfo クラスを DialogComponents の内部クラスとして統合
+  static ZapInfo = class {
+    constructor(event, defaultIcon) {
+      this.event = event;
+      this.defaultIcon = defaultIcon;
+    }
+
+    static async createFromEvent(event, defaultIcon, config = {}) {
+      // ZapInfo の参照を DialogComponents.ZapInfo に変更
+      const zapInfo = new DialogComponents.ZapInfo(event, defaultIcon);
+      return await zapInfo.extractInfo(config);
+    }
+
+    static getAmountColorClass(amount, isColorModeEnabled) {
+      const colorMode = isColorModeEnabled === undefined ? 
+        APP_CONFIG.ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+        !!isColorModeEnabled;
+
+      if (!colorMode) return APP_CONFIG.ZAP_AMOUNT_CONFIG.DISABLED_CLASS;
+      return this.#calculateAmountColorClass(amount);
+    }
+
+    static #calculateAmountColorClass(amount) {
+      const { THRESHOLDS, DEFAULT_CLASS } = APP_CONFIG.ZAP_AMOUNT_CONFIG;
+      return THRESHOLDS.find(t => amount >= t.value)?.className || DEFAULT_CLASS;
+    }
+
+    async extractInfo(config = {}) {
+      const eventId = this.event.id;
+      const cachedInfo = cacheManager.getZapInfo(eventId);
+      if (cachedInfo) {
+        // ZapInfo の参照を DialogComponents.ZapInfo に変更
+        cachedInfo.colorClass = DialogComponents.ZapInfo.getAmountColorClass(
+          cachedInfo.satsAmount,
+          config.isColorModeEnabled
+        );
+        return cachedInfo;
+      }
+
+      try {
+        const { pubkey, content, satsText } = await parseZapEvent(this.event);
+        const satsAmount = parseInt(satsText.replace(/,/g, "").split(" ")[0], 10);
+        const normalizedPubkey = typeof pubkey === "string" ? pubkey : null;
+
+        const reference = this.event.reference || null;
+        
+        const info = {
+          satsText,
+          satsAmount,
+          comment: content || "",
+          pubkey: normalizedPubkey || "",
+          created_at: this.event.created_at,
+          displayIdentifier: normalizedPubkey
+            ? formatIdentifier(encodeNpub(normalizedPubkey))
+            : "anonymous",
+          senderName: null,
+          senderIcon: null,
+          reference,
+          colorClass: DialogComponents.ZapInfo.getAmountColorClass(
+            satsAmount, 
+            config?.isColorModeEnabled
+          )
+        };
+
+        cacheManager.setZapInfo(eventId, info);
+        return info;
+
+      } catch (error) {
+        console.error("Failed to extract zap info:", error, this.event);
+        const defaultInfo = createDefaultZapInfo(this.event, this.defaultIcon);
+        cacheManager.setZapInfo(eventId, defaultInfo);
+        return defaultInfo;
+      }
+    }
+
+    static async batchExtractInfo(events, defaultIcon, isColorModeEnabled = true) {
+      const results = new Map();
+      await Promise.all(
+        events.map(async event => {
+          // ZapInfo の参照を DialogComponents.ZapInfo に変更
+          const zapInfo = new DialogComponents.ZapInfo(event, defaultIcon);
+          const info = await zapInfo.extractInfo({ isColorModeEnabled });
+          results.set(event.id, info);
+        })
+      );
+      return results;
+    }
   }
 }
