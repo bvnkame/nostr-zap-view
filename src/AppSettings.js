@@ -58,12 +58,12 @@ export const APP_CONFIG = {
   },
   REQUEST_CONFIG: {
     METADATA_TIMEOUT: 20000,
-    REQUEST_TIMEOUT: 4000,
+    REQUEST_TIMEOUT: 2000,
     CACHE_DURATION: 300000,
   },
   PROFILE_CONFIG: {
     BATCH_SIZE: 20,
-    BATCH_DELAY: 50,
+    BATCH_DELAY: 100,
     RELAYS: [
       "wss://relay.nostr.band",
       "wss://purplepag.es",
@@ -75,7 +75,7 @@ export const APP_CONFIG = {
   BATCH_CONFIG: {
     REFERENCE_PROCESSOR: {
       BATCH_SIZE: 20,
-      BATCH_DELAY: 50,
+      BATCH_DELAY: 100,
     },
     SUPPORTED_EVENT_KINDS: [1, 30023, 30030, 30009, 40, 42, 31990],
   },

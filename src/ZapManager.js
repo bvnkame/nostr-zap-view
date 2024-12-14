@@ -107,6 +107,7 @@ class ZapSubscriptionManager {
 
   // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
+    console.log("Initializing subscription:", { viewId, config });
     try {
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
@@ -121,47 +122,57 @@ class ZapSubscriptionManager {
 
       this._initializeLoadState(viewId);
       
-      // 初期ローディングスピナーを表示
-      const list = this._getListElement(viewId);
-      if (list) {
-        const trigger = this._createLoadTrigger();
-        list.appendChild(trigger);
-      }
+      // 初期ローディングスピナー表示を非同期で行う
+      this._showInitialLoadingSpinner(viewId);
       
+      // イベント収集を開始
+      console.log("Subscription initialization started:", { viewId, config });
       const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
       
+      console.log("Subscription initialization completed:", { viewId, config });
       if (batchEvents?.length > 0) {
-        await this._processBatchEvents(batchEvents, viewId);
+        // バッチ処理は非同期で行い、finalizationを遅らせない
+        this._processBatchEvents(batchEvents, viewId).catch(console.error);
       }
       
+      // 即座にfinalizationを実行
+      console.log("Subscription initialized:", { viewId, config });
       await this.finalizeInitialization(viewId, lastEventTime);
+      console.log("Subscription initialized:", { viewId, config });
     } catch (error) {
       console.error("Subscription initialization error:", error);
       throw error;
     }
   }
 
+  _showInitialLoadingSpinner(viewId) {
+    const list = this._getListElement(viewId);
+    if (list) {
+      const trigger = this._createLoadTrigger();
+      list.appendChild(trigger);
+    }
+  }
+
   async finalizeInitialization(viewId, lastEventTime) {
-    cacheManager.updateLoadState(viewId, {
-      isInitialFetchComplete: true,
-      lastEventTime
+    // 必要なデータを事前に取得
+    const cachedEvents = cacheManager.getZapEvents(viewId);
+    const list = this._getListElement(viewId);
+
+    // 状態の更新を非同期で行う
+    const updateState = cacheManager.updateLoadState(viewId, {
+        isInitialFetchComplete: true,
+        lastEventTime
     });
 
-    const cachedEvents = cacheManager.getZapEvents(viewId);
-    if (cachedEvents.length === 0) {
-      if (this.zapListUI) {
-        await this.zapListUI.showNoZapsMessage();
-      }
-    }
+    // 同時に複数の処理を実行
+    await Promise.all([
+        updateState,
+        cachedEvents.length === 0 ? this.zapListUI?.showNoZapsMessage() : null,
+        cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT ? this.setupInfiniteScroll(viewId) : null
+    ]);
 
-    // 一旦ローディングスピナーを削除
-    const list = this._getListElement(viewId);
+    // DOMの更新は最後に
     list?.querySelector('.load-more-trigger')?.remove();
-
-    // イベントが十分にある場合のみ、実際のInfinite Scrollを設定
-    if (cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-      this.setupInfiniteScroll(viewId);
-    }
   }
 
   _initializeLoadState(viewId) {
@@ -182,6 +193,7 @@ class ZapSubscriptionManager {
 
   // 無限スクロール関連メソッド
   setupInfiniteScroll(viewId) {
+    console.log('Setting up infinite scroll:', viewId);
     try {
       this._cleanupInfiniteScroll(viewId);
       const list = this._getListElement(viewId);
