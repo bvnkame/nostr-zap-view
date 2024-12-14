@@ -120,9 +120,7 @@ export class EventPool {
       const eventId = type === 'e' ? tag[1] : `${tag[1]}`; // キャッシュキーを抽出
       console.log('Fetching reference:', eventId);
 
-      // イベントIDではなくタグの値でキャッシュを確認
       const cached = cacheManager.getReference(eventId);
-      console.log('Cached reference:', cached);
       if (cached) return cached;
 
       const pending = this.#referenceFetching.get(eventId);

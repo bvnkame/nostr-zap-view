@@ -27,6 +27,7 @@ export class BatchProcessor {
   }
 
   getOrCreateFetchPromise(key) {
+    console.log("key", key);
     if (this.pendingFetches.has(key)) {
       return this.pendingFetches.get(key);
     }
@@ -71,6 +72,7 @@ export class BatchProcessor {
   async _processBatch(batchItems) {
     try {
       await this.onBatchProcess(batchItems);
+      console.log("batchItems", batchItems);
     } catch (error) {
       this._handleBatchError(batchItems, error);
     } finally {
@@ -100,7 +102,7 @@ export class BatchProcessor {
   }
 
   // Override these methods in derived classes
-  async onBatchProcess(items) {
+  async onBatchProcess(_items) {
     throw new Error("onBatchProcess must be implemented by derived class");
   }
 
@@ -127,6 +129,7 @@ export class BatchProcessor {
 
   // 共通のプロミスベースの処理を抽象化
   async _createSubscriptionPromise(items, relayUrls, filter, eventHandler) {
+    console.log("_createSubscriptionPromise items", items);
     if (!relayUrls?.length) {
       items.forEach(id => this.resolveItem(id, null));
       return;
@@ -135,11 +138,17 @@ export class BatchProcessor {
     return new Promise((resolve) => {
       const processedItems = new Set();
       const timeoutDuration = 5000;
+      let isCompleted = false;
       let timeoutId;
+      let sub;
 
       const cleanup = () => {
+        if (isCompleted) return;
+        isCompleted = true;
+
         if (timeoutId) clearTimeout(timeoutId);
         if (sub) sub.close();
+
         items.forEach(item => {
           if (!processedItems.has(item)) {
             this.resolveItem(item, null);
@@ -148,29 +157,43 @@ export class BatchProcessor {
         resolve();
       };
 
-      const sub = this.pool.subscribeMany(
+      const checkCompletion = () => {
+        if (processedItems.size === items.length) {
+          cleanup();
+        }
+      };
+
+      sub = this.pool.subscribeMany(
         relayUrls,
         filter,
         {
           onevent: (event) => {
             try {
-              eventHandler(event, processedItems);
-              // すべてのアイテムが処理されたら早期終了
-              if (processedItems.size === items.length) {
-                cleanup();
+              if (!isCompleted) {
+                eventHandler(event, processedItems);
+                checkCompletion();
               }
             } catch (error) {
               console.error('Event handler error:', error);
             }
           },
-          oneose: cleanup,
+          oneose: () => {
+            // oneoseが呼ばれる前に最終チェックを行う
+            setTimeout(cleanup, 100);
+          },
           onerror: (error) => {
             console.error('Subscription error:', error);
           }
         }
       );
+      console.log("sub", sub);
 
-      timeoutId = setTimeout(cleanup, timeoutDuration);
+      timeoutId = setTimeout(() => {
+        if (!isCompleted) {
+          console.warn('Subscription timeout');
+          cleanup();
+        }
+      }, timeoutDuration);
     });
   }
 
@@ -236,6 +259,7 @@ export class ETagReferenceProcessor extends BatchProcessor {
   }
 
   async onBatchProcess(items) {
+    console.log("items", items);
     if (!items?.length) return;
 
     const filter = [{
