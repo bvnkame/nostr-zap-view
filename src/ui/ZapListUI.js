@@ -102,6 +102,8 @@ export class ZapListUI {
 
   async renderZapListFromCache(zapEventsCache) {
     if (!zapEventsCache?.length) {
+      // キャッシュ状態をリセット
+      cacheManager.setNoZapsState(this.viewId, false);
       return this.showNoZapsMessage();
     }
 
@@ -197,12 +199,19 @@ export class ZapListUI {
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
+    // キャッシュされたNO_ZAPS状態をチェック
+    if (cacheManager.hasNoZaps(this.viewId)) {
+      this.#displayNoZapsMessage(list);
+      return;
+    }
+
     // キャッシュを遅延チェック
     const hasZaps = await this.#checkCacheWithDelay();
     if (hasZaps) return;
 
-    // NoZapsメッセージを表示
+    // NoZapsメッセージを表示し、状態をキャッシュ
     this.#displayNoZapsMessage(list);
+    cacheManager.setNoZapsState(this.viewId, true);
   }
 
   async #checkCacheWithDelay() {

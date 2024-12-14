@@ -180,6 +180,7 @@ class ReferenceCache extends BaseCache {
 
 class StatsCache extends BaseCache {
   #viewStats = new Map();
+  #noZapsStates = new Map();
 
   setCached(viewId, identifier, stats) {
     const key = `${viewId}:${identifier}`;
@@ -216,9 +217,22 @@ class StatsCache extends BaseCache {
     this.#viewStats.delete(viewId);
   }
 
+  setNoZapsState(viewId, hasNoZaps) {
+    this.#noZapsStates.set(viewId, hasNoZaps);
+  }
+
+  hasNoZaps(viewId) {
+    return this.#noZapsStates.get(viewId) || false;
+  }
+
+  clearNoZapsState(viewId) {
+    this.#noZapsStates.delete(viewId);
+  }
+
   clear() {
     super.clear();
     this.#viewStats.clear();
+    this.#noZapsStates.clear();
   }
 }
 
@@ -429,6 +443,14 @@ export class CacheManager {
 
   getViewStats(viewId) {
     return this.statsCache.getViewStats(viewId);
+  }
+
+  setNoZapsState(viewId, hasNoZaps) {
+    return this.statsCache.setNoZapsState(viewId, hasNoZaps);
+  }
+
+  hasNoZaps(viewId) {
+    return this.statsCache.hasNoZaps(viewId);
   }
 
   // キャッシュデータ処理メソッドを追加
