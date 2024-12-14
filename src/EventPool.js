@@ -117,8 +117,7 @@ export class EventPool {
       const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
       if (!tag) return null;
 
-      const eventId = type === 'e' ? tag[1] : `${tag[1]}`; // キャッシュキーを抽出
-      console.log('Fetching reference:', eventId);
+      const eventId = type === 'e' ? tag[1] : `${tag[1]}`;
 
       const cached = cacheManager.getReference(eventId);
       if (cached) return cached;
@@ -127,11 +126,9 @@ export class EventPool {
       if (pending) return pending;
 
       const processor = type === 'e' ? this.#etagProcessor : this.#aTagProcessor;
-      console.log('Fetching reference:', eventId);
 
       try {
         const reference = await processor.getOrCreateFetchPromise(eventId);
-        console.log('Reference fetched:', reference);
         
         if (reference) {
           // タグの値をキーとしてキャッシュ

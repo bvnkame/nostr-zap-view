@@ -27,7 +27,6 @@ export class BatchProcessor {
   }
 
   getOrCreateFetchPromise(key) {
-    console.log("key", key);
     if (this.pendingFetches.has(key)) {
       return this.pendingFetches.get(key);
     }
@@ -66,7 +65,6 @@ export class BatchProcessor {
     const batchItems = Array.from(this.batchQueue).slice(0, this.batchSize);
     batchItems.forEach(item => {
       this.batchQueue.delete(item);
-      console.log("delete item", item);
       this.processingItems.add(item);
     });
     return batchItems;
@@ -75,7 +73,6 @@ export class BatchProcessor {
   async _processBatch(batchItems) {
     try {
       await this.onBatchProcess(batchItems);
-      console.log("batchItems", batchItems);
     } catch (error) {
       this._handleBatchError(batchItems, error);
     } finally {
@@ -132,7 +129,6 @@ export class BatchProcessor {
 
   // 共通のプロミスベースの処理を抽象化
   async _createSubscriptionPromise(items, relayUrls, filter, eventHandler) {
-    console.log("_createSubscriptionPromise items", items);
     if (!relayUrls?.length) {
       items.forEach(id => this.resolveItem(id, null));
       return;
@@ -261,7 +257,6 @@ export class ETagReferenceProcessor extends BatchProcessor {
   }
 
   async onBatchProcess(items) {
-    console.log("items", items);
     if (!items?.length) return;
 
     const filter = [{
@@ -278,7 +273,6 @@ export class ETagReferenceProcessor extends BatchProcessor {
         }
       }
     };
-    console.log("ref filter", filter);
 
     await this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
   }
