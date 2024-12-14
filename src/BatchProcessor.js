@@ -252,9 +252,9 @@ export class ETagReferenceProcessor extends BatchProcessor {
         }
       }
     };
+    console.log("ref filter", filter);
 
     await this._createSubscriptionPromise(items, this.relayUrls, filter, eventHandler);
-    console.log(`Processed ${items.length} ETag references`);
   }
 }
 
@@ -263,8 +263,8 @@ export class ATagReferenceProcessor extends BatchProcessor {
     super(options);
   }
 
-  _parseAtagValue(aTagValue) {
-    const parts = aTagValue.split(':');
+  _parseAtagValue(targetEventId) {
+    const parts = targetEventId.split(':');
     if (parts.length !== 3) return null;
 
     return {
@@ -284,25 +284,24 @@ export class ATagReferenceProcessor extends BatchProcessor {
       '#d': []
     };
 
-    items.slice(0, this.batchSize).forEach(aTagValue => {
-      const parsed = this._parseAtagValue(aTagValue);
+    items.slice(0, this.batchSize).forEach(targetEventId => {
+      const parsed = this._parseAtagValue(targetEventId);
       if (parsed) {
         filterConditions.kinds.push(parsed.kind);
         filterConditions.authors.push(parsed.pubkey);
         filterConditions['#d'].push(parsed.identifier);
-        validItems.push(aTagValue);
+        validItems.push(targetEventId);
       } else {
-        this.resolveItem(aTagValue, null);
+        this.resolveItem(targetEventId, null);
       }
     });
 
     if (validItems.length === 0) return;
 
-    // 単一のフィルターオブジェクトにマージ
     const filter = [filterConditions];
 
     const eventHandler = (event, processedItems) => {
-      const aTagValue = validItems.find(item => {
+      const targetEventId = validItems.find(item => {
         const parsed = this._parseAtagValue(item);
         return parsed && 
                event.kind === parsed.kind && 
@@ -310,12 +309,12 @@ export class ATagReferenceProcessor extends BatchProcessor {
                event.tags.some(t => t[0] === 'd' && t[1] === parsed.identifier);
       });
 
-      if (aTagValue) {
-        const cachedEvent = this.getCachedItem(aTagValue);
+      if (targetEventId) {
+        const cachedEvent = this.getCachedItem(targetEventId);
         if (!cachedEvent || event.created_at > cachedEvent.created_at) {
-          this.setCachedItem(aTagValue, event);
-          this.resolveItem(aTagValue, event);
-          processedItems.add(aTagValue);
+          this.setCachedItem(targetEventId, event);
+          this.resolveItem(targetEventId, event);
+          processedItems.add(targetEventId);
         }
       }
     };

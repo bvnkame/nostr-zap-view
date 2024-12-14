@@ -40,6 +40,7 @@ class ZapSubscriptionManager {
       if (isEventIdentifier(identifier)) return false;
 
       const reference = await this._fetchEventReference(event, config);
+      console.log("Reference fetched:", reference, { eventId: event.id });
       if (reference) {
         event.reference = reference;
         return true;

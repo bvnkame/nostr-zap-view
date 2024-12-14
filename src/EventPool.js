@@ -117,28 +117,32 @@ export class EventPool {
       const tag = event.tags.find(t => Array.isArray(t) && t[0] === type);
       if (!tag) return null;
 
-      const tagValue = type === 'e' ? tag[1] : `${tag[1]}`; // キャッシュキーを抽出
+      const eventId = type === 'e' ? tag[1] : `${tag[1]}`; // キャッシュキーを抽出
+      console.log('Fetching reference:', eventId);
 
       // イベントIDではなくタグの値でキャッシュを確認
-      const cached = cacheManager.getReference(tagValue);
+      const cached = cacheManager.getReference(eventId);
+      console.log('Cached reference:', cached);
       if (cached) return cached;
 
-      const pending = this.#referenceFetching.get(tagValue);
+      const pending = this.#referenceFetching.get(eventId);
       if (pending) return pending;
 
       const processor = type === 'e' ? this.#etagProcessor : this.#aTagProcessor;
+      console.log('Fetching reference:', eventId);
 
       try {
-        const reference = await processor.getOrCreateFetchPromise(tagValue);
+        const reference = await processor.getOrCreateFetchPromise(eventId);
+        console.log('Reference fetched:', reference);
         
         if (reference) {
           // タグの値をキーとしてキャッシュ
-          cacheManager.setReference(tagValue, reference);
+          cacheManager.setReference(eventId, reference);
         }
-        this.#referenceFetching.delete(tagValue);
+        this.#referenceFetching.delete(eventId);
         return reference;
       } finally {
-        this.#referenceFetching.delete(tagValue);
+        this.#referenceFetching.delete(eventId);
       }
     } catch (error) {
       return this.#handleReferenceError(event?.id, error);
