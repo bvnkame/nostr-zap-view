@@ -5,54 +5,119 @@ import { APP_CONFIG } from "./AppSettings.js";
 import arrowRightIcon from "./assets/arrow_right.svg";
 import quickReferenceIcon from "./assets/link.svg";
 
-// 定数定義
-const REFERENCE_KIND_MAPPING = {
-  1: 'content',
-  30023: 'title',
-  30030: 'title',
-  30009: 'name',
-  40: 'content',
-  42: 'name',
-  31990: 'alt'
-};
-
 export class DialogComponents {
-  // Public APIs
-  static createUIComponents(zapInfo, _viewId, identifier) {
+  // クラス内定数定義
+  static #REFERENCE_KIND_MAPPING = {
+    1: 'content',
+    30023: 'title',
+    30030: 'title',
+    30009: 'name',
+    40: 'content',
+    42: 'name',
+    31990: 'alt'
+  };
 
-    const normalizedReference = this.#getNormalizedReference(zapInfo);
-    
+  // UI Component Creation Methods
+  static createUIComponents(zapInfo, _viewId, identifier) {
+    try {
+      const normalizedReference = this.#getNormalizedReference(zapInfo);
+      return {
+        iconComponent: '<div class="zap-placeholder-icon skeleton"></div>',
+        nameComponent: this.#createNameComponent(zapInfo),
+        pubkeyComponent: this.#createPubkeyComponent(zapInfo, identifier),
+        referenceComponent: this.#createReferenceComponent(normalizedReference),
+      };
+    } catch (error) {
+      console.error('Failed to create UI components:', error);
+      return this.#createDefaultComponents();
+    }
+  }
+
+  static #createDefaultComponents() {
     return {
       iconComponent: '<div class="zap-placeholder-icon skeleton"></div>',
-      nameComponent: this.#createNameComponent(zapInfo),
-      pubkeyComponent: this.#createPubkeyComponent(zapInfo, identifier),
-      referenceComponent: this.#createReferenceComponent(normalizedReference),
+      nameComponent: '<div class="zap-placeholder-name skeleton"></div>',
+      pubkeyComponent: '',
+      referenceComponent: '',
     };
   }
 
-  // 外部から呼び出し可能なパブリックメソッドとして追加
+  // Reference Handling Methods
   static createReferenceComponent(reference) {
-    const normalizedRef = this.#getNormalizedReference({ reference });
-    return this.#createReferenceComponent(normalizedRef);
+    return this.#createReferenceComponent(this.#getNormalizedReference({ reference }));
   }
 
-  // 新しいメソッドを追加
   static addReferenceToElement(element, reference) {
-    if (!element || !reference) return;
+    if (!this.#validateReferenceElement(element, reference)) return;
 
     const zapContent = element.querySelector('.zap-content');
-    if (!zapContent) return;
+    this.#updateReferenceContent(zapContent, reference);
+  }
 
-    // 既存の参照を削除
-    const existingReferences = zapContent.querySelectorAll('.zap-reference');
-    existingReferences.forEach(ref => ref.remove());
+  static #validateReferenceElement(element, reference) {
+    return element && reference && element.querySelector('.zap-content');
+  }
 
-    // 新しい参照を追加
+  static #updateReferenceContent(zapContent, reference) {
+    zapContent.querySelectorAll('.zap-reference').forEach(ref => ref.remove());
     const referenceHTML = this.createReferenceComponent({ reference });
     zapContent.insertAdjacentHTML('beforeend', referenceHTML);
   }
 
-  // Private methods
+  // Template Generation Methods
+  static getDialogTemplate() {
+    return `
+      <dialog class="dialog">
+        <h2 class="dialog-title"><a href="#" target="_blank"></a></h2>
+        <button class="close-dialog-button">X</button>
+        <div class="zap-stats"></div>
+        <ul class="dialog-zap-list"></ul>
+      </dialog>
+    `;
+  }
+
+  static createZapItemHTML(zapInfo, colorClass, viewId, identifier) {
+    try {
+      const components = this.createUIComponents(zapInfo, viewId, identifier);
+      return this.#buildZapItemTemplate(zapInfo, colorClass, components);
+    } catch (error) {
+      console.error('Failed to create zap item HTML:', error);
+      return '';
+    }
+  }
+
+  static createNoZapsMessageHTML(message) {
+    return `
+      <div class="no-zaps-container">
+        <div class="no-zaps-message">${message}</div>
+      </div>
+    `;
+  }
+
+  // Private Helper Methods
+  static #buildZapItemTemplate(zapInfo, colorClass, components) {
+    const [amount, unit] = zapInfo.satsText.split(" ");
+    const isNew = isWithin24Hours(zapInfo.created_at);
+
+    return `
+      <div class="zap-content">
+        <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
+          <div class="sender-icon${isNew ? " is-new" : ""}">
+            ${components.iconComponent}
+          </div>
+          <div class="sender-info">
+            ${components.nameComponent}
+            ${components.pubkeyComponent}
+          </div>
+          <div class="zap-amount ${colorClass}"><span class="number">${amount}</span> ${unit}</div>
+        </div>
+        ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
+        ${components.referenceComponent}
+      </div>
+    `;
+  }
+
+  // Reference Processing Methods
   static #getNormalizedReference(zapInfo) {
     if (!zapInfo) return null;
 
@@ -159,7 +224,7 @@ export class DialogComponents {
   static #getReferenceContent(reference) {
     if (!reference) return '';
 
-    const tagKey = REFERENCE_KIND_MAPPING[reference.kind];
+    const tagKey = DialogComponents.#REFERENCE_KIND_MAPPING[reference.kind];
 
     if (tagKey) {
       const tag = reference.tags.find(t => Array.isArray(t) && t[0] === tagKey);
@@ -198,49 +263,7 @@ export class DialogComponents {
     `;
   }
 
-  static getDialogTemplate() {
-    return `
-      <dialog class="dialog">
-        <h2 class="dialog-title"><a href="#" target="_blank"></a></h2>
-        <button class="close-dialog-button">X</button>
-        <div class="zap-stats"></div>
-        <ul class="dialog-zap-list"></ul>
-      </dialog>
-    `;
-  }
-
-  static createZapItemHTML(zapInfo, colorClass, viewId, identifier) {
-    const components = this.createUIComponents(zapInfo, viewId, identifier);
-    const [amount, unit] = zapInfo.satsText.split(" ");
-    const isNew = isWithin24Hours(zapInfo.created_at);
-
-    return `
-      <div class="zap-content">
-        <div class="zap-sender${zapInfo.comment ? " with-comment" : ""}" data-pubkey="${zapInfo.pubkey}">
-          <div class="sender-icon${isNew ? " is-new" : ""}">
-            ${components.iconComponent}
-          </div>
-          <div class="sender-info">
-            ${components.nameComponent}
-            ${components.pubkeyComponent}
-          </div>
-          <div class="zap-amount ${colorClass}"><span class="number">${amount}</span> ${unit}</div>
-        </div>
-        ${zapInfo.comment ? `<div class="zap-details"><span class="zap-comment">${escapeHTML(zapInfo.comment)}</span></div>` : ""}
-        ${components.referenceComponent}
-      </div>
-    `;
-  }
-
-  static createNoZapsMessageHTML(message) {
-    return `
-      <div class="no-zaps-container">
-        <div class="no-zaps-message">${message}</div>
-      </div>
-    `;
-  }
-
-  // ZapInfo クラスを DialogComponents の内部クラスとして統合
+  // ZapInfo Integration
   static ZapInfo = class {
     constructor(event, defaultIcon) {
       this.event = event;
