@@ -18,7 +18,16 @@ export class ProfileUI {
       const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
 
-      const [profile] = await profilePool.fetchProfiles([pubkey]);
+      // まずキャッシュをチェック
+      let profile = cacheManager.getProfile(pubkey);
+      
+      // キャッシュになければ取得
+      if (!profile) {
+        [profile] = await profilePool.fetchProfiles([pubkey]);
+        if (profile) {
+          cacheManager.setProfile(pubkey, profile);
+        }
+      }
 
       const senderName = profile
         ? getProfileDisplayName(profile) || "nameless"
@@ -51,12 +60,28 @@ export class ProfileUI {
 
   #createDefaultIcon(pubkey, altText = "anonymous user's icon") {
     const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
-    return Object.assign(document.createElement("img"), {
-      src: robohashUrl,
+    const cachedImage = cacheManager.getImageCache(robohashUrl);
+    
+    const img = Object.assign(document.createElement("img"), {
       alt: altText,
       loading: "lazy",
       className: "profile-icon",
     });
+
+    if (cachedImage) {
+      img.src = robohashUrl;
+      return img;
+    }
+
+    // Load and cache the robohash image
+    const tempImg = new Image();
+    tempImg.onload = () => {
+      cacheManager.setImageCache(robohashUrl, tempImg);
+    };
+    tempImg.src = robohashUrl;
+    img.src = robohashUrl;
+
+    return img;
   }
 
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
