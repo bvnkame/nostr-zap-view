@@ -49,24 +49,34 @@ export class ProfileUI {
     }
   }
 
+  #createDefaultIcon(pubkey, altText = "anonymous user's icon") {
+    const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
+    return Object.assign(document.createElement("img"), {
+      src: robohashUrl,
+      alt: altText,
+      loading: "lazy",
+      className: "profile-icon",
+    });
+  }
+
   #updateIcon(skeleton, iconContainer, senderIcon, senderName) {
     if (skeleton && iconContainer) {
       const updateIcon = (src) => {
-        // 既存の画像要素とリンクを削除
         skeleton.remove();
         const existingImage = iconContainer.querySelector('img');
         const existingLink = iconContainer.querySelector('a');
         if (existingImage) existingImage.remove();
         if (existingLink) existingLink.remove();
 
-        const img = Object.assign(document.createElement("img"), {
-          src,
-          alt: `${escapeHTML(senderName)}'s icon`,
-          loading: "lazy",
-          className: "profile-icon",
-        });
+        const img = src === 'robohash' 
+          ? this.#createDefaultIcon(iconContainer.closest("[data-pubkey]")?.dataset.pubkey, `${escapeHTML(senderName)}'s icon`)
+          : Object.assign(document.createElement("img"), {
+              src,
+              alt: `${escapeHTML(senderName)}'s icon`,
+              loading: "lazy",
+              className: "profile-icon",
+            });
 
-        // Create link wrapper
         const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
         if (pubkey) {
           const nprofile = encodeNprofile(pubkey);
@@ -89,15 +99,11 @@ export class ProfileUI {
           updateIcon(senderIcon);
         };
         img.onerror = () => {
-          const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
-          const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
-          updateIcon(robohashUrl);
+          updateIcon('robohash');
         };
         img.src = senderIcon;
       } else {
-        const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
-        const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
-        updateIcon(robohashUrl);
+        updateIcon('robohash');
       }
     }
   }
@@ -124,15 +130,8 @@ export class ProfileUI {
     if (skeleton) {
       const iconContainer = skeleton.parentElement;
       const pubkey = element.closest("[data-pubkey]")?.dataset.pubkey;
-      const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
       skeleton.remove();
-      const defaultImg = Object.assign(document.createElement("img"), {
-        src: robohashUrl,
-        alt: "anonymous user's icon",
-        loading: "lazy",
-        className: "profile-icon",
-      });
-      iconContainer.appendChild(defaultImg);
+      iconContainer.appendChild(this.#createDefaultIcon(pubkey));
     }
   }
 
