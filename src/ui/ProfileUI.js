@@ -1,5 +1,4 @@
 import { profilePool } from "../ProfilePool.js";
-import defaultIcon from "../assets/nostr-icon.svg";
 import {
   getProfileDisplayName,
   escapeHTML,
@@ -89,10 +88,16 @@ export class ProfileUI {
           cacheManager.setImageCache(senderIcon, img);
           updateIcon(senderIcon);
         };
-        img.onerror = () => updateIcon(defaultIcon);
+        img.onerror = () => {
+          const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
+          const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
+          updateIcon(robohashUrl);
+        };
         img.src = senderIcon;
       } else {
-        updateIcon(defaultIcon);
+        const pubkey = iconContainer.closest("[data-pubkey]")?.dataset.pubkey;
+        const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
+        updateIcon(robohashUrl);
       }
     }
   }
@@ -118,9 +123,11 @@ export class ProfileUI {
     const skeleton = element.querySelector(".zap-placeholder-icon");
     if (skeleton) {
       const iconContainer = skeleton.parentElement;
+      const pubkey = element.closest("[data-pubkey]")?.dataset.pubkey;
+      const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
       skeleton.remove();
       const defaultImg = Object.assign(document.createElement("img"), {
-        src: defaultIcon,
+        src: robohashUrl,
         alt: "anonymous user's icon",
         loading: "lazy",
         className: "profile-icon",

@@ -1,6 +1,5 @@
 import { DialogComponents } from "../DialogComponents.js";
 import { APP_CONFIG } from "../AppSettings.js";
-import defaultIcon from "../assets/nostr-icon.svg";
 import { cacheManager } from "../CacheManager.js";
 
 class ZapItemBuilder {
@@ -10,7 +9,7 @@ class ZapItemBuilder {
   }
 
   async createListItem(event) {
-    const zapInfo = await DialogComponents.ZapInfo.createFromEvent(event, defaultIcon, {
+    const zapInfo = await DialogComponents.ZapInfo.createFromEvent(event, {
       isColorModeEnabled: this.config?.isColorModeEnabled
     });
 

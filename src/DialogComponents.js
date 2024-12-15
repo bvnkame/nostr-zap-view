@@ -274,16 +274,13 @@ export class DialogComponents {
   // ZapInfo Integration
   static ZapInfo = class {
     #event;
-    #defaultIcon;
-
-    constructor(event, defaultIcon) {
+    
+    constructor(event) {
       this.#event = event;
-      this.#defaultIcon = defaultIcon;
     }
 
-    static async createFromEvent(event, defaultIcon, config = {}) {
-      // ZapInfo の参照を DialogComponents.ZapInfo に変更
-      const zapInfo = new DialogComponents.ZapInfo(event, defaultIcon);
+    static async createFromEvent(event, config = {}) {
+      const zapInfo = new DialogComponents.ZapInfo(event);
       return await zapInfo.extractInfo(config);
     }
 
@@ -305,7 +302,6 @@ export class DialogComponents {
       const eventId = this.#event.id;
       const cachedInfo = cacheManager.getZapInfo(eventId);
       if (cachedInfo) {
-        // ZapInfo の参照を DialogComponents.ZapInfo に変更
         cachedInfo.colorClass = DialogComponents.ZapInfo.getAmountColorClass(
           cachedInfo.satsAmount,
           config.isColorModeEnabled
@@ -343,18 +339,17 @@ export class DialogComponents {
 
       } catch (error) {
         console.error("Failed to extract zap info:", error, this.#event);
-        const defaultInfo = createDefaultZapInfo(this.#event, this.#defaultIcon);
+        const defaultInfo = createDefaultZapInfo(this.#event);
         cacheManager.setZapInfo(eventId, defaultInfo);
         return defaultInfo;
       }
     }
 
-    static async batchExtractInfo(events, defaultIcon, isColorModeEnabled = true) {
+    static async batchExtractInfo(events, isColorModeEnabled = true) {
       const results = new Map();
       await Promise.all(
         events.map(async event => {
-          // ZapInfo の参照を DialogComponents.ZapInfo に変更
-          const zapInfo = new DialogComponents.ZapInfo(event, defaultIcon);
+          const zapInfo = new DialogComponents.ZapInfo(event);
           const info = await zapInfo.extractInfo({ isColorModeEnabled });
           results.set(event.id, info);
         })
