@@ -19,16 +19,7 @@ export class ProfileUI {
       const skeleton = iconContainer?.querySelector(".zap-placeholder-icon");
       const pubkeyElement = element.querySelector(".sender-pubkey");
 
-      // まずキャッシュをチェック
       let profile = cacheManager.getProfile(pubkey);
-      
-      // キャッシュになければ取得
-      if (!profile) {
-        [profile] = await profilePool.fetchProfiles([pubkey]);
-        if (profile) {
-          cacheManager.setProfile(pubkey, profile);
-        }
-      }
 
       const senderName = profile
         ? getProfileDisplayName(profile) || "nameless"
