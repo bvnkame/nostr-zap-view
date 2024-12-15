@@ -79,6 +79,13 @@ export const APP_CONFIG = {
     },
     SUPPORTED_EVENT_KINDS: [1, 30023, 30030, 30009, 40, 42, 31990],
   },
+  BATCH_PROCESSOR_CONFIG: {
+    DEFAULT_BATCH_SIZE: 50,
+    DEFAULT_BATCH_DELAY: 100,
+    DEFAULT_MAX_CACHE_AGE: 1800000, // 30分
+    DEFAULT_RELAY_URLS: [],
+    TIMEOUT_DURATION: 500,
+  },
 };
 
 export class ViewerConfig {

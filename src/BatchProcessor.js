@@ -1,3 +1,5 @@
+import { APP_CONFIG } from './AppSettings';
+
 export class BatchProcessor {
   constructor(options = {}) {
     this._validateOptions(options);
@@ -12,9 +14,9 @@ export class BatchProcessor {
 
   _initializeProperties(options) {
     this.pool = options.pool;
-    this.batchSize = options.batchSize || 50;
-    this.batchDelay = options.batchDelay || 100;
-    this.relayUrls = options.relayUrls || [];
+    this.batchSize = options.batchSize || APP_CONFIG.BATCH_PROCESSOR_CONFIG.DEFAULT_BATCH_SIZE;
+    this.batchDelay = options.batchDelay || APP_CONFIG.BATCH_PROCESSOR_CONFIG.DEFAULT_BATCH_DELAY;
+    this.relayUrls = options.relayUrls || APP_CONFIG.BATCH_PROCESSOR_CONFIG.DEFAULT_RELAY_URLS;
     
     this.batchQueue = new Set();
     this.pendingFetches = new Map();
@@ -23,7 +25,7 @@ export class BatchProcessor {
     this.batchTimer = null;
 
     this.eventCache = new Map();
-    this.maxCacheAge = options.maxCacheAge || 1800000;
+    this.maxCacheAge = options.maxCacheAge || APP_CONFIG.BATCH_PROCESSOR_CONFIG.DEFAULT_MAX_CACHE_AGE;
   }
 
   getOrCreateFetchPromise(key) {
@@ -136,7 +138,7 @@ export class BatchProcessor {
 
     return new Promise((resolve) => {
       const processedItems = new Set();
-      const timeoutDuration = 5000;
+      const timeoutDuration = APP_CONFIG.BATCH_PROCESSOR_CONFIG.TIMEOUT_DURATION;
       let isCompleted = false;
       let timeoutId;
       let sub;
@@ -319,10 +321,10 @@ export class ProfileProcessor extends BatchProcessor {
     const { simplePool, config } = options;
     super({
       pool: simplePool,
-      batchSize: config.BATCH_SIZE,
-      batchDelay: config.BATCH_DELAY,
-      relayUrls: config.RELAYS,
-      maxCacheAge: 1800000 // 30分
+      batchSize: config.BATCH_SIZE || APP_CONFIG.PROFILE_CONFIG.BATCH_SIZE,
+      batchDelay: config.BATCH_DELAY || APP_CONFIG.PROFILE_CONFIG.BATCH_DELAY,
+      relayUrls: config.RELAYS || APP_CONFIG.PROFILE_CONFIG.RELAYS,
+      maxCacheAge: APP_CONFIG.BATCH_PROCESSOR_CONFIG.DEFAULT_MAX_CACHE_AGE,
     });
     this.config = config;
   }
