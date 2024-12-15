@@ -1,5 +1,6 @@
 import { APP_CONFIG } from "./AppSettings.js";
 import { cacheManager } from "./CacheManager.js";
+import defaultIcon from "./assets/nostr-icon.svg";
 
 // Core constants
 const CONSTANTS = {
@@ -204,8 +205,6 @@ const ZapUtils = {
     }
   },
   createDefaultZapInfo: (event) => {
-    const pubkey = event?.pubkey || '';
-    const robohashUrl = `https://robohash.org/${pubkey}.png?set=set5&bgset=bg2&size=128x128`;
     return {
       satsText: "Amount: Unknown",
       satsAmount: 0,
@@ -214,7 +213,7 @@ const ZapUtils = {
       created_at: event.created_at,
       displayIdentifier: "anonymous",
       senderName: "anonymous",
-      senderIcon: robohashUrl,
+      senderIcon: defaultIcon,
       reference: null,
     };
   }

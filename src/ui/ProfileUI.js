@@ -3,9 +3,10 @@ import {
   getProfileDisplayName,
   escapeHTML,
   sanitizeImageUrl,
-  encodeNprofile, // Add import
+  encodeNprofile,
 } from "../utils.js";
-import { cacheManager } from "../CacheManager.js";  // 追加
+import { cacheManager } from "../CacheManager.js";
+import defaultIcon from "../assets/nostr-icon.svg";
 
 export class ProfileUI {
   async loadAndUpdate(pubkey, element) {
@@ -73,8 +74,12 @@ export class ProfileUI {
       return img;
     }
 
-    // Load and cache the robohash image
+    // Load and cache the robohash image with fallback
     const tempImg = new Image();
+    tempImg.onerror = () => {
+      img.src = defaultIcon;
+      cacheManager.setImageCache(robohashUrl, defaultIcon);
+    };
     tempImg.onload = () => {
       cacheManager.setImageCache(robohashUrl, tempImg);
     };

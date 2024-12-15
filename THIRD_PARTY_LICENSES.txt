@@ -35,3 +35,7 @@ Third-Party Licenses
 8. nostr-logo
    License: CC0 1.0 Universal
    URL: https://github.com/mbarulli/nostr-logo
+
+9. robohash.org (set5)
+   License: "Free for personal and commercial use. 😇"
+   URL: https://github.com/e1ven/Robohash
