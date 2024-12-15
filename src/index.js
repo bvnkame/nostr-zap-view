@@ -5,7 +5,6 @@ import {
 import {
   createDialog,
   showDialog,
-  renderZapListFromCache,
 } from "./UIManager.js";
 import { subscriptionManager } from "./ZapManager.js";
 import { statsManager } from "./StatsManager.js";
@@ -25,7 +24,6 @@ async function initializeViewer(viewId, config) {
   const { hasEnoughCachedEvents } = await cacheManager.processCachedData(
     viewId,
     config,
-    renderZapListFromCache
   );
 
   if (hasEnoughCachedEvents) {

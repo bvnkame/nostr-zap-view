@@ -35,7 +35,7 @@ class NostrZapViewDialog extends HTMLElement {
     
     try {
       await this.#initializationPromise;
-      this.#state.isBasicInitialized = true;
+      this.#state.isInitialized = true;
       
       // フルUIの初期化を実行
       const config = subscriptionManager.getViewConfig(this.viewId);
@@ -173,7 +173,7 @@ class NostrZapViewDialog extends HTMLElement {
   async showDialog() {
     await this.#initializationPromise; // 基本初期化の完了を待つ
     const dialog = this.#getElement(".dialog");
-    if (!dialog || dialog.open || !this.#state.isBasicInitialized) {
+    if (!dialog || dialog.open || !this.#state.isInitialized) {
       console.warn("Cannot show dialog - not properly initialized");
       return;
     }
@@ -190,16 +190,6 @@ class NostrZapViewDialog extends HTMLElement {
       subscriptionManager.unsubscribe(this.viewId);
       dialog.close();
       this.remove();
-    }
-  }
-
-  // Delegate methods to specialized UI classes
-  async renderZapListFromCache(zapEventsCache) {
-    console.log(`Rendering2 ${zapEventsCache.length} cached zaps for viewId: ${this.viewId}`);
-    await this.zapListUI.renderZapListFromCache(zapEventsCache);
-    // キャッシュからの表示後に無限スクロールを設定
-    if (zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {
-      subscriptionManager.setupInfiniteScroll(this.viewId);
     }
   }
 
@@ -240,8 +230,9 @@ class NostrZapViewDialog extends HTMLElement {
 
   // UI操作メソッド
   getOperations() {
+    console.log('Getting operations for viewId:', this.viewId);
     // 基本初期化チェック
-    if (!this.#state.isBasicInitialized) {
+    if (!this.#state.isInitialized) {
       console.warn(`Basic initialization not complete for viewId: ${this.viewId}`);
       return null;
     }
@@ -253,9 +244,8 @@ class NostrZapViewDialog extends HTMLElement {
 
     // 完全な初期化が完了している場合のみ追加の操作を提供
     if (this.#state.isInitialized) {
+      console.log('Adding specialized operations for viewId:', this.viewId);
       Object.assign(operations, {
-        replacePlaceholderWithZap: (event, index) => this.zapListUI?.replacePlaceholder(event, index),
-        renderZapListFromCache: (cache) => this.zapListUI?.renderZapListFromCache(cache),
         prependZap: (event) => this.zapListUI?.prependZap(event),
         displayZapStats: (stats) => this.statsUI?.displayStats(stats),
         showNoZapsMessage: () => this.zapListUI?.showNoZapsMessage()
@@ -356,7 +346,7 @@ export async function showDialog(viewId) {
   }
 }
 
-// 以下の���クスポート関数を修正
+// 以下のエクスポート関数を修正
 export const closeDialog = (viewId) => {
   const dialog = dialogManager.get(viewId);
   if (dialog) {
@@ -367,8 +357,6 @@ export const closeDialog = (viewId) => {
 export const displayZapStats = (stats, viewId) => dialogManager.execute(viewId, 'displayZapStats', stats);
 export const replacePlaceholderWithZap = (event, index, viewId) => 
   dialogManager.execute(viewId, 'replacePlaceholderWithZap', event, index);
-export const renderZapListFromCache = async (cache, viewId) => 
-  await dialogManager.execute(viewId, 'renderZapListFromCache', cache);
 export const prependZap = (event, viewId) => dialogManager.execute(viewId, 'prependZap', event);
 export const showNoZapsMessage = (viewId) => {
   const dialog = dialogManager.get(viewId);

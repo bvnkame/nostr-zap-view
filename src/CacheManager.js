@@ -454,7 +454,7 @@ export class CacheManager {
   }
 
   // キャッシュデータ処理メソッドを追加
-  async processCachedData(viewId, config, renderCallback) {
+  async processCachedData(viewId, config) {
     this.setRelayUrls(config.relayUrls);
     
     const cachedEvents = this.getZapEvents(viewId);
@@ -462,7 +462,6 @@ export class CacheManager {
     
     const results = await Promise.all([
       this.getCachedStats(viewId, config.identifier),
-      cachedEvents.length > 0 ? renderCallback(cachedEvents, viewId) : null
     ]);
 
     return {

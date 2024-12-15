@@ -105,76 +105,94 @@ export class ZapListUI {
     });
   }
 
-  async renderZapListFromCache(_zapEventsCache) {
-    console.log("Rendering zaps from cache...");
-    // viewId に基づいて正しいイベントを取得
-    const events = cacheManager.getZapEvents(this.viewId);
+  async renderZapListFromCache(events) {
     if (!events?.length) {
       cacheManager.setNoZapsState(this.viewId, false);
       return this.showNoZapsMessage();
     }
 
     await this.#updateListContent(async (list) => {
-      const uniqueEvents = this.#getUniqueEvents(events); // zapEventsCache から events に変更
-      const listFragment = document.createDocumentFragment();
-      const profileUpdatesQueue = [];
+      const { initialBatch, remainingBatch } = this.#prepareEventBatches(events);
+      
+      // 初期バッチの処理
+      const { fragment, profileUpdates } = await this.#processInitialBatch(initialBatch);
+      this.#updateList(list, fragment);
 
-      // 最初のバッチを即座に処理
-      const INITIAL_BATCH = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.INITIAL_BATCH;
-      const initialEvents = uniqueEvents.slice(0, INITIAL_BATCH);
-      const remainingEvents = uniqueEvents.slice(INITIAL_BATCH);
-
-      // 最初のバッチを同期的に処理
-      for (const event of initialEvents) {
-        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-        this.#handleCachedReference(event.id, li);
-        listFragment.appendChild(li);
-        if (zapInfo.pubkey) {
-          profileUpdatesQueue.push({ pubkey: zapInfo.pubkey, element: li });
-        }
-      }
-
-      // 最初のバッチをDOMに追加
-      this.#updateList(list, listFragment);
-
-      // 残りのイベントを非同期で処理
-      if (remainingEvents.length > 0) {
-        requestIdleCallback(async () => {
-          const batchSize = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.REMAINING_BATCH;
-          for (let i = 0; i < remainingEvents.length; i += batchSize) {
-            const batch = remainingEvents.slice(i, i + batchSize);
-            const batchFragment = document.createDocumentFragment();
-
-            await Promise.all(batch.map(async (event) => {
-              const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-              this.#handleCachedReference(event.id, li);
-              batchFragment.appendChild(li);
-              if (zapInfo.pubkey) {
-                profileUpdatesQueue.push({ pubkey: zapInfo.pubkey, element: li });
-              }
-            }));
-
-            // バッチをDOMに追加
-            const existingTrigger = list.querySelector('.load-more-trigger');
-            if (existingTrigger) {
-              list.insertBefore(batchFragment, existingTrigger);
-            } else {
-              list.appendChild(batchFragment);
-            }
-
-            // UIの更新を待つ
-            await new Promise(resolve => requestAnimationFrame(resolve));
-          }
-
-          // プロフィール更新を開始
-          this.#updateProfiles(profileUpdatesQueue);
-          console.log("Cached batch processed:", remainingEvents.length);
-        });
+      // 残りのバッチを非同期で処理
+      if (remainingBatch.length > 0) {
+        this.#processRemainingBatchAsync(remainingBatch, list, profileUpdates);
       } else {
-        // 初期バッチのプロフィール更新を実行
-        this.#updateProfiles(profileUpdatesQueue);
+        await this.#updateProfiles(profileUpdates);
       }
     });
+  }
+
+  #prepareEventBatches(events) {
+    const uniqueEvents = this.#getUniqueEvents(events);
+    const INITIAL_BATCH = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.INITIAL_BATCH;
+    
+    return {
+      initialBatch: uniqueEvents.slice(0, INITIAL_BATCH),
+      remainingBatch: uniqueEvents.slice(INITIAL_BATCH)
+    };
+  }
+
+  async #processInitialBatch(events) {
+    const fragment = document.createDocumentFragment();
+    const profileUpdates = [];
+
+    for (const event of events) {
+      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+      this.#handleCachedReference(event.id, li);
+      fragment.appendChild(li);
+      if (zapInfo.pubkey) {
+        profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+      }
+    }
+
+    return { fragment, profileUpdates };
+  }
+
+  #processRemainingBatchAsync(remainingEvents, list, profileUpdates) {
+    requestIdleCallback(async () => {
+      const batchSize = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.REMAINING_BATCH;
+      
+      for (let i = 0; i < remainingEvents.length; i += batchSize) {
+        await this.#processBatch(
+          remainingEvents.slice(i, i + batchSize),
+          list,
+          profileUpdates
+        );
+      }
+
+      await this.#updateProfiles(profileUpdates);
+      console.log("Cached batch processed:", remainingEvents.length);
+    });
+  }
+
+  async #processBatch(batch, list, profileUpdates) {
+    const batchFragment = document.createDocumentFragment();
+
+    await Promise.all(batch.map(async (event) => {
+      const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+      this.#handleCachedReference(event.id, li);
+      batchFragment.appendChild(li);
+      if (zapInfo.pubkey) {
+        profileUpdates.push({ pubkey: zapInfo.pubkey, element: li });
+      }
+    }));
+
+    this.#insertBatchToList(list, batchFragment);
+    await new Promise(resolve => requestAnimationFrame(resolve));
+  }
+
+  #insertBatchToList(list, fragment) {
+    const existingTrigger = list.querySelector('.load-more-trigger');
+    if (existingTrigger) {
+      list.insertBefore(fragment, existingTrigger);
+    } else {
+      list.appendChild(fragment);
+    }
   }
 
   async prependZap(event) {
