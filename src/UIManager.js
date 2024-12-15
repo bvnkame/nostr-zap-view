@@ -98,6 +98,7 @@ class NostrZapViewDialog extends HTMLElement {
     if (!zapEvents?.length) {
       this.zapListUI.showNoZapsMessage();
     } else {
+      console.log(`Rendering ${zapEvents.length} cached zaps for viewId: ${this.viewId}`);
       await this.zapListUI.renderZapListFromCache(zapEvents);
     }
 
@@ -194,6 +195,7 @@ class NostrZapViewDialog extends HTMLElement {
 
   // Delegate methods to specialized UI classes
   async renderZapListFromCache(zapEventsCache) {
+    console.log(`Rendering2 ${zapEventsCache.length} cached zaps for viewId: ${this.viewId}`);
     await this.zapListUI.renderZapListFromCache(zapEventsCache);
     // キャッシュからの表示後に無限スクロールを設定
     if (zapEventsCache.length >= APP_CONFIG.INITIAL_LOAD_COUNT) {

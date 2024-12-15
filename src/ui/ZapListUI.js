@@ -67,6 +67,7 @@ export class ZapListUI {
   }
 
   async #updateListContent(operation) {
+    console.log("Updating list content...");
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
@@ -104,7 +105,8 @@ export class ZapListUI {
     });
   }
 
-  async renderZapListFromCache(zapEventsCache) {
+  async renderZapListFromCache(_zapEventsCache) {
+    console.log("Rendering zaps from cache...");
     // viewId に基づいて正しいイベントを取得
     const events = cacheManager.getZapEvents(this.viewId);
     if (!events?.length) {
@@ -166,6 +168,7 @@ export class ZapListUI {
 
           // プロフィール更新を開始
           this.#updateProfiles(profileUpdatesQueue);
+          console.log("Cached batch processed:", remainingEvents.length);
         });
       } else {
         // 初期バッチのプロフィール更新を実行
@@ -175,12 +178,14 @@ export class ZapListUI {
   }
 
   async prependZap(event) {
+    console.log("Prepending zap:", event.id);
     return this.#createAndAddZapElement(event, (list, li) => list.prepend(li));
   }
 
   async appendZap(event) {
+    console.log("Appending zap:", event.id);
     return this.#createAndAddZapElement(event, (list, li) => {
-      const position = this.findInsertPosition(list, event.created_at);
+      const position = this.#findInsertPosition(list, event.created_at);
       position ? list.insertBefore(li, position) : list.appendChild(li);
     });
   }
@@ -401,6 +406,7 @@ export class ZapListUI {
   }
 
   async #updateProfiles(profileUpdates) {
+    console.log("Updating profiles:", profileUpdates.length);
     const PROFILE_BATCH_SIZE = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.PROFILE_BATCH;
     for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
       const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);

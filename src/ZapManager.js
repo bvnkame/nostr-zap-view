@@ -114,7 +114,6 @@ class ZapSubscriptionManager {
 
   // 初期化関連メソッド
   async initializeSubscriptions(config, viewId) {
-    console.log("Initializing subscription:", { viewId, config });
     try {
       if (!this._isValidFilter(config)) {
         console.warn("Invalid filter configuration:", config);
@@ -133,19 +132,15 @@ class ZapSubscriptionManager {
       this._showInitialLoadingSpinner(viewId);
       
       // イベント収集を開始
-      console.log("Subscription initialization started:", { viewId, config });
       const { batchEvents, lastEventTime } = await this._collectInitialEvents(viewId, config, decoded);
       
-      console.log("Subscription initialization completed:", { viewId, config });
       if (batchEvents?.length > 0) {
         // バッチ処理は非同期で行い、finalizationを遅らせない
         this._processBatchEvents(batchEvents, viewId).catch(console.error);
       }
       
       // 即座にfinalizationを実行
-      console.log("Subscription initialized:", { viewId, config });
       await this.finalizeInitialization(viewId, lastEventTime);
-      console.log("Subscription initialized:", { viewId, config });
     } catch (error) {
       console.error("Subscription initialization error:", error);
       throw error;
@@ -200,7 +195,6 @@ class ZapSubscriptionManager {
 
   // 無限スクロール関連メソッド
   setupInfiniteScroll(viewId) {
-    console.log('Setting up infinite scroll:', viewId);
     try {
       this._cleanupInfiniteScroll(viewId);
       const list = this._getListElement(viewId);
@@ -492,7 +486,6 @@ class ZapSubscriptionManager {
       // Observer のクリーンアップ
       this._cleanupInfiniteScroll(viewId);
       
-      console.log(`Unsubscribed from zaps for viewId: ${viewId}`);
     } catch (error) {
       console.error(`Failed to unsubscribe for viewId ${viewId}:`, error);
     }
