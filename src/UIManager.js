@@ -98,7 +98,6 @@ class NostrZapViewDialog extends HTMLElement {
     if (!zapEvents?.length) {
       this.zapListUI.showNoZapsMessage();
     } else {
-      console.log(`Rendering ${zapEvents.length} cached zaps for viewId: ${this.viewId}`);
       await this.zapListUI.renderZapListFromCache(zapEvents);
     }
 
@@ -230,7 +229,6 @@ class NostrZapViewDialog extends HTMLElement {
 
   // UI操作メソッド
   getOperations() {
-    console.log('Getting operations for viewId:', this.viewId);
     // 基本初期化チェック
     if (!this.#state.isInitialized) {
       console.warn(`Basic initialization not complete for viewId: ${this.viewId}`);
@@ -244,7 +242,6 @@ class NostrZapViewDialog extends HTMLElement {
 
     // 完全な初期化が完了している場合のみ追加の操作を提供
     if (this.#state.isInitialized) {
-      console.log('Adding specialized operations for viewId:', this.viewId);
       Object.assign(operations, {
         prependZap: (event) => this.zapListUI?.prependZap(event),
         displayZapStats: (stats) => this.statsUI?.displayStats(stats),

@@ -67,7 +67,6 @@ export class ZapListUI {
   }
 
   async #updateListContent(operation) {
-    console.log("Updating list content...");
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
@@ -85,9 +84,22 @@ export class ZapListUI {
 
   #updateList(list, fragment) {
     const existingTrigger = list.querySelector('.load-more-trigger');
-    list.innerHTML = '';
-    list.appendChild(fragment);
-    if (existingTrigger) list.appendChild(existingTrigger);
+    if (existingTrigger) {
+      existingTrigger.remove();
+    }
+
+    fragment.childNodes.forEach(newItem => {
+      const eventId = newItem.getAttribute('data-event-id');
+      const existingItem = list.querySelector(`.zap-list-item[data-event-id="${eventId}"]`);
+      if (!existingItem) {
+        list.appendChild(newItem);
+      }
+    });
+
+    // load-more-triggerをリストの最下部に追加
+    if (existingTrigger) {
+      list.appendChild(existingTrigger);
+    }
   }
 
   #removeNoZapsMessage(list) {
@@ -166,7 +178,6 @@ export class ZapListUI {
       }
 
       await this.#updateProfiles(profileUpdates);
-      console.log("Cached batch processed:", remainingEvents.length);
     });
   }
 
@@ -189,19 +200,19 @@ export class ZapListUI {
   #insertBatchToList(list, fragment) {
     const existingTrigger = list.querySelector('.load-more-trigger');
     if (existingTrigger) {
-      list.insertBefore(fragment, existingTrigger);
-    } else {
-      list.appendChild(fragment);
+      existingTrigger.remove();
+    }
+    list.appendChild(fragment);
+    if (existingTrigger) {
+      list.appendChild(existingTrigger);
     }
   }
 
   async prependZap(event) {
-    console.log("Prepending zap:", event.id);
     return this.#createAndAddZapElement(event, (list, li) => list.prepend(li));
   }
 
   async appendZap(event) {
-    console.log("Appending zap:", event.id);
     return this.#createAndAddZapElement(event, (list, li) => {
       const position = this.#findInsertPosition(list, event.created_at);
       position ? list.insertBefore(li, position) : list.appendChild(li);
@@ -265,16 +276,13 @@ export class ZapListUI {
     if (!list) return;
 
     try {
-      const existingTrigger = list.querySelector('.load-more-trigger');
       const existingItems = new Map(
         Array.from(list.querySelectorAll('.zap-list-item'))
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      // イベントを時系列で並び替え
       const sortedEvents = [...events].sort((a, b) => b.created_at - a.created_at);
 
-      // 更新が必要なイベントのみをフィルタリング
       const eventsToUpdate = sortedEvents.filter(event => {
         const existingItem = existingItems.get(event.id);
         return !existingItem || (event.reference && !existingItem.querySelector('.zap-reference'));
@@ -285,97 +293,26 @@ export class ZapListUI {
       }
 
       const fragment = document.createDocumentFragment();
-      const updateQueue = [];
 
-      // 既存のアイテムとの統合処理
-      if (options.isFullUpdate) {
-        // 完全更新の場合は全てのイベントを再構築
-        const allEvents = this.#mergeAndSortEvents(
-          Array.from(existingItems.values()),
-          eventsToUpdate
-        );
-
-        for (const eventOrElement of allEvents) {
-          if (eventOrElement instanceof Element) {
-            fragment.appendChild(eventOrElement);
-          } else {
-            const { li, zapInfo } = await this.itemBuilder.createListItem(eventOrElement);
-            fragment.appendChild(li);
-            if (eventOrElement.reference) {
-              updateQueue.push(() => this.updateZapReference(eventOrElement));
-            }
-            if (zapInfo.pubkey) {
-              updateQueue.push(() => this.#updateProfileIfNeeded(zapInfo.pubkey, li));
-            }
-          }
+      for (const event of eventsToUpdate) {
+        const { li, zapInfo } = await this.itemBuilder.createListItem(event);
+        if (event.reference) {
+          await this.updateZapReference(event);
         }
-      } else {
-        // バッファー更新の場合は既存のアイテムを維持
-        existingItems.forEach(item => fragment.appendChild(item));
-        
-        for (const event of eventsToUpdate) {
-          const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-          const insertPosition = this.#findInsertPosition(fragment, event.created_at);
-          if (insertPosition) {
-            fragment.insertBefore(li, insertPosition);
-          } else {
-            fragment.appendChild(li);
-          }
-
-          if (event.reference) {
-            updateQueue.push(() => this.updateZapReference(event));
-          }
-          if (zapInfo.pubkey) {
-            updateQueue.push(() => this.#updateProfileIfNeeded(zapInfo.pubkey, li));
-          }
+        fragment.appendChild(li);
+        if (zapInfo.pubkey) {
+          await this.#updateProfileIfNeeded(zapInfo.pubkey, li);
         }
       }
 
-      // UIの更新（ローディングトリガーを保持）
-      if (existingTrigger) {
-        existingTrigger.remove();
-      }
-
-      list.innerHTML = '';
-      list.appendChild(fragment);
-
-      if (existingTrigger) {
-        list.appendChild(existingTrigger);
-      }
-
-      // バックグラウンドで更新を実行
-      if (updateQueue.length > 0) {
-        requestIdleCallback(() => this.#processUpdateQueue(updateQueue));
-      }
+      // リストを更新します。
+      this.#updateList(list, fragment);
 
     } catch (error) {
       console.error("Failed to batch update:", error);
     }
   }
 
-  #mergeAndSortEvents(existingElements, newEvents) {
-    const merged = [];
-    const elementTimestamps = new Map(
-      existingElements.map(element => [
-        element,
-        parseInt(element.getAttribute('data-timestamp') || '0')
-      ])
-    );
-
-    // 既存の要素とイベントを統合してソート
-    merged.push(
-      ...existingElements,
-      ...newEvents
-    );
-
-    return merged.sort((a, b) => {
-      const timeA = a instanceof Element ? 
-        elementTimestamps.get(a) : a.created_at;
-      const timeB = b instanceof Element ? 
-        elementTimestamps.get(b) : b.created_at;
-      return timeB - timeA;
-    });
-  }
 
   #findInsertPosition(parent, timestamp) {
     const items = Array.from(parent.children);
@@ -385,13 +322,6 @@ export class ZapListUI {
     });
   }
 
-  async #processUpdateQueue(queue, batchSize = 10) {
-    for (let i = 0; i < queue.length; i += batchSize) {
-      const batch = queue.slice(i, i + batchSize);
-      await Promise.all(batch.map(update => update()));
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-  }
 
   updateZapReference(event) {
     if (!event?.id || !event?.reference) return;
@@ -424,7 +354,6 @@ export class ZapListUI {
   }
 
   async #updateProfiles(profileUpdates) {
-    console.log("Updating profiles:", profileUpdates.length);
     const PROFILE_BATCH_SIZE = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.PROFILE_BATCH;
     for (let i = 0; i < profileUpdates.length; i += PROFILE_BATCH_SIZE) {
       const batch = profileUpdates.slice(i, i + PROFILE_BATCH_SIZE);
