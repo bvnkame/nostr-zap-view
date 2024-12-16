@@ -466,7 +466,7 @@ export class CacheManager {
 
     return {
       stats: results[0],
-      hasEnoughCachedEvents: cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT,
+      hasEnoughCachedEvents: cachedEvents.length > 0,
       hasReferences: hasReferences
     };
   }

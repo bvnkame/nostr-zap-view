@@ -88,15 +88,36 @@ export class ZapListUI {
       existingTrigger.remove();
     }
 
-    fragment.childNodes.forEach(newItem => {
+    // 既存のアイテムを維持しながら新しいアイテムを追加
+    Array.from(fragment.children).forEach(newItem => {
       const eventId = newItem.getAttribute('data-event-id');
-      const existingItem = list.querySelector(`.zap-list-item[data-event-id="${eventId}"]`);
+      const timestamp = parseInt(newItem.getAttribute('data-timestamp'));
+      
+      // 適切な挿入位置を見つける
+      let insertPosition = null;
+      const items = Array.from(list.children);
+      for (let i = 0; i < items.length; i++) {
+        const itemTimestamp = parseInt(items[i].getAttribute('data-timestamp'));
+        if (timestamp > itemTimestamp) {
+          insertPosition = items[i];
+          break;
+        }
+      }
+
+      // 重複チェックと挿入
+      const existingItem = list.querySelector(
+        `.zap-list-item[data-event-id="${eventId}"]`
+      );
       if (!existingItem) {
-        list.appendChild(newItem);
+        if (insertPosition) {
+          list.insertBefore(newItem, insertPosition);
+        } else {
+          list.appendChild(newItem);
+        }
       }
     });
 
-    // load-more-triggerをリストの最下部に追加
+    // トリガーを最後に追加
     if (existingTrigger) {
       list.appendChild(existingTrigger);
     }
@@ -118,6 +139,7 @@ export class ZapListUI {
   }
 
   async renderZapListFromCache(events) {
+    console.log('renderZapListFromCache', events);
     if (!events?.length) {
       cacheManager.setNoZapsState(this.viewId, false);
       return this.showNoZapsMessage();
@@ -140,7 +162,9 @@ export class ZapListUI {
   }
 
   #prepareEventBatches(events) {
+    console.log('Total events:', events.length);
     const uniqueEvents = this.#getUniqueEvents(events);
+    console.log('Unique events:', uniqueEvents.length);
     const INITIAL_BATCH = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.INITIAL_BATCH;
     
     return {
@@ -166,24 +190,38 @@ export class ZapListUI {
   }
 
   #processRemainingBatchAsync(remainingEvents, list, profileUpdates) {
-    requestIdleCallback(async () => {
-      const batchSize = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.REMAINING_BATCH;
-      
-      for (let i = 0; i < remainingEvents.length; i += batchSize) {
-        await this.#processBatch(
-          remainingEvents.slice(i, i + batchSize),
-          list,
-          profileUpdates
-        );
+    if (!remainingEvents.length) return;
+
+    // バッチサイズを大きくして処理効率を上げる
+    const batchSize = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.REMAINING_BATCH;
+    let currentIndex = 0;
+
+    const processNextBatch = async () => {
+      if (currentIndex >= remainingEvents.length) {
+        await this.#updateProfiles(profileUpdates);
+        return;
       }
 
-      await this.#updateProfiles(profileUpdates);
-    });
+      const currentBatch = remainingEvents.slice(
+        currentIndex,
+        currentIndex + batchSize
+      );
+
+      await this.#processBatch(currentBatch, list, profileUpdates);
+      currentIndex += batchSize;
+
+      // 次のバッチを非同期で処理
+      setTimeout(() => processNextBatch(), 0);
+    };
+
+    requestIdleCallback(() => processNextBatch());
   }
 
   async #processBatch(batch, list, profileUpdates) {
+    // fragment作成
     const batchFragment = document.createDocumentFragment();
 
+    // すべてのイベントを処理
     await Promise.all(batch.map(async (event) => {
       const { li, zapInfo } = await this.itemBuilder.createListItem(event);
       this.#handleCachedReference(event.id, li);
@@ -193,19 +231,18 @@ export class ZapListUI {
       }
     }));
 
-    this.#insertBatchToList(list, batchFragment);
-    await new Promise(resolve => requestAnimationFrame(resolve));
-  }
-
-  #insertBatchToList(list, fragment) {
+    // リストに追加（既存のアイテムは保持）
     const existingTrigger = list.querySelector('.load-more-trigger');
     if (existingTrigger) {
       existingTrigger.remove();
     }
-    list.appendChild(fragment);
+    list.appendChild(batchFragment);
     if (existingTrigger) {
       list.appendChild(existingTrigger);
     }
+
+    // UIの更新を待つ
+    await new Promise(resolve => requestAnimationFrame(resolve));
   }
 
   async prependZap(event) {
@@ -272,6 +309,7 @@ export class ZapListUI {
 
   // バッチ更新関連
   async batchUpdate(events, options = {}) {
+    console.log('batchUpdate', events, options);
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 
@@ -281,9 +319,9 @@ export class ZapListUI {
           .map(item => [item.getAttribute('data-event-id'), item])
       );
 
-      const sortedEvents = [...events].sort((a, b) => b.created_at - a.created_at);
+      const uniqueEvents = this.#getUniqueEvents(events);
 
-      const eventsToUpdate = sortedEvents.filter(event => {
+      const eventsToUpdate = uniqueEvents.filter(event => {
         const existingItem = existingItems.get(event.id);
         return !existingItem || (event.reference && !existingItem.querySelector('.zap-reference'));
       });

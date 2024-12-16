@@ -56,7 +56,7 @@ const Decoder = {
     }
 
     const req = reqCreator();
-    req.limit = since ? APP_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.INITIAL_LOAD_COUNT;
+    req.limit = since ? APP_CONFIG.REQ_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.REQ_CONFIG.INITIAL_LOAD_COUNT;
     if (since) req.until = since;
 
     return { req };

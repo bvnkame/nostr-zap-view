@@ -156,24 +156,20 @@ class ZapSubscriptionManager {
   }
 
   async finalizeInitialization(viewId, lastEventTime) {
-    // 必要なデータを事前に取得
     const cachedEvents = cacheManager.getZapEvents(viewId);
     const list = this._getListElement(viewId);
 
-    // 状態の更新を非同期で行う
     const updateState = cacheManager.updateLoadState(viewId, {
         isInitialFetchComplete: true,
         lastEventTime
     });
 
-    // 同時に複数の処理を実行
     await Promise.all([
         updateState,
         cachedEvents.length === 0 ? this.zapListUI?.showNoZapsMessage() : null,
-        cachedEvents.length >= APP_CONFIG.INITIAL_LOAD_COUNT ? this.setupInfiniteScroll(viewId) : null
+        lastEventTime ? this.setupInfiniteScroll(viewId) : null  // イベント時刻を基準に判定
     ]);
 
-    // DOMの更新は最後に
     list?.querySelector('.load-more-trigger')?.remove();
   }
 
@@ -426,6 +422,7 @@ class ZapSubscriptionManager {
 
   // UI更新関連メソッド
   async _processBatchEvents(events, viewId) {
+    console.log('Processing batch events:', events.length);
     if (!events?.length) return;
 
     events.sort((a, b) => b.created_at - a.created_at);
@@ -443,7 +440,7 @@ class ZapSubscriptionManager {
     await this._updateUI(events, viewId);
   }
 
-  async _updateUI(events, viewId) {
+  async _updateUI(events, _viewId) {
     if (!this.zapListUI) return;
     await this.zapListUI.batchUpdate(events, { isFullUpdate: true });
   }

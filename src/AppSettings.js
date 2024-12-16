@@ -12,8 +12,10 @@ export const APP_CONFIG = {
     colorMode: true,
   },
   BATCH_SIZE: 5,
-  INITIAL_LOAD_COUNT: 15, // 初期ロード件数
-  ADDITIONAL_LOAD_COUNT: 20, // 追加ロード件数
+  REQ_CONFIG: {
+    INITIAL_LOAD_COUNT: 15,
+    ADDITIONAL_LOAD_COUNT: 20,
+  },
   LOAD_TIMEOUT: 10000, // タイムアウト時間（ms）
   BUFFER_INTERVAL: 500, // バッファ間隔（ms）
   BUFFER_MIN_INTERVAL: 100, // バッファ最小間隔（ms）
