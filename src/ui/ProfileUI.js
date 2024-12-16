@@ -169,12 +169,34 @@ export class ProfileUI {
     if (iconElement) {
       if (profile.picture) {
         const img = document.createElement('img');
-        img.src = profile.picture;
         img.alt = profile.name || 'Profile Picture';
-        img.width = 40;
-        img.height = 40;
+        img.width = 32;
+        img.height = 32;
+        img.className = 'profile-icon';
+
+        // 画像読み込みエラー時の処理を追加
+        img.onerror = () => {
+          const pubkey = element.getAttribute('data-pubkey');
+          if (pubkey) {
+            const robohashImg = this.#createDefaultIcon(pubkey, profile.name || 'anonymous user');
+            if (img.parentElement) {
+              img.parentElement.replaceChild(robohashImg, img);
+            }
+          }
+        };
+
+        img.src = profile.picture;
         if (iconElement.parentElement) {
           iconElement.parentElement.replaceChild(img, iconElement);
+        }
+      } else {
+        // プロフィール画像が存在しない場合は直接robohashを使用
+        const pubkey = element.getAttribute('data-pubkey');
+        if (pubkey) {
+          const robohashImg = this.#createDefaultIcon(pubkey, profile.name || 'anonymous user');
+          if (iconElement.parentElement) {
+            iconElement.parentElement.replaceChild(robohashImg, iconElement);
+          }
         }
       }
     }
