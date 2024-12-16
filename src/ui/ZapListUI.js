@@ -1,6 +1,7 @@
 import { DialogComponents } from "../DialogComponents.js";
 import { APP_CONFIG } from "../AppSettings.js";
 import { cacheManager } from "../CacheManager.js";
+import { isEventIdentifier } from "../utils.js";
 
 class ZapItemBuilder {
   constructor(viewId, config) {
@@ -316,9 +317,14 @@ export class ZapListUI {
       );
 
       const uniqueEvents = this.#getUniqueEvents(events);
+      const isEventId = isEventIdentifier(this.config.identifier);
 
       const eventsToUpdate = uniqueEvents.filter(event => {
         const existingItem = existingItems.get(event.id);
+        // reference処理をスキップする条件を追加
+        if (isEventId) {
+          return !existingItem;
+        }
         return !existingItem || (event.reference && !existingItem.querySelector('.zap-reference'));
       });
 
@@ -330,7 +336,8 @@ export class ZapListUI {
 
       for (const event of eventsToUpdate) {
         const { li, zapInfo } = await this.itemBuilder.createListItem(event);
-        if (event.reference) {
+        // reference処理をスキップする条件を追加
+        if (!isEventId && event.reference) {
           this.updateZapReference(event);
         }
         fragment.appendChild(li);
@@ -426,6 +433,9 @@ export class ZapListUI {
   }
 
   #handleCachedReference(eventId, element) {
+    // reference処理をスキップする条件を追加
+    if (isEventIdentifier(this.config.identifier)) return;
+    
     const cachedReference = cacheManager.getReference(eventId);
     if (cachedReference) {
       DialogComponents.addReferenceToElement(element, cachedReference);

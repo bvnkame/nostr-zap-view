@@ -346,19 +346,14 @@ function encodeNaddr(kind, pubkey, identifier, relays = []) {
 function isEventIdentifier(identifier) {
   if (!identifier || typeof identifier !== "string") return false;
 
-  // キャッシュから結果を取得
-  const cached = cacheManager.getCacheItem('identifierType', identifier);
+  const cacheKey = `isEventIdentifier:${identifier}`;
+  const cached = cacheManager.getCacheItem('isEventIdentifier', cacheKey);
   if (cached !== undefined) {
-    console.log('Cache hit:', identifier, cached);
     return cached;
   }
 
-  // 新しい結果を計算
   const result = identifier.startsWith("note1") || identifier.startsWith("nevent1");
-  
-  // 結果をキャッシュに保存
-  const saved = cacheManager.setCacheItem('identifierType', identifier, result);
-  console.log('Cache saved:', identifier, saved);
+  cacheManager.setCacheItem('isEventIdentifier', cacheKey, result);
 
   return result;
 }

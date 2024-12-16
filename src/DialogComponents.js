@@ -24,13 +24,19 @@ export class DialogComponents {
   };
 
   // Core UI Component Methods
-  static createUIComponents(zapInfo, _viewId, identifier) {
+  static createUIComponents(zapInfo, viewId, identifier) {
     try {
-      const normalizedReference = this.#getNormalizedReference(zapInfo);
+      // identifierの取得をViewConfigから行う
+      const config = this.viewConfigs?.get(viewId);
+      const currentIdentifier = identifier || config?.identifier;
+      
+      // identifierがeventの場合はreferenceを無視
+      const normalizedReference = isEventIdentifier(currentIdentifier) ? null : this.#getNormalizedReference(zapInfo);
+      
       return {
         iconComponent: this.#createIconComponent(),
         nameComponent: this.#createNameComponent(zapInfo),
-        pubkeyComponent: this.#createPubkeyComponent(zapInfo, identifier),
+        pubkeyComponent: this.#createPubkeyComponent(zapInfo, currentIdentifier),
         referenceComponent: this.#createReferenceComponent(normalizedReference),
       };
     } catch (error) {
@@ -357,4 +363,7 @@ export class DialogComponents {
       return results;
     }
   }
+
+  // ViewConfigsの保持用
+  static viewConfigs = new Map();
 }

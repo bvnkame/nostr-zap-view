@@ -4,6 +4,7 @@ import { statsManager } from "./StatsManager.js";
 import { eventPool } from "./EventPool.js";
 import { cacheManager } from "./CacheManager.js";
 import { profilePool } from "./ProfilePool.js";
+import { DialogComponents } from "./DialogComponents.js";  // 追加
 
 class ZapSubscriptionManager {
   constructor() {
@@ -26,6 +27,8 @@ class ZapSubscriptionManager {
 
   setViewConfig(viewId, config) {
     this.viewConfigs.set(viewId, config);
+    // DialogComponentsにも設定を共有
+    DialogComponents.viewConfigs.set(viewId, config);
     cacheManager.initializeZapView(viewId);
   }
 
@@ -44,7 +47,10 @@ class ZapSubscriptionManager {
       }
 
       const identifier = config?.identifier || '';
-      if (isEventIdentifier(identifier)) return false;
+      // イベント識別子の場合は早期リターン
+      if (isEventIdentifier(identifier)) {
+        return false;
+      }
 
       const reference = await this._fetchEventReference(event, config);
       if (reference) {
@@ -97,6 +103,7 @@ class ZapSubscriptionManager {
     if (!config?.relayUrls?.length) return;
 
     const identifier = config?.identifier || '';
+    // イベント識別子の場合は早期リターン
     if (isEventIdentifier(identifier)) return;
 
     const fetchPromises = events.map(event => this.updateEventReference(event, viewId));
@@ -121,7 +128,6 @@ class ZapSubscriptionManager {
       }
 
       const decoded = decodeIdentifier(config.identifier);
-      console.log("Decoded identifier:", decoded);
       if (!decoded) {
         console.warn("Failed to decode identifier:", config.identifier);
         throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
@@ -302,7 +308,6 @@ class ZapSubscriptionManager {
 
   async _executeLoadMore(viewId, state, config) {
     const decoded = decodeIdentifier(config.identifier, state.lastEventTime);
-    console.log('Decoded identifier for load more:', decoded);
     if (!decoded) {
       console.warn('Failed to decode identifier for load more:', { 
         identifier: config.identifier, 

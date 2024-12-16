@@ -398,7 +398,7 @@ export class CacheManager {
     const CACHE_NAMES = [
       'zapInfo', 'uiComponent', 'decoded', 'nip05', 
       'nip05PendingFetches', 'zapLoadStates', 'imageCache',
-      'identifierType'  // 追加: identifier type用のキャッシュ
+      'isEventIdentifier'  // 追加: identifier type用のキャッシュ
     ];
 
     this.#caches = CACHE_NAMES.reduce((acc, name) => {
