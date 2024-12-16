@@ -21,14 +21,8 @@ const Validator = {
     }
   },
   isValidTimestamp: (timestamp) => typeof timestamp === "number" && timestamp > 0,
-  isProfileIdentifier: (identifier) => {
-    if (!identifier || typeof identifier !== "string") return false;
-    return identifier.startsWith("npub1") || identifier.startsWith("nprofile1");
-  },
-  isEventIdentifier: (identifier) => {
-    if (!identifier || typeof identifier !== "string") return false;
-    return identifier.startsWith("note1") || identifier.startsWith("nevent1");
-  }
+  isProfileIdentifier, // スタンドアロン関数を参照
+  isEventIdentifier // スタンドアロン関数を参照
 };
 
 // Decoder utilities
@@ -351,7 +345,22 @@ function encodeNaddr(kind, pubkey, identifier, relays = []) {
 // --- Move individual functions out of Validator ---
 function isEventIdentifier(identifier) {
   if (!identifier || typeof identifier !== "string") return false;
-  return identifier.startsWith("note1") || identifier.startsWith("nevent1");
+
+  // キャッシュから結果を取得
+  const cached = cacheManager.getCacheItem('identifierType', identifier);
+  if (cached !== undefined) {
+    console.log('Cache hit:', identifier, cached);
+    return cached;
+  }
+
+  // 新しい結果を計算
+  const result = identifier.startsWith("note1") || identifier.startsWith("nevent1");
+  
+  // 結果をキャッシュに保存
+  const saved = cacheManager.setCacheItem('identifierType', identifier, result);
+  console.log('Cache saved:', identifier, saved);
+
+  return result;
 }
 
 function isProfileIdentifier(identifier) {

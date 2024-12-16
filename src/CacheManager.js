@@ -17,15 +17,15 @@ class BaseCache {
     this.cache.set(key, value);
     this.accessOrder.delete(key);
     this.accessOrder.set(key, Date.now());
+    return value; // 設定した値を返す
   }
 
   get(key) {
-    const value = this.cache.get(key);
-    if (value !== undefined) {
-      // アクセス順を更新
-      this.accessOrder.delete(key);
-      this.accessOrder.set(key, Date.now());
+    if (!this.cache.has(key)) {
+      return undefined;
     }
+    const value = this.cache.get(key);
+    this.accessOrder.set(key, Date.now());
     return value;
   }
 
@@ -373,12 +373,14 @@ class Nip05Cache extends ProfileCache {
 }
 
 export class CacheManager {
-  #instance = null;
+  static #instance = null;
   #relayUrls = null;
   #caches = {};
 
   constructor() {
-    if (this.#instance) return this.#instance;
+    if (CacheManager.#instance) {
+      return CacheManager.#instance;
+    }
 
     // 専用キャッシュの初期化
     this.profileCache = new ProfileCache();
@@ -395,18 +397,19 @@ export class CacheManager {
     // 汎用キャッシュの初期化
     const CACHE_NAMES = [
       'zapInfo', 'uiComponent', 'decoded', 'nip05', 
-      'nip05PendingFetches', 'zapLoadStates', 'imageCache'
+      'nip05PendingFetches', 'zapLoadStates', 'imageCache',
+      'identifierType'  // 追加: identifier type用のキャッシュ
     ];
 
-    this.#caches = CACHE_NAMES.reduce((acc, name) => ({
-      ...acc,
-      [name]: new BaseCache()
-    }), {});
+    this.#caches = CACHE_NAMES.reduce((acc, name) => {
+      acc[name] = new BaseCache();
+      return acc;
+    }, {});
 
     this.viewStats = new Map();
     this.viewStates = new Map();
 
-    this.#instance = this;
+    CacheManager.#instance = this;
   }
 
   // プロフィール関連の委譲メソッド
@@ -535,12 +538,17 @@ export class CacheManager {
   // その他の汎用キャッシュメソッド
   setCacheItem(cacheName, key, value) {
     const cache = this.#caches[cacheName];
-    if (cache) cache.set(key, value);
+    if (cache && key !== undefined) {
+      const result = cache.set(key, value);
+      return result;
+    }
+    return null;
   }
 
   getCacheItem(cacheName, key) {
     const cache = this.#caches[cacheName];
-    return cache ? cache.get(key) : null;
+    if (!cache || key === undefined) return null;
+    return cache.get(key);
   }
 
   // グローバル設定

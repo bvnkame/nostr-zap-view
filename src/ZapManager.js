@@ -121,6 +121,7 @@ class ZapSubscriptionManager {
       }
 
       const decoded = decodeIdentifier(config.identifier);
+      console.log("Decoded identifier:", decoded);
       if (!decoded) {
         console.warn("Failed to decode identifier:", config.identifier);
         throw new Error(APP_CONFIG.ZAP_CONFIG.ERRORS.DECODE_FAILED);
@@ -301,6 +302,7 @@ class ZapSubscriptionManager {
 
   async _executeLoadMore(viewId, state, config) {
     const decoded = decodeIdentifier(config.identifier, state.lastEventTime);
+    console.log('Decoded identifier for load more:', decoded);
     if (!decoded) {
       console.warn('Failed to decode identifier for load more:', { 
         identifier: config.identifier, 
