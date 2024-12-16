@@ -139,7 +139,6 @@ export class ZapListUI {
   }
 
   async renderZapListFromCache(events) {
-    console.log('renderZapListFromCache', events);
     if (!events?.length) {
       cacheManager.setNoZapsState(this.viewId, false);
       return this.showNoZapsMessage();
@@ -162,9 +161,7 @@ export class ZapListUI {
   }
 
   #prepareEventBatches(events) {
-    console.log('Total events:', events.length);
     const uniqueEvents = this.#getUniqueEvents(events);
-    console.log('Unique events:', uniqueEvents.length);
     const INITIAL_BATCH = APP_CONFIG.DIALOG_CONFIG.ZAP_LIST.INITIAL_BATCH;
     
     return {
@@ -309,7 +306,6 @@ export class ZapListUI {
 
   // バッチ更新関連
   async batchUpdate(events, options = {}) {
-    console.log('batchUpdate', events, options);
     const list = this.#getElement(".dialog-zap-list");
     if (!list) return;
 

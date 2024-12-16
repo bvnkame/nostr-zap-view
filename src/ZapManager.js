@@ -167,7 +167,7 @@ class ZapSubscriptionManager {
     await Promise.all([
         updateState,
         cachedEvents.length === 0 ? this.zapListUI?.showNoZapsMessage() : null,
-        lastEventTime ? this.setupInfiniteScroll(viewId) : null  // イベント時刻を基準に判定
+        cachedEvents.length >= APP_CONFIG.REQ_CONFIG.INITIAL_LOAD_COUNT ? this.setupInfiniteScroll(viewId) : null
     ]);
 
     list?.querySelector('.load-more-trigger')?.remove();
@@ -321,7 +321,7 @@ class ZapSubscriptionManager {
     }, APP_CONFIG.LOAD_TIMEOUT);
 
     try {
-      await this._collectEvents(viewId, config, decoded, batchEvents, APP_CONFIG.ADDITIONAL_LOAD_COUNT, state);
+      await this._collectEvents(viewId, config, decoded, batchEvents, APP_CONFIG.REQ_CONFIG.ADDITIONAL_LOAD_COUNT, state);
 
       if (batchEvents.length > 0) {
         await this._processBatchEvents(batchEvents, viewId);
@@ -422,7 +422,6 @@ class ZapSubscriptionManager {
 
   // UI更新関連メソッド
   async _processBatchEvents(events, viewId) {
-    console.log('Processing batch events:', events.length);
     if (!events?.length) return;
 
     events.sort((a, b) => b.created_at - a.created_at);
@@ -431,7 +430,6 @@ class ZapSubscriptionManager {
     try {
       await Promise.all([
         profilePool.processBatchProfiles(events)
-        // statsManager.handleZapEventの呼び出しを削除
       ]);
     } catch (error) {
       console.warn('Profile processing failed:', error);
