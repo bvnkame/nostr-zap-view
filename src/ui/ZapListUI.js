@@ -297,7 +297,7 @@ export class ZapListUI {
       for (const event of eventsToUpdate) {
         const { li, zapInfo } = await this.itemBuilder.createListItem(event);
         if (event.reference) {
-          await this.updateZapReference(event);
+          this.updateZapReference(event);
         }
         fragment.appendChild(li);
         if (zapInfo.pubkey) {
