@@ -27,6 +27,7 @@ export const APP_CONFIG = {
   },
   ZAP_CONFIG: {
     DEFAULT_LIMIT: 1,
+    DEFAULT_COLOR_MODE: true,  // 追加
     ERRORS: {
       DIALOG_NOT_FOUND: "Zap dialog not found",
       BUTTON_NOT_FOUND: "Fetch button not found",
@@ -94,19 +95,17 @@ export class ViewerConfig {
   constructor(identifier, relayUrls, colorMode = null) {
     this.identifier = identifier;
     this.relayUrls = relayUrls;
-    // boolean型に確実に変換
+    // colorModeがnullの場合のみデフォルト値を使用
     this.isColorModeEnabled = colorMode === null ? 
-      APP_CONFIG.ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
+      APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE : 
       String(colorMode).toLowerCase() === "true";
   }
 
   static determineColorMode(button) {
-    if (!button) return APP_CONFIG.ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE;
+    if (!button) return APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE;
+    if (!button.hasAttribute("data-zap-color-mode")) return APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE;
     const colorModeAttr = button.getAttribute("data-zap-color-mode");
-    // boolean型に確実に変換
-    return colorModeAttr === null ? 
-      APP_CONFIG.ZAP_AMOUNT_CONFIG.DEFAULT_COLOR_MODE : 
-      String(colorModeAttr).toLowerCase() === "true";
+    return String(colorModeAttr).toLowerCase() === "true";
   }
 
   static fromButton(button) {

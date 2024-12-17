@@ -80,8 +80,9 @@ function initializeApp() {
     const viewId = `nostr-zap-view-${index}`;
     button.setAttribute("data-zap-view-id", viewId);
 
+    // data-zap-color-modeが存在しない場合はデフォルト値を設定
     if (!button.hasAttribute("data-zap-color-mode")) {
-      button.setAttribute("data-zap-color-mode", APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE.toString());
+      button.setAttribute("data-zap-color-mode", APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE);
     }
 
     button.addEventListener("click", () => handleButtonClick(button, viewId));
