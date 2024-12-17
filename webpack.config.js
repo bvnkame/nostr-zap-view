@@ -1,6 +1,7 @@
 const path = require("path");
 const TerserPlugin = require("terser-webpack-plugin");
 const fs = require("fs");
+const CopyPlugin = require('copy-webpack-plugin');
 
 module.exports = [
   {
@@ -48,6 +49,13 @@ module.exports = [
         }),
       ],
     },
+    plugins: [
+      new CopyPlugin({
+        patterns: [
+          { from: "src/types", to: "dist/types" }
+        ],
+      }),
+    ],
   },
   {
     // ESModule用の設定を追加
@@ -98,5 +106,12 @@ module.exports = [
         }),
       ],
     },
+    plugins: [
+      new CopyPlugin({
+        patterns: [
+          { from: "src/types", to: "dist/types" }
+        ],
+      }),
+    ],
   },
 ];
