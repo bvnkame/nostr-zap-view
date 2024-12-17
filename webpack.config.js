@@ -2,49 +2,101 @@ const path = require("path");
 const TerserPlugin = require("terser-webpack-plugin");
 const fs = require("fs");
 
-module.exports = {
-  entry: "./src/index.js",
-  output: {
-    path: path.resolve(__dirname, "dist"),
-    filename: "nostr-zap-view.js",
-    library: "nostrZapView",
-    libraryTarget: "umd",
-  },
-  mode: "production",
-  module: {
-    rules: [
-      {
-        test: /\.css$/,
-        use: ["to-string-loader", "css-loader"],
-      },
-      {
-        test: /\.svg$/,
-        type: "asset/inline",
-      },
-    ],
-  },
-  resolve: {
-    modules: [path.resolve(__dirname, "src"), "node_modules"],
-  },
-  optimization: {
-    minimize: true,
-    minimizer: [
-      new TerserPlugin({
-        terserOptions: {
-          format: {
-            comments: /@license/i,
-          },
-          compress: {
-            drop_console: true,
-          },
+module.exports = [
+  {
+    entry: "./src/index.js",
+    output: {
+      path: path.resolve(__dirname, "dist"),
+      filename: "nostr-zap-view.js",
+      library: "nostrZapView",
+      libraryTarget: "umd",
+    },
+    mode: "production",
+    module: {
+      rules: [
+        {
+          test: /\.css$/,
+          use: ["to-string-loader", "css-loader"],
         },
-        extractComments: {
-          condition: "some",
-          banner: () => {
-            return fs.readFileSync(path.resolve(__dirname, "LICENSE"), "utf8");
-          },
+        {
+          test: /\.svg$/,
+          type: "asset/inline",
         },
-      }),
-    ],
+      ],
+    },
+    resolve: {
+      modules: [path.resolve(__dirname, "src"), "node_modules"],
+    },
+    optimization: {
+      minimize: true,
+      minimizer: [
+        new TerserPlugin({
+          terserOptions: {
+            format: {
+              comments: /@license/i,
+            },
+            compress: {
+              drop_console: true,
+            },
+          },
+          extractComments: {
+            condition: "some",
+            banner: () => {
+              return fs.readFileSync(path.resolve(__dirname, "LICENSE"), "utf8");
+            },
+          },
+        }),
+      ],
+    },
   },
-};
+  {
+    // ESModule用の設定を追加
+    entry: "./src/index.js",
+    output: {
+      path: path.resolve(__dirname, "dist"),
+      filename: "nostr-zap-view.esm.js",
+      library: { type: "module" },
+      chunkFormat: "module",
+    },
+    experiments: {
+      outputModule: true,
+    },
+    mode: "production",
+    module: {
+      rules: [
+        {
+          test: /\.css$/,
+          use: ["to-string-loader", "css-loader"],
+        },
+        {
+          test: /\.svg$/,
+          type: "asset/inline",
+        },
+      ],
+    },
+    resolve: {
+      modules: [path.resolve(__dirname, "src"), "node_modules"],
+    },
+    optimization: {
+      minimize: true,
+      minimizer: [
+        new TerserPlugin({
+          terserOptions: {
+            format: {
+              comments: /@license/i,
+            },
+            compress: {
+              drop_console: true,
+            },
+          },
+          extractComments: {
+            condition: "some",
+            banner: () => {
+              return fs.readFileSync(path.resolve(__dirname, "LICENSE"), "utf8");
+            },
+          },
+        }),
+      ],
+    },
+  },
+];

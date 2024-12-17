@@ -88,6 +88,27 @@ function initializeApp() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", initializeApp);
+if (typeof window !== 'undefined') {
+  document.addEventListener("DOMContentLoaded", initializeApp); 
+}
 
-export { profilePool, eventPool, APP_CONFIG };
+// npmユーザー向けのexport
+export {
+  ViewerConfig,
+  profilePool,
+  eventPool,
+  APP_CONFIG,
+  cacheManager,
+  subscriptionManager,
+  statsManager
+};
+
+// 初期化関数をexport
+export function initialize(options = {}) {
+  // カスタム設定のマージ
+  Object.assign(APP_CONFIG, options);
+  
+  if (typeof window !== 'undefined') {
+    initializeApp();
+  }
+}
