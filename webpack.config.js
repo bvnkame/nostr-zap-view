@@ -109,7 +109,7 @@ module.exports = [
     plugins: [
       new CopyPlugin({
         patterns: [
-          { from: "src/types", to: "dist/types" }
+          { from: "src/types", to: "types" }
         ],
       }),
     ],
