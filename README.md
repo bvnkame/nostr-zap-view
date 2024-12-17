@@ -26,7 +26,7 @@ To configure a button for displaying zap information, use the following attribut
 
 Add this script tag right before the bottom closing body tag.
 ```js
-<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.3.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/nostr-zap-view@1.3.2"></script>
 ```
 
 ## Related repository
