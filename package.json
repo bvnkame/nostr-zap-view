@@ -5,12 +5,12 @@
   "main": "./dist/nostr-zap-view.js",
   "module": "./dist/nostr-zap-view.esm.js",
   "types": "./dist/types/index.d.ts",
-  "browser": "./dist/nostr-zap-view.esm.js",
   "exports": {
     ".": {
       "import": "./dist/nostr-zap-view.esm.js",
       "require": "./dist/nostr-zap-view.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "author": "Lokuyow",
   "license": "MIT",
