@@ -105,7 +105,11 @@ export class ViewerConfig {
     if (!button) return APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE;
     if (!button.hasAttribute("data-zap-color-mode")) return APP_CONFIG.ZAP_CONFIG.DEFAULT_COLOR_MODE;
     const colorModeAttr = button.getAttribute("data-zap-color-mode");
-    return String(colorModeAttr).toLowerCase() === "true";
+    // trueまたはfalse以外の値の場合はtrueを返す
+    if (colorModeAttr.toLowerCase() !== 'true' && colorModeAttr.toLowerCase() !== 'false') {
+      return true;
+    }
+    return colorModeAttr.toLowerCase() === "true";
   }
 
   static fromButton(button) {
