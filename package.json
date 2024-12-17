@@ -9,8 +9,7 @@
     ".": {
       "import": "./dist/nostr-zap-view.esm.js",
       "require": "./dist/nostr-zap-view.js"
-    },
-    "./package.json": "./package.json"
+    }
   },
   "author": "Lokuyow",
   "license": "MIT",
