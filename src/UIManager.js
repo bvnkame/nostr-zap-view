@@ -21,6 +21,13 @@ class NostrZapViewDialog extends HTMLElement {
       isInitialized: false,
       theme: APP_CONFIG.DEFAULT_OPTIONS.theme,
     };
+
+    this.popStateHandler = (e) => {
+      e.preventDefault();
+      if (this.#getElement(".dialog")?.open) {
+        this.closeDialog();
+      }
+    };
   }
 
   async connectedCallback() {
@@ -129,6 +136,11 @@ class NostrZapViewDialog extends HTMLElement {
       if (e.target === dialog) this.closeDialog();
     });
 
+    dialog.addEventListener("cancel", (e) => {
+      e.preventDefault();
+      this.closeDialog();
+    });
+
     // スペースキーでのスクロール制御を追加
     document.addEventListener("keydown", (e) => {
       if (dialog?.open) {
@@ -177,6 +189,9 @@ class NostrZapViewDialog extends HTMLElement {
       return;
     }
 
+    history.pushState({ dialogOpen: true }, "");
+    window.addEventListener("popstate", this.popStateHandler);
+
     dialog.showModal();
     queueMicrotask(() => {
       if (document.activeElement) {
@@ -195,7 +210,7 @@ class NostrZapViewDialog extends HTMLElement {
       subscriptionManager.unsubscribe(this.viewId);
       dialog.close();
       this.remove();
-      
+      window.removeEventListener("popstate", this.popStateHandler);
     }
   }
 
