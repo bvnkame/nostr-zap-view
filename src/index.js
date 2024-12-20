@@ -93,17 +93,6 @@ if (typeof window !== 'undefined') {
   document.addEventListener("DOMContentLoaded", initializeApp); 
 }
 
-// npmユーザー向けのexport
-export {
-  ViewerConfig,
-  profilePool,
-  eventPool,
-  APP_CONFIG,
-  cacheManager,
-  subscriptionManager,
-  statsManager
-};
-
 // 初期化関数をexport
 export function initialize(options = {}) {
   // カスタム設定のマージ
