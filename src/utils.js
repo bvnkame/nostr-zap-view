@@ -357,7 +357,9 @@ function isEventIdentifier(identifier) {
     return cached;
   }
 
-  const result = identifier.startsWith("note1") || identifier.startsWith("nevent1");
+  const result = identifier.startsWith("note1") || 
+                 identifier.startsWith("nevent1") || 
+                 identifier.startsWith("naddr1");
   cacheManager.setCacheItem('isEventIdentifier', cacheKey, result);
 
   return result;
