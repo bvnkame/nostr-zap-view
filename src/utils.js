@@ -5,7 +5,7 @@ import defaultIcon from "./assets/nostr-icon.svg";
 // Core constants
 const CONSTANTS = {
   DEFAULT_ERROR_MESSAGE: "Processing failed",
-  SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent"],
+  SUPPORTED_TYPES: ["npub", "note", "nprofile", "nevent", "naddr"],
   PROTOCOLS: ["http:", "https:"],
 };
 
@@ -40,7 +40,11 @@ const Decoder = {
       npub: () => ({ kinds: [9735], "#p": [data] }),
       note: () => ({ kinds: [9735], "#e": [data] }),
       nprofile: () => ({ kinds: [9735], "#p": [data.pubkey] }),
-      nevent: () => ({ kinds: [9735], "#e": [data.id] })
+      nevent: () => ({ kinds: [9735], "#e": [data.id] }),
+      naddr: () => ({ 
+        kinds: [9735], 
+        "#a": [`${data.kind}:${data.pubkey}:${data.identifier}`] 
+      })
     };
 
     const reqCreator = baseReq[type];
@@ -53,6 +57,7 @@ const Decoder = {
     req.limit = since ? APP_CONFIG.REQ_CONFIG.ADDITIONAL_LOAD_COUNT : APP_CONFIG.REQ_CONFIG.INITIAL_LOAD_COUNT;
     if (since) req.until = since;
 
+    console.debug("Created request:", req);
     return { req };
   }
 };
