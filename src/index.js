@@ -94,7 +94,7 @@ if (typeof window !== 'undefined') {
 }
 
 // 初期化関数をexport
-export function initialize(options = {}) {
+export function nostrZapView(options = {}) {
   // カスタム設定のマージ
   Object.assign(APP_CONFIG, options);
   
