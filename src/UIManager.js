@@ -179,6 +179,12 @@ class NostrZapViewDialog extends HTMLElement {
 
     dialog.showModal();
     this.#updateDialogTitle();
+    
+    // ダイアログを開いた時に履歴エントリを追加
+    history.pushState({ dialogOpen: true }, "");
+    
+    // 戻るボタンが押された時のイベントリスナーを追加
+    window.addEventListener("popstate", this.#handlePopState);
   }
 
   closeDialog() {
@@ -189,8 +195,16 @@ class NostrZapViewDialog extends HTMLElement {
       subscriptionManager.unsubscribe(this.viewId);
       dialog.close();
       this.remove();
+      
+      // イベントリスナーを削除
+      window.removeEventListener("popstate", this.#handlePopState);
     }
   }
+
+  // popstateイベントハンドラを追加
+  #handlePopState = () => {
+    this.closeDialog();
+  };
 
   displayZapStats(stats) {
     this.statsUI.displayStats(stats);
