@@ -6,7 +6,7 @@
     Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   --main-text: Black;
   --pubkey-text: #888;
-  --tite-text: #555;
+  --custom-title-text: #555;
   --stats-item-text: #333;
   --name-text: #444;
   --dialog-bg: #ffffff;
@@ -74,13 +74,13 @@ button {
 }
 
 .close-dialog-button {
+  color: var(--custom-title-text);
   font-size: 16px;
   font-weight: 500;
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 36px;
-  height: 36px;
+  right: 0;
+  width: 2.625rem;
+  height: 2.625rem;
   border: none;
   border-radius: 50%;
   background: none;
@@ -119,7 +119,7 @@ button {
 }
 
 .dialog-title.custom-title a {
-  color: var(--tite-text);
+  color: var(--custom-title-text);
   font-weight: 600;
   font-size: 1rem;
 }
