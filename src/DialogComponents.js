@@ -264,15 +264,13 @@ export class DialogComponents {
   static #buildReferenceHTML(url, content) {
     return `
       <div class="zap-reference">
-        <div class="reference-icon">
-          <img src="${arrowRightIcon}" alt="Reference" width="16" height="16" />
+        <div class="reference-arrow">
+          <img src="${arrowRightIcon}" alt="Reference" width="18" height="18" />
         </div>
-        <div class="reference-content">
-          <div class="reference-text">${escapeHTML(content)}</div>
-          <a href="${url}" target="_blank" class="reference-link">
-            <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
-          </a>
-        </div>
+        <div class="reference-text">${escapeHTML(content)}</div>
+        <a href="${url}" target="_blank" class="reference-link">
+          <img src="${quickReferenceIcon}" alt="Quick Reference" width="16" height="16" />
+        </a>
       </div>
     `;
   }

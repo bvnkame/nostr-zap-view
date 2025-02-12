@@ -330,29 +330,43 @@ button {
   margin: 0;
   font-size: 0.875rem;
   color: var(--pubkey-text);
-}
-
-.reference-icon {
-  margin-right: 2px;
-}
-
-.reference-content {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  flex: 1;
-  min-width: 0;
+}
+
+.reference-arrow {
+  margin-right: 2px;
+  flex-shrink: 0;
+
+  img {
+    height: 18px;
+    width: auto;
+  }
 }
 
 .reference-text {
   font-size: 0.75rem;
   margin: 2px 0;
+  flex-grow: 1;
+  margin-left: 4px;
+  margin-right: 4px;
 }
 
 .reference-link {
-  color: var(--pubkey-text);
-  margin-left: 6px;
-  padding-left: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 1.8rem;
+  width: 2.4rem;
   text-decoration: none;
   border-left: 1px solid var(--border);
+  flex-shrink: 0;
+
+  & img {
+    height: 20px;
+    width: auto;
+  }
 }
 
 .zap-placeholder-name {
@@ -403,7 +417,6 @@ button {
 .zap-sender,
 .stats-item,
 .zap-details,
-.reference-content,
 .reference-link,
 .zap-reference {
   display: flex;
@@ -417,13 +430,6 @@ button {
   height: 32px;
   border-radius: 4px;
   position: relative;
-}
-
-/* 共通のリファレンス画像サイズ */
-.reference-icon img,
-.reference-link img {
-  height: 16px;
-  width: auto;
 }
 
 .load-more-trigger {
