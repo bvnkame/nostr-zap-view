@@ -12,7 +12,7 @@
   --dialog-bg: #ffffff;
   --zap-stats-bg: #edf2f7;
   --hover-bg: #edf2f7;
-  --border: #edf2f7;
+  --border: #ddd;
   --skeleton: #fdfdfd;
   --skeleton2: #e2e5ec;
   --zap-stats-skeleton-bg: #bbc5cf;
@@ -211,7 +211,7 @@ button {
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border);
-  padding: 2px 0;
+  padding: 4px 0;
 }
 
 .zap-content {
@@ -304,7 +304,7 @@ button {
 
 .zap-comment {
   font-size: 0.9375rem;
-  margin: 2px 0;
+  margin: 0;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   max-width: 100%;
