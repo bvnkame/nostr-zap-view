@@ -297,7 +297,7 @@ button {
 }
 
 .zap-details {
-  padding: 2px 0 4px 50px;
+  padding: 2px 6px 4px 6px;
   border-radius: 0 0 6px 6px;
   margin: 0;
 }
@@ -326,14 +326,14 @@ button {
 }
 
 .zap-reference {
-  padding: 0 0 2px 50px;
+  padding: 0 0 2px 12px;
   margin: 0;
   font-size: 0.875rem;
   color: var(--pubkey-text);
 }
 
 .reference-icon {
-  margin-right: 4px;
+  margin-right: 2px;
 }
 
 .reference-content {
