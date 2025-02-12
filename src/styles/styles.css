@@ -326,7 +326,7 @@ button {
 }
 
 .zap-reference {
-  padding: 0 0 2px 12px;
+  padding: 2px 0 2px 12px;
   margin: 0;
   font-size: 0.875rem;
   color: var(--pubkey-text);
@@ -346,7 +346,7 @@ button {
 
 .reference-text {
   font-size: 0.75rem;
-  margin: 2px;
+  margin: 0 2px;
   flex-grow: 1;
 }
 
@@ -354,8 +354,8 @@ button {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 1.8rem;
-  width: 2.4rem;
+  height: 1.6rem;
+  width: 2.6rem;
   text-decoration: none;
   border-left: 1px solid var(--border);
   flex-shrink: 0;
