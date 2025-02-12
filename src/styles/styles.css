@@ -336,7 +336,6 @@ button {
 }
 
 .reference-arrow {
-  margin-right: 2px;
   flex-shrink: 0;
 
   img {
@@ -347,10 +346,8 @@ button {
 
 .reference-text {
   font-size: 0.75rem;
-  margin: 2px 0;
+  margin: 2px;
   flex-grow: 1;
-  margin-left: 4px;
-  margin-right: 4px;
 }
 
 .reference-link {
