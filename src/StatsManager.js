@@ -104,7 +104,14 @@ export class StatsManager {
       return this.#initializationStatus.get(viewId);
     }
 
-    // キャッシュされた現在の統計情報をチェック
+    // naddrの場合は即座にtimeoutを返す
+    const decoded = safeNip19Decode(identifier);
+    if (decoded?.type === "naddr") {
+      const timeoutStats = this.createTimeoutError();
+      this.displayStats(timeoutStats, viewId);
+      this.#currentStats.set(viewId, timeoutStats);
+      return timeoutStats;
+    }
 
     const initPromise = (async () => {
       try {
