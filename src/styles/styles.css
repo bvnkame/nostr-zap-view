@@ -339,7 +339,7 @@ button {
   flex-shrink: 0;
 
   img {
-    height: 18px;
+    height: 16px;
     width: auto;
   }
 }
@@ -354,7 +354,7 @@ button {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 1.6rem;
+  height: 1.5rem;
   width: 2.6rem;
   text-decoration: none;
   border-left: 1px solid var(--border);
