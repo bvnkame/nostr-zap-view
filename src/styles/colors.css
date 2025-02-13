@@ -11,36 +11,108 @@
   border-radius: 6px 6px 0 0;
 }
 
+[class*="zap-amount-"] .zap-details {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 /* Amount-based Styles */
-.zap-amount-100 .zap-sender { background-color: var(--zap-100); }
-.zap-amount-200 .zap-sender { background-color: var(--zap-200); }
-.zap-amount-500 .zap-sender { background-color: var(--zap-500); }
-.zap-amount-1k .zap-sender { background-color: var(--zap-1k); }
-.zap-amount-2k .zap-sender { background-color: var(--zap-2k); }
-.zap-amount-5k .zap-sender { background-color: var(--zap-5k); }
-.zap-amount-10k .zap-sender { background-color: var(--zap-10k); }
+.zap-amount-100 .zap-sender {
+  background-color: var(--zap-100);
+}
+
+.zap-amount-200 .zap-sender {
+  background-color: var(--zap-200);
+}
+
+.zap-amount-500 .zap-sender {
+  background-color: var(--zap-500);
+}
+
+.zap-amount-1k .zap-sender {
+  background-color: var(--zap-1k);
+}
+
+.zap-amount-2k .zap-sender {
+  background-color: var(--zap-2k);
+}
+
+.zap-amount-5k .zap-sender {
+  background-color: var(--zap-5k);
+}
+
+.zap-amount-10k .zap-sender {
+  background-color: var(--zap-10k);
+}
 
 /* Details Background Colors */
-.zap-amount-100 .zap-details { background-color: var(--zap-100-light); }
-.zap-amount-200 .zap-details { background-color: var(--zap-200-light); }
-.zap-amount-500 .zap-details { background-color: var(--zap-500-light); }
-.zap-amount-1k .zap-details { background-color: var(--zap-1k-light); }
-.zap-amount-2k .zap-details { background-color: var(--zap-2k-light); }
-.zap-amount-5k .zap-details { background-color: var(--zap-5k-light); }
-.zap-amount-10k .zap-details { background-color: var(--zap-10k-light); }
+.zap-amount-100 .zap-details {
+  background-color: var(--zap-100-light);
+}
+
+.zap-amount-200 .zap-details {
+  background-color: var(--zap-200-light);
+}
+
+.zap-amount-500 .zap-details {
+  background-color: var(--zap-500-light);
+}
+
+.zap-amount-1k .zap-details {
+  background-color: var(--zap-1k-light);
+}
+
+.zap-amount-2k .zap-details {
+  background-color: var(--zap-2k-light);
+}
+
+.zap-amount-5k .zap-details {
+  background-color: var(--zap-5k-light);
+}
+
+.zap-amount-10k .zap-details {
+  background-color: var(--zap-10k-light);
+}
 
 /* Dark Text Colors */
-.zap-amount-100, .zap-amount-2k, .zap-amount-5k, .zap-amount-10k {
-  .zap-amount { color: var(--text-light); }
-  .sender-name { color: var(--text-light-secondary); }
-  .sender-pubkey { color: var(--text-light-tertiary); }
-  .zap-comment { color: var(--text-light); }
+.zap-amount-100,
+.zap-amount-2k,
+.zap-amount-5k,
+.zap-amount-10k {
+  .zap-amount {
+    color: var(--text-light);
+  }
+
+  .sender-name {
+    color: var(--text-light-secondary);
+  }
+
+  .sender-pubkey {
+    color: var(--text-light-tertiary);
+  }
+
+  .zap-comment {
+    color: var(--text-light);
+  }
 }
 
 /* Light Text Colors */
-.zap-amount-200, .zap-amount-500, .zap-amount-1k {
-  .zap-amount { color: var(--text-dark); }
-  .sender-name { color: var(--text-dark-secondary); }
-  .sender-pubkey { color: var(--text-dark-tertiary); }
-  .zap-comment { color: var(--text-dark); }
+.zap-amount-200,
+.zap-amount-500,
+.zap-amount-1k {
+  .zap-amount {
+    color: var(--text-dark);
+  }
+
+  .sender-name {
+    color: var(--text-dark-secondary);
+  }
+
+  .sender-pubkey {
+    color: var(--text-dark-tertiary);
+  }
+
+  .zap-comment {
+    color: var(--text-dark);
+  }
 }

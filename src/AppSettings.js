@@ -45,7 +45,7 @@ export const APP_CONFIG = {
       { value: 200, className: "zap-amount-200" },
       { value: 100, className: "zap-amount-100" },
     ],
-    DEFAULT_CLASS: "zap-amount-default",
+    DEFAULT_CLASS: "default-color",
     DISABLED_CLASS: "",
   },
   DIALOG_CONFIG: {
