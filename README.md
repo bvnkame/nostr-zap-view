@@ -1,7 +1,7 @@
 # nostr-zap-view
 [![NPM](https://img.shields.io/npm/v/nostr-zap-view.svg)](https://www.npmjs.com/package/nostr-zap-view)
 
-View any nostr zaps from anywhere, supporting npub, nprofile, note, and nevent identifiers.
+View any Nostr Zaps from anywhere, supporting npub, nprofile, note, nevent, and naddr identifiers.
 
 Example page: https://lokuyow.github.io/nostr-zap-view/
 
@@ -10,7 +10,7 @@ Example page: https://lokuyow.github.io/nostr-zap-view/
 To configure a button for displaying zap information, use the following attributes:
 
 - `data-title`: (Optional) Custom title for the zap dialog. If left empty, the identifier will be used as the title.
-- `data-nzv-id`: The Nostr identifier (npub, nprofile, note, or nevent) for which zap information will be displayed.
+- `data-nzv-id`: The Nostr identifier (npub, nprofile, note, nevent or naddr) for which zap information will be displayed.
 - `data-zap-color-mode`: (Optional) Enable or disable color mode for zap amounts. Set to "true" to enable and "false" to disable.
 - `data-relay-urls`: Comma-separated list of relay URLs to fetch zap information from.
 
