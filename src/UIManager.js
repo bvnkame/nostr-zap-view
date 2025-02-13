@@ -189,7 +189,6 @@ class NostrZapViewDialog extends HTMLElement {
       return;
     }
 
-    history.pushState({ dialogOpen: true }, "");
     window.addEventListener("popstate", this.popStateHandler);
 
     dialog.showModal();
